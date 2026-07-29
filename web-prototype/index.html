@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TradingNote Analytics</title>
+    <link rel="stylesheet" href="styles.css?v=20260727-1" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">TN</div>
+        <div>
+          <strong>TradingNote</strong>
+          <span>Performance OS</span>
+        </div>
+      </div>
+      <nav aria-label="主要導覽">
+        <a class="active" href="#dashboard" data-page-link="dashboard"><span aria-hidden="true">⌂</span>績效總覽</a>
+        <a href="#objectives" data-page-link="objectives"><span aria-hidden="true">◉</span>挑戰目標</a>
+        <a href="#analytics" data-page-link="analytics"><span aria-hidden="true">⌁</span>深度分析</a>
+        <a href="#review" data-page-link="review"><span aria-hidden="true">◎</span>交易複盤</a>
+        <a href="#period" data-page-link="period"><span aria-hidden="true">▦</span>週月績效</a>
+        <a href="#trades" data-page-link="trades"><span aria-hidden="true">≡</span>交易紀錄</a>
+        <a href="#checklist" data-page-link="checklist"><span aria-hidden="true">✓</span>交易檢查</a>
+        <a href="#calculator" data-page-link="calculator"><span aria-hidden="true">％</span>風控計算</a>
+      </nav>
+    </aside>
+
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Excel import · TradingNote_20251021</p>
+          <h1 id="pageTitle">交易績效儀表板</h1>
+        </div>
+        <div class="actions">
+          <button id="themeToggle" class="icon-button" title="切換明暗模式">◐</button>
+          <button id="exportCsvButton" class="ghost-button">匯出 CSV</button>
+          <button id="newTradeButton" class="primary-button">＋新增交易</button>
+        </div>
+      </header>
+
+      <section class="filters" aria-label="篩選條件">
+        <label>
+          年度
+          <select id="yearFilter"></select>
+        </label>
+        <label>
+          商品
+          <select id="pairFilter"></select>
+        </label>
+        <label>
+          結果
+          <select id="outcomeFilter">
+            <option value="all">全部結果</option>
+            <option value="win">獲利</option>
+            <option value="loss">虧損</option>
+            <option value="be">損益兩平</option>
+          </select>
+        </label>
+        <label>
+          期間
+          <select id="windowFilter">
+            <option value="all">所有交易</option>
+            <option value="week">本週</option>
+            <option value="month">本月</option>
+            <option value="7">最近 7 筆</option>
+            <option value="30">最近 30 筆</option>
+            <option value="90">最近 90 筆</option>
+          </select>
+        </label>
+        <div class="filter-meta">
+          <span id="filterSummary" aria-live="polite">顯示全部交易</span>
+          <button id="resetFiltersButton" class="text-button" type="button">重設篩選</button>
+        </div>
+      </section>
+
+      <section id="dashboard" class="page active" data-page="dashboard">
+        <section class="metric-grid" aria-label="Key metrics">
+          <article class="metric">
+            <span>總損益</span>
+            <strong id="totalProfit">$0</strong>
+            <small id="avgProfit">Avg $0 / trade</small>
+            <em id="profitTrend" class="trend-comparisons">—</em>
+          </article>
+          <article class="metric">
+            <span>總 R 倍數</span>
+            <strong id="totalR">0R</strong>
+            <small id="avgR">Avg 0R / trade</small>
+            <em id="rTrend" class="trend-comparisons">—</em>
+          </article>
+          <article class="metric">
+            <span>勝率</span>
+            <strong id="winRate">0%</strong>
+            <small id="tradeCount">0 trades</small>
+            <em id="winTrend" class="trend-comparisons">—</em>
+          </article>
+          <article class="metric danger">
+            <span>最大回撤</span>
+            <strong id="maxDd">0R</strong>
+            <small id="lossStreak">0 loss streak</small>
+            <em id="ddTrend" class="trend-comparisons">—</em>
+          </article>
+        </section>
+
+        <section class="insight-grid" aria-label="Advanced metrics">
+          <article class="insight">
+            <span>獲利因子 <i class="stat-help" title="總獲利 R ÷ 總虧損 R；大於 1 表示整體具正收益。">?</i></span>
+            <strong id="profitFactor">0.00</strong>
+          </article>
+          <article class="insight">
+            <span>期望值 <i class="stat-help" title="平均每筆交易可獲得的 R 倍數。">?</i></span>
+            <strong id="expectancy">0.00R</strong>
+          </article>
+          <article class="insight">
+            <span>平均獲利 <i class="stat-help" title="所有獲利交易的平均 R 倍數。">?</i></span>
+            <strong id="averageWin">0.00R</strong>
+          </article>
+          <article class="insight">
+            <span>平均虧損 <i class="stat-help" title="所有虧損交易的平均 R 倍數。">?</i></span>
+            <strong id="averageLoss">0.00R</strong>
+          </article>
+          <article class="insight">
+            <span>最佳商品</span>
+            <strong id="bestPair">-</strong>
+          </article>
+          <article class="insight">
+            <span>最弱商品</span>
+            <strong id="worstPair">-</strong>
+          </article>
+        </section>
+
+        <section class="panel-grid">
+          <section class="panel chart-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>權益曲線</h2>
+                <p>以 R 值累積，快速看策略波動。</p>
+              </div>
+              <span id="chartBadge">All trades</span>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="equityChart" width="920" height="360" aria-label="累積 R 權益曲線"></canvas>
+              <span id="chartCrosshairX" class="chart-crosshair crosshair-x" hidden></span>
+              <span id="chartCrosshairY" class="chart-crosshair crosshair-y" hidden></span>
+              <div id="equityTooltip" class="chart-tooltip" hidden></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>商品分布</h2>
+                <p>交易商品分布與勝率。</p>
+              </div>
+            </div>
+            <div id="pairBars" class="bars"></div>
+          </section>
+        </section>
+      </section>
+
+      <section id="objectives" class="page" data-page="objectives">
+        <section class="objective-hero panel">
+          <div>
+            <p class="eyebrow">ACCOUNT METRIX</p>
+            <h2>挑戰帳戶控制台</h2>
+            <p>即時計算獲利目標、每日虧損、最大虧損、交易日與一致性。</p>
+          </div>
+          <span id="challengeStatus" class="challenge-status">設定中</span>
+        </section>
+
+        <section class="objective-layout">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>帳戶規則</h2>
+                <p>可依不同 Prop Firm 與挑戰方案自行調整。</p>
+              </div>
+            </div>
+            <form id="accountRulesForm" class="rules-form">
+              <label>帳戶名稱 <input id="accountNameInput" type="text" maxlength="40" value="FTMO Challenge" /></label>
+              <label>帳戶階段
+                <select id="accountPhaseInput">
+                  <option value="challenge">Challenge</option>
+                  <option value="verification">Verification</option>
+                  <option value="funded">Funded</option>
+                </select>
+              </label>
+              <label>初始資金 <input id="initialBalanceInput" type="number" min="1" step="1000" value="100000" /></label>
+              <label>獲利目標 % <input id="profitTargetInput" type="number" min="0" max="100" step="0.1" value="10" /></label>
+              <label>每日最大虧損 % <input id="dailyLossInput" type="number" min="0.1" max="100" step="0.1" value="5" /></label>
+              <label>總最大虧損 % <input id="maxLossInput" type="number" min="0.1" max="100" step="0.1" value="10" /></label>
+              <label>最低交易日 <input id="minimumDaysInput" type="number" min="0" max="100" value="4" /></label>
+              <label>最大虧損模式
+                <select id="lossModeInput">
+                  <option value="static">固定基準</option>
+                  <option value="trailing">日結餘額追蹤</option>
+                </select>
+              </label>
+              <button class="primary-button full" type="submit">儲存帳戶規則</button>
+            </form>
+          </section>
+
+          <section class="objective-board">
+            <div id="objectiveCards" class="objective-cards"></div>
+            <section class="panel risk-monitor">
+              <div class="panel-heading">
+                <div>
+                  <h2>今日風險空間</h2>
+                  <p id="riskMonitorDate">依最新交易日計算</p>
+                </div>
+                <strong id="riskMonitorLabel">SAFE</strong>
+              </div>
+              <div id="dailyRiskGauge" class="risk-gauge"><span></span></div>
+              <div id="riskMonitorStats" class="risk-monitor-stats"></div>
+            </section>
+          </section>
+        </section>
+
+        <section class="objective-secondary">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Best Day Rule</h2>
+                <p>最佳獲利日占所有正收益日的比例。</p>
+              </div>
+              <strong id="bestDayStatus" class="rule-status">—</strong>
+            </div>
+            <div id="bestDayRule" class="best-day-rule"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>FTMO 式紀律分數</h2>
+                <p>衡量結果是否過度集中在單一交易日。</p>
+              </div>
+            </div>
+            <div id="ftmoDiscipline" class="ftmo-discipline"></div>
+          </section>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h2>每日摘要</h2>
+              <p>每日交易數、手數、損益、R 與風險狀態。</p>
+            </div>
+          </div>
+          <div class="table-wrap objective-table-wrap">
+            <table class="daily-summary-table">
+              <thead>
+                <tr>
+                  <th>日期</th>
+                  <th>交易數</th>
+                  <th>手數</th>
+                  <th>損益</th>
+                  <th>R</th>
+                  <th>日內回撤</th>
+                  <th>狀態</th>
+                </tr>
+              </thead>
+              <tbody id="dailySummaryRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="analytics" class="page" data-page="analytics">
+        <section class="analytics-grid">
+          <section class="panel analytics-chart">
+            <div class="panel-heading">
+              <div>
+                <h2>累積淨利</h2>
+                <p id="profitChartSub">依結算時間累積，支援 P/L 與 ROI 走勢切換。</p>
+              </div>
+              <div class="segmented" role="group" aria-label="Profit chart mode">
+                <button class="active" type="button" data-profit-mode="profit">累積淨利</button>
+                <button type="button" data-profit-mode="roi">ROI 走勢</button>
+              </div>
+            </div>
+            <canvas id="profitChart" width="920" height="360"></canvas>
+          </section>
+
+          <aside class="panel key-metrics">
+            <div class="panel-heading">
+              <div>
+                <h2>關鍵指標</h2>
+                <p>用交易版語言看整體狀態。</p>
+              </div>
+            </div>
+            <div id="analyticsMetrics" class="analytics-metrics"></div>
+          </aside>
+        </section>
+
+        <section class="panel edge-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>運氣 vs 實力</h2>
+              <p>實際 R 曲線 vs 期望值與 ±2σ 運氣帶。</p>
+            </div>
+          </div>
+          <div id="edgeSummary" class="edge-summary"></div>
+          <canvas id="edgeChart" width="1280" height="420"></canvas>
+          <p class="chart-note">以目前篩選後的勝率與平均贏/輸 R 估算，這是自我複盤工具，不是投資建議。</p>
+        </section>
+
+        <section class="behavior-grid">
+          <section class="panel">
+            <div class="panel-heading"><div><h2>多空方向</h2><p>比較 Long 與 Short 的交易優勢。</p></div></div>
+            <div id="directionAnalysis" class="breakdown-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading"><div><h2>交易時段</h2><p>找出績效最好的進場時段。</p></div></div>
+            <div id="hourAnalysis" class="breakdown-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading"><div><h2>星期績效</h2><p>辨識一週中的強勢與弱勢日。</p></div></div>
+            <div id="weekdayAnalysis" class="breakdown-list"></div>
+          </section>
+        </section>
+      </section>
+
+      <section id="review" class="page" data-page="review">
+        <section class="review-grid">
+          <section class="panel heatmap-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>交易日曆</h2>
+                <p id="calendarSummary">按日期看每天的 R 與交易量。</p>
+              </div>
+            </div>
+            <div id="calendarHeatmap" class="calendar-heatmap"></div>
+          </section>
+
+          <section class="panel discipline-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>紀律分數</h2>
+                <p>用 checklist 與 lesson 關鍵字推估執行品質。</p>
+              </div>
+            </div>
+            <div id="disciplineScore" class="discipline-score"></div>
+            <div id="disciplineBreakdown" class="discipline-breakdown"></div>
+          </section>
+
+          <section class="panel mistake-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>錯誤與學習分析</h2>
+                <p>把 Lesson Learn 自動分類，看哪些問題最傷 R。</p>
+              </div>
+            </div>
+            <div id="mistakeRows" class="mistake-list"></div>
+          </section>
+
+          <section class="panel weekly-report-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>每週自動報告</h2>
+                <p>自動整理本週結果、最佳/最差交易與下週焦點。</p>
+              </div>
+            </div>
+            <div id="weeklyReport" class="weekly-report"></div>
+            <div id="actionItems" class="action-items"></div>
+          </section>
+        </section>
+      </section>
+
+      <section id="period" class="page" data-page="period">
+        <section class="period-grid" aria-label="Period analysis">
+          <article class="panel period-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>本週績效</h2>
+                <p id="weekRange">-</p>
+              </div>
+            </div>
+            <div id="weekStats" class="period-stats"></div>
+          </article>
+          <article class="panel period-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>本月績效</h2>
+                <p id="monthRange">-</p>
+              </div>
+            </div>
+            <div id="monthStats" class="period-stats"></div>
+          </article>
+          <article class="panel period-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>每月績效</h2>
+                <p>按月份拆解 R、P/L、勝率與交易次數。</p>
+              </div>
+            </div>
+            <div id="monthlyRows" class="month-list"></div>
+          </article>
+        </section>
+      </section>
+
+      <section id="trades" class="page" data-page="trades">
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h2>交易紀錄</h2>
+              <p>點擊任一筆交易可以看完整細節與賽後筆記。</p>
+            </div>
+            <div class="trade-tools">
+              <input id="searchInput" type="search" placeholder="搜尋商品、策略或筆記" aria-label="搜尋交易" />
+              <label class="file-button" for="importFileInput">合併匯入</label>
+              <input id="importFileInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv,.json" />
+              <label class="file-button danger-button" for="replaceFileInput" title="備份後，以新 Excel／CSV 完整取代目前資料">取代來源</label>
+              <input id="replaceFileInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv" />
+              <button id="exportJsonButton" class="ghost-button" type="button">完整備份</button>
+            </div>
+          </div>
+          <div id="tradeEmptyState" class="empty-state page-empty" hidden>
+            <strong>沒有符合條件的交易</strong>
+            <span>請重設篩選，或匯入 Excel、CSV、JSON 資料。</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>商品</th>
+                  <th>結果</th>
+                  <th>損益</th>
+                  <th>R 倍數</th>
+                  <th>手數</th>
+                  <th>止損點數</th>
+                  <th>Entry</th>
+                  <th>SL</th>
+                  <th>TP</th>
+                  <th>策略</th>
+                  <th>來源</th>
+                </tr>
+              </thead>
+              <tbody id="tradeRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="checklist" class="page" data-page="checklist">
+        <section class="panel single-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>交易前檢查表</h2>
+              <p>必要條件沒過，交易狀態會顯示 NO TRADE。</p>
+            </div>
+            <span id="checklistScore" class="score-badge">0/0</span>
+          </div>
+          <div id="checklistItems" class="checklist"></div>
+          <div id="tradeGate" class="trade-gate">NO TRADE</div>
+        </section>
+      </section>
+
+      <section id="calculator" class="page" data-page="calculator">
+        <section class="panel single-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>風控手數計算</h2>
+              <p>資金、風險、SL 轉成建議手數。</p>
+            </div>
+          </div>
+          <div class="calc">
+            <label>Account <input id="accountInput" type="number" value="200000" /></label>
+            <label>Risk % <input id="riskInput" type="number" value="0.5" step="0.1" /></label>
+            <label>SL pips <input id="slInput" type="number" value="50" /></label>
+            <label>Pip value <input id="pipInput" type="number" value="1" step="0.1" /></label>
+            <output id="calcOutput">0 lots</output>
+          </div>
+        </section>
+
+        <section class="panel single-panel return-simulator">
+          <div class="panel-heading">
+            <div>
+              <h2>100 筆交易報酬模擬</h2>
+              <p>依照勝率、每筆風險與平均盈虧比，隨機模擬資金曲線；每次重跑都會產生不同順序。</p>
+            </div>
+            <button id="useJournalStatsButton" class="ghost-button" type="button">帶入日誌數據</button>
+          </div>
+          <form id="returnSimulatorForm" class="simulator-inputs">
+            <label>起始資金
+              <input id="simBalanceInput" type="number" min="1" step="100" value="100000" required />
+            </label>
+            <label>每筆風險 %
+              <input id="simRiskInput" type="number" min="0.01" max="100" step="0.1" value="1" required />
+            </label>
+            <label>平均盈虧比
+              <input id="simRewardInput" type="number" min="0.01" step="0.1" value="1.5" required />
+            </label>
+            <label>勝率 %
+              <input id="simWinRateInput" type="number" min="0" max="100" step="0.1" value="50" required />
+            </label>
+            <label>模擬筆數
+              <input id="simTradesInput" type="number" min="10" max="1000" step="10" value="100" required />
+            </label>
+            <button class="primary-button simulator-run" type="submit">重新模擬</button>
+          </form>
+          <div id="simulationMetrics" class="simulation-metrics"></div>
+          <div class="simulation-chart-wrap">
+            <div class="chart-legend"><span><i></i>帳戶報酬率</span><strong id="simulationFormula"></strong></div>
+            <canvas id="simulationChart" aria-label="模擬交易資金曲線"></canvas>
+          </div>
+          <p class="simulation-note">此結果是隨機情境，不是獲利保證；實際交易還會受到滑價、手續費、連續虧損與執行差異影響。</p>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="tradeDialog" class="modal">
+      <form id="tradeForm" method="dialog">
+        <input name="localId" type="hidden" />
+        <input name="baseKey" type="hidden" />
+        <div class="modal-heading">
+          <div>
+            <h2 id="tradeDialogTitle">新增交易</h2>
+            <p id="tradeDialogSubtitle">記錄核心欄位，資料會保存在這個瀏覽器。</p>
+          </div>
+          <button class="icon-button" value="cancel" type="button" id="closeTradeDialog">×</button>
+        </div>
+        <div class="form-grid">
+          <label>年度 <input name="year" type="number" min="2000" max="2100" value="2026" required /></label>
+          <label>日期 <input name="date" type="date" required /></label>
+          <label>Time <input name="time" type="time" /></label>
+          <label>商品 <input name="pair" type="text" maxlength="20" value="NAS100" required /></label>
+          <label>Direction
+            <select name="direction">
+              <option>Long</option>
+              <option>Short</option>
+            </select>
+          </label>
+          <label>Outcome
+            <select name="outcome">
+              <option value="win">Win</option>
+              <option value="loss">Loss</option>
+              <option value="be">BE</option>
+            </select>
+          </label>
+          <label>損益 <input name="profit" type="number" step="0.01" min="-10000000" max="10000000" required /></label>
+          <label>R 倍數
+            <input name="r" type="number" step="any" min="-100" max="100" required />
+            <small class="form-hint" id="rFormulaHint">自動計算：損益 ÷（手數 × 止損點數）</small>
+          </label>
+          <label>手數 <input name="lots" type="number" step="0.01" min="0" max="100000" /></label>
+          <label>入場價格 Entry <input name="entry" type="number" step="any" /></label>
+          <label>止損價格 SL <input name="stopLoss" type="number" step="any" /></label>
+          <label>實際出場價格
+            <input name="exitPrice" type="number" step="any" />
+            <small class="form-hint">獲利時記錄；虧損時可留空。</small>
+          </label>
+          <label>止損點數
+            <input name="slPips" type="number" step="any" min="0" max="100000" />
+            <small class="form-hint" id="slFormulaHint">自動計算：ABS（Entry − SL）</small>
+          </label>
+          <label class="full">Setup <input name="setup" type="text" placeholder="AOI rejection, breakout, pullback..." /></label>
+          <label class="full">Review <textarea name="review" rows="4" placeholder="進場理由、情緒、錯誤、下次要注意什麼"></textarea></label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="ghost-button danger-button" id="clearLocalTrades">清除本機資料</button>
+          <button type="submit" class="primary-button" id="saveTradeButton">儲存交易</button>
+        </div>
+      </form>
+    </dialog>
+
+    <aside id="detailDrawer" class="drawer" aria-hidden="true">
+      <button id="closeDrawer" class="icon-button drawer-close" title="關閉">×</button>
+      <div id="detailContent"></div>
+    </aside>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script src="xlsx.full.min.js"></script>
+    <script src="data/trades.js"></script>
+    <script src="app.js?v=20260727-1"></script>
+  </body>
+</html>
