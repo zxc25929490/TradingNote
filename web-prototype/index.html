@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TradingNote Analytics</title>
-    <link rel="stylesheet" href="styles.css?v=20260727-1" />
+    <link rel="stylesheet" href="styles.css?v=20260727-6" />
   </head>
   <body>
     <aside class="sidebar">
@@ -376,6 +376,7 @@
               </div>
             </div>
             <div id="weekStats" class="period-stats"></div>
+            <div id="weeklyBreakdown" class="week-list"></div>
           </article>
           <article class="panel period-panel">
             <div class="panel-heading">
@@ -409,6 +410,7 @@
               <input id="searchInput" type="search" placeholder="搜尋商品、策略或筆記" aria-label="搜尋交易" />
               <label class="file-button" for="importFileInput">合併匯入</label>
               <input id="importFileInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv,.json" />
+              <button id="toggleReviewsButton" class="ghost-button" type="button" aria-pressed="false">展開 Review</button>
               <label class="file-button danger-button" for="replaceFileInput" title="備份後，以新 Excel／CSV 完整取代目前資料">取代來源</label>
               <input id="replaceFileInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv" />
               <button id="exportJsonButton" class="ghost-button" type="button">完整備份</button>
@@ -513,6 +515,12 @@
       <form id="tradeForm" method="dialog">
         <input name="localId" type="hidden" />
         <input name="baseKey" type="hidden" />
+        <div class="trade-command-strip" aria-hidden="true">
+          <span class="signal-pill" id="tradeOutcomePulse">READY</span>
+          <span class="signal-line"></span>
+          <span class="signal-readout" id="tradeRiskPreview">R pending</span>
+          <span class="signal-readout" id="tradeSessionClock">Manual entry</span>
+        </div>
         <div class="modal-heading">
           <div>
             <h2 id="tradeDialogTitle">新增交易</h2>
@@ -573,6 +581,6 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
-    <script src="app.js?v=20260727-1"></script>
+    <script src="app.js?v=20260727-4"></script>
   </body>
 </html>

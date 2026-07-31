@@ -2,6 +2,9 @@ const importedTrades = window.TRADES || [];
 const STORAGE_KEY = "tradingnote.localTrades";
 const DELETED_KEY = "tradingnote.deletedTrades";
 const ACCOUNT_RULES_KEY = "tradingnote.accountRules";
+const THEME_KEY = "tradingnote.theme";
+
+applyStoredTheme();
 
 let localTrades = loadLocalTrades();
 let deletedTrades = loadDeletedTrades();
@@ -9,6 +12,9 @@ let trades = mergeTrades();
 let currentDetailId = null;
 let toastTimer = null;
 let accountRules = loadAccountRules();
+let selectedPeriodMonth = monthKey(new Date());
+let selectedPeriodWeekStart = null;
+let reviewsExpanded = false;
 
 const els = {
   year: document.querySelector("#yearFilter"),
@@ -74,6 +80,7 @@ const els = {
   weeklyReport: document.querySelector("#weeklyReport"),
   actionItems: document.querySelector("#actionItems"),
   weekRange: document.querySelector("#weekRange"),
+  weeklyBreakdown: document.querySelector("#weeklyBreakdown"),
   monthRange: document.querySelector("#monthRange"),
   weekStats: document.querySelector("#weekStats"),
   monthStats: document.querySelector("#monthStats"),
@@ -113,10 +120,14 @@ const els = {
   importFile: document.querySelector("#importFileInput"),
   replaceFile: document.querySelector("#replaceFileInput"),
   exportJson: document.querySelector("#exportJsonButton"),
+  toggleReviews: document.querySelector("#toggleReviewsButton"),
   tradeEmpty: document.querySelector("#tradeEmptyState"),
   dialogTitle: document.querySelector("#tradeDialogTitle"),
   dialogSubtitle: document.querySelector("#tradeDialogSubtitle"),
   saveTrade: document.querySelector("#saveTradeButton"),
+  tradeOutcomePulse: document.querySelector("#tradeOutcomePulse"),
+  tradeRiskPreview: document.querySelector("#tradeRiskPreview"),
+  tradeSessionClock: document.querySelector("#tradeSessionClock"),
   toast: document.querySelector("#toast"),
   drawer: document.querySelector("#detailDrawer"),
   detail: document.querySelector("#detailContent"),
@@ -200,6 +211,11 @@ function saveLocalTrades() {
 
 function saveAccountRules() {
   localStorage.setItem(ACCOUNT_RULES_KEY, JSON.stringify(accountRules));
+}
+
+function applyStoredTheme() {
+  const theme = localStorage.getItem(THEME_KEY) || "dark";
+  document.body.classList.toggle("dark", theme !== "light");
 }
 
 function populateAccountRulesForm() {
@@ -306,6 +322,23 @@ function animateMetric(element, target, formatter) {
     if (progress < 1) metricAnimations.set(element, requestAnimationFrame(tick));
   };
   metricAnimations.set(element, requestAnimationFrame(tick));
+}
+
+function attachRippleFeedback() {
+  document.addEventListener("pointerdown", (event) => {
+    const target = event.target.closest("button, .file-button");
+    if (!target || target.disabled || !motionAllowed) return;
+    const rect = target.getBoundingClientRect();
+    const ripple = document.createElement("span");
+    const size = Math.max(rect.width, rect.height) * 1.35;
+    ripple.className = "button-ripple";
+    ripple.style.width = `${size}px`;
+    ripple.style.height = `${size}px`;
+    ripple.style.left = `${event.clientX - rect.left - size / 2}px`;
+    ripple.style.top = `${event.clientY - rect.top - size / 2}px`;
+    target.appendChild(ripple);
+    ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
+  });
 }
 
 function parseTradeDate(trade) {
@@ -732,10 +765,11 @@ function renderMetrics(items) {
   els.tradeCount.textContent = `${items.length} trades`;
   animateMetric(els.maxDd, stats.maxDd, (value) => signed(value, "R"));
   els.lossStreak.textContent = `${stats.worstLoss} max loss streak`;
-  els.profitFactor.textContent = Number.isFinite(stats.profitFactor) ? stats.profitFactor.toFixed(2) : "∞";
-  els.expectancy.textContent = signed(stats.expectancy, "R");
-  els.averageWin.textContent = signed(stats.averageWin, "R");
-  els.averageLoss.textContent = signed(stats.averageLoss, "R");
+  if (Number.isFinite(stats.profitFactor)) animateMetric(els.profitFactor, stats.profitFactor, (value) => value.toFixed(2));
+  else els.profitFactor.textContent = "∞";
+  animateMetric(els.expectancy, stats.expectancy, (value) => signed(value, "R"));
+  animateMetric(els.averageWin, stats.averageWin, (value) => signed(value, "R"));
+  animateMetric(els.averageLoss, stats.averageLoss, (value) => signed(value, "R"));
   els.bestPair.textContent = stats.bestPair ? `${stats.bestPair.pair} ${signed(stats.bestPair.r, "R")}` : "-";
   els.worstPair.textContent = stats.worstPair ? `${stats.worstPair.pair} ${signed(stats.worstPair.r, "R")}` : "-";
   els.chartBadge.textContent = `${items.length} trades`;
@@ -840,8 +874,14 @@ function renderChart(items) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--accent");
-  ctx.lineWidth = 3;
+  const accent = getComputedStyle(document.body).getPropertyValue("--accent");
+  const accent2 = getComputedStyle(document.body).getPropertyValue("--accent-2");
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 5;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 14;
   ctx.beginPath();
   points.forEach((point, index) => {
     const x = px(index);
@@ -850,9 +890,18 @@ function renderChart(items) {
     else ctx.lineTo(x, y);
   });
   ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = accent;
+  ctx.stroke();
 
-  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--accent-2");
   const last = points.at(-1);
+  ctx.strokeStyle = accent2;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(px(last.x), py(last.y), 9, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = accent2;
   ctx.beginPath();
   ctx.arc(px(last.x), py(last.y), 5, 0, Math.PI * 2);
   ctx.fill();
@@ -1062,7 +1111,52 @@ function renderPeriodStats(target, items) {
     .join("");
 }
 
-function renderMonthlyRows() {
+function tradesForMonth(key) {
+  return trades.filter((trade) => {
+    const date = parseTradeDate(trade);
+    return date && monthKey(date) === key;
+  });
+}
+
+function getWeekRows(monthItems) {
+  const grouped = new Map();
+  for (const trade of monthItems) {
+    const date = parseTradeDate(trade);
+    if (!date) continue;
+    const range = getWeekRange(date);
+    const key = isoDate(range.start);
+    const bucket = grouped.get(key) || { start: range.start, end: range.end, items: [] };
+    bucket.items.push(trade);
+    grouped.set(key, bucket);
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => a.start - b.start);
+}
+
+function renderWeeklyBreakdown(rows) {
+  if (!rows.length) {
+    els.weeklyBreakdown.innerHTML = `<div class="empty-state">這個月份沒有可拆解的週績效。</div>`;
+    return;
+  }
+
+  els.weeklyBreakdown.innerHTML = rows
+    .map((row) => {
+      const stats = computeStats(row.items);
+      const weekKey = isoDate(row.start);
+      const active = weekKey === selectedPeriodWeekStart ? " active" : "";
+      return `
+        <div class="week-row${active}" role="button" tabindex="0" data-week="${weekKey}" aria-pressed="${weekKey === selectedPeriodWeekStart}">
+          <div>
+            <strong>${isoDate(row.start)} ~ ${isoDate(row.end)}</strong>
+            <span>${row.items.length} trades · ${stats.winRate.toFixed(0)}% WR · ${money(stats.totalProfit)}</span>
+          </div>
+          <strong class="${stats.totalR >= 0 ? "profit-pos" : "profit-neg"}">${signed(stats.totalR, "R")}</strong>
+        </div>`;
+    })
+    .join("");
+}
+
+function getMonthlyRows() {
   const grouped = new Map();
   for (const trade of trades) {
     const date = parseTradeDate(trade);
@@ -1073,20 +1167,43 @@ function renderMonthlyRows() {
     grouped.set(key, bucket);
   }
 
-  const rows = Array.from(grouped.entries())
+  return Array.from(grouped.entries())
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([key, items]) => {
       const stats = computeStats(items);
       return { key, items, stats };
     });
+}
+
+function ensureSelectedPeriodMonth(rows) {
+  if (!rows.length) {
+    selectedPeriodMonth = monthKey(new Date());
+  } else if (!rows.some((row) => row.key === selectedPeriodMonth)) {
+    selectedPeriodMonth = rows[0].key;
+  }
+}
+
+function ensureSelectedPeriodWeek(rows) {
+  const currentWeek = getWeekRange(new Date());
+  const currentWeekKey = isoDate(currentWeek.start);
+  if (!rows.length) {
+    selectedPeriodWeekStart = null;
+  } else if (!rows.some((row) => isoDate(row.start) === selectedPeriodWeekStart)) {
+    const defaultWeek = rows.find((row) => isoDate(row.start) === currentWeekKey) || rows.at(-1);
+    selectedPeriodWeekStart = isoDate(defaultWeek.start);
+  }
+}
+
+function renderMonthlyRows(rows) {
   const maxAbsR = Math.max(...rows.map((row) => Math.abs(row.stats.totalR)), 1);
 
   els.monthlyRows.innerHTML = rows
     .map((row) => {
       const width = Math.max(4, (Math.abs(row.stats.totalR) / maxAbsR) * 100);
       const fillClass = row.stats.totalR < 0 ? "loss-fill" : "";
+      const active = row.key === selectedPeriodMonth ? " active" : "";
       return `
-        <div class="month-row">
+        <div class="month-row${active}" role="button" tabindex="0" data-month="${row.key}" aria-pressed="${row.key === selectedPeriodMonth}">
           <strong>${row.key}</strong>
           <div>
             <div class="month-track"><div class="month-fill ${fillClass}" style="width:${width}%"></div></div>
@@ -1099,20 +1216,20 @@ function renderMonthlyRows() {
 }
 
 function renderPeriodAnalysis() {
-  const now = new Date();
-  const { start, end } = getWeekRange(now);
-  const currentMonth = monthKey(now);
-  const weekItems = trades.filter((trade) => inRange(trade, start, end));
-  const monthItems = trades.filter((trade) => {
-    const date = parseTradeDate(trade);
-    return date && monthKey(date) === currentMonth;
-  });
+  const monthlyRows = getMonthlyRows();
+  ensureSelectedPeriodMonth(monthlyRows);
+  const monthItems = tradesForMonth(selectedPeriodMonth);
+  const weekRows = getWeekRows(monthItems);
+  ensureSelectedPeriodWeek(weekRows);
+  const selectedWeek = weekRows.find((row) => isoDate(row.start) === selectedPeriodWeekStart);
+  const weekItems = selectedWeek?.items || [];
 
-  els.weekRange.textContent = `${isoDate(start)} ~ ${isoDate(end)}`;
-  els.monthRange.textContent = currentMonth;
+  els.weekRange.textContent = selectedWeek ? `${isoDate(selectedWeek.start)} ~ ${isoDate(selectedWeek.end)}` : selectedPeriodMonth;
+  els.monthRange.textContent = selectedPeriodMonth;
   renderPeriodStats(els.weekStats, weekItems);
   renderPeriodStats(els.monthStats, monthItems);
-  renderMonthlyRows();
+  renderWeeklyBreakdown(weekRows);
+  renderMonthlyRows(monthlyRows);
 }
 
 function renderCalendarHeatmap(items) {
@@ -1258,15 +1375,23 @@ function renderReview(items) {
   renderWeeklyReport(items);
 }
 
+function tradeReviewText(trade) {
+  return trade.review || trade.lesson || "尚未填寫賽後檢討。";
+}
+
 function renderRows(items) {
   const labels = ["編號", "商品", "結果", "損益", "R 倍數", "手數", "止損點數", "Entry", "SL", "TP", "策略", "來源"];
   const outcomeLabels = { win: "獲利", loss: "虧損", be: "損益兩平" };
+  if (els.toggleReviews) {
+    els.toggleReviews.textContent = reviewsExpanded ? "收合 Review" : "展開 Review";
+    els.toggleReviews.setAttribute("aria-pressed", String(reviewsExpanded));
+  }
   els.rows.innerHTML = sortByDate(items)
     .reverse()
     .slice(0, 100)
     .map((trade) => {
       const profitClass = trade.profit >= 0 ? "profit-pos" : "profit-neg";
-      return `
+      const mainRow = `
         <tr data-id="${trade.id}" tabindex="0">
           <td data-label="${labels[0]}">${trade.id}</td>
           <td data-label="${labels[1]}"><strong>${trade.pair}</strong></td>
@@ -1280,6 +1405,14 @@ function renderRows(items) {
           <td data-label="${labels[9]}">${trade.takeProfit ?? "-"}</td>
           <td data-label="${labels[10]}">${trade.setup || trade.checklist || "-"}</td>
           <td data-label="${labels[11]}">${trade.date || "-"} · ${trade.origin === "local" ? "手動新增" : `第 ${trade.row} 列`}</td>
+        </tr>`;
+      if (!reviewsExpanded) return mainRow;
+      return `${mainRow}
+        <tr class="review-row">
+          <td colspan="12">
+            <span>Review</span>
+            <p>${tradeReviewText(trade)}</p>
+          </td>
         </tr>`;
     })
     .join("");
@@ -1503,6 +1636,29 @@ function resetTradeForm() {
   updateTradeDerivedFields();
 }
 
+function updateTradeCommandStrip() {
+  const form = els.tradeForm.elements;
+  const profit = Number(form.profit.value);
+  const r = Number(form.r.value);
+  const outcome = form.outcome.value || "pending";
+  const hasProfit = form.profit.value !== "" && Number.isFinite(profit);
+  const state = hasProfit ? outcome : "pending";
+  const labels = {
+    win: "WIN SIGNAL",
+    loss: "LOSS CONTROL",
+    be: "BREAK EVEN",
+    pending: "READY",
+  };
+
+  els.tradeOutcomePulse.textContent = labels[state] || labels.pending;
+  els.tradeOutcomePulse.dataset.state = state;
+  els.tradeForm.dataset.tradeState = state;
+  els.tradeRiskPreview.textContent = Number.isFinite(r) && form.r.value !== ""
+    ? `${signed(r, "R")} computed`
+    : "R pending";
+  els.tradeSessionClock.textContent = `${form.pair.value || "SYMBOL"} · ${form.time.value || "--:--"}`;
+}
+
 function updateTradeDerivedFields() {
   const form = els.tradeForm.elements;
   const date = form.date.value;
@@ -1531,6 +1687,7 @@ function updateTradeDerivedFields() {
     form.slPips.dataset.autoCalculated = "true";
     slHint.textContent = `ABS(${entry} − ${stopLoss}) = ${Number(calculatedSlPips.toFixed(6))} 點`;
     slHint.classList.add("calculated");
+    form.slPips.classList.add("field-pulse");
   } else {
     if (form.slPips.dataset.autoCalculated === "true") form.slPips.value = "";
     delete form.slPips.dataset.autoCalculated;
@@ -1546,6 +1703,7 @@ function updateTradeDerivedFields() {
     form.r.dataset.autoCalculated = "true";
     hint.textContent = `${money(profit)} ÷ (${lots} × ${slPips}) = ${signed(calculatedR, "R")}`;
     hint.classList.add("calculated");
+    form.r.classList.add("field-pulse");
   } else {
     if (form.r.dataset.autoCalculated === "true") form.r.value = "";
     delete form.r.dataset.autoCalculated;
@@ -1553,6 +1711,11 @@ function updateTradeDerivedFields() {
     hint.classList.remove("calculated");
   }
 
+  window.setTimeout(() => {
+    form.slPips.classList.remove("field-pulse");
+    form.r.classList.remove("field-pulse");
+  }, 520);
+  updateTradeCommandStrip();
 }
 
 function editTrade(trade) {
@@ -1706,6 +1869,39 @@ function normalizeHeader(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s_./%-]+/g, "");
 }
 
+const importColumnAliases = {
+  date: ["date", "日期", "交易日期"],
+  pair: ["pair", "symbol", "商品", "交易商品", "品種"],
+  profit: ["profit", "p/l", "pl", "交易結果", "損益", "獲利", "netprofit"],
+  r: ["r", "r&r", "r multiple", "rmultiple", "rr", "r倍數", "風報比"],
+};
+
+function hasHeaderAlias(headers, aliases) {
+  return aliases.some((alias) => headers.has(normalizeHeader(alias)));
+}
+
+function findTradeHeaderRow(rows) {
+  return rows.findIndex((row) => {
+    const headers = new Set(row.map(normalizeHeader).filter(Boolean));
+    return (
+      hasHeaderAlias(headers, importColumnAliases.date) &&
+      hasHeaderAlias(headers, importColumnAliases.pair) &&
+      hasHeaderAlias(headers, importColumnAliases.profit) &&
+      hasHeaderAlias(headers, importColumnAliases.r)
+    );
+  });
+}
+
+function extractWorkbookRows(workbook) {
+  return workbook.SheetNames.flatMap((sheetName) => {
+    const sheet = workbook.Sheets[sheetName];
+    const previewRows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
+    const headerRow = findTradeHeaderRow(previewRows);
+    if (headerRow === -1) return [];
+    return window.XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true, range: headerRow });
+  });
+}
+
 function pickRowValue(row, aliases) {
   const entries = Object.entries(row);
   for (const alias of aliases) {
@@ -1724,6 +1920,22 @@ function normalizeDateValue(value) {
   const text = String(value).trim().replace(/[./]/g, "-");
   const parsed = new Date(text);
   return Number.isNaN(parsed.getTime()) ? text.slice(0, 10) : parsed.toISOString().slice(0, 10);
+}
+
+function normalizeTimeValue(value) {
+  if (value === "" || value == null) return "";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const fraction = ((value % 1) + 1) % 1;
+    const totalSeconds = Math.round(fraction * 24 * 60 * 60);
+    const hours = Math.floor(totalSeconds / 3600) % 24;
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
+  }
+  const text = String(value).trim();
+  const match = text.match(/\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/);
+  if (!match) return text.slice(0, 8);
+  return [match[1], match[2], match[3] || "00"].map((part) => part.padStart(2, "0")).join(":");
 }
 
 function normalizeImportedRows(rows, sourceName) {
@@ -1759,6 +1971,47 @@ function normalizeImportedRows(rows, sourceName) {
       exitPrice: exitPrice ?? (profit > 0 && Number.isFinite(Number(takeProfit)) ? Number(takeProfit) : null),
       setup: String(pickRowValue(row, ["setup", "strategy", "策略", "型態"])),
       review: String(pickRowValue(row, ["review", "lesson", "note", "檢討", "筆記", "心得"])),
+      source: sourceName,
+      row: index + 2,
+    };
+  }).filter(Boolean);
+}
+
+function normalizeImportedTradeRows(rows, sourceName) {
+  return rows.map((row, index) => {
+    const profit = Number(pickRowValue(row, importColumnAliases.profit));
+    const r = Number(pickRowValue(row, importColumnAliases.r));
+    const pair = String(pickRowValue(row, importColumnAliases.pair)).trim().toUpperCase();
+    const date = normalizeDateValue(pickRowValue(row, importColumnAliases.date));
+    let outcome = String(pickRowValue(row, ["outcome", "result", "結果", "勝負"])).trim().toLowerCase();
+    if (!["win", "loss", "be"].includes(outcome)) outcome = profit > 0 ? "win" : profit < 0 ? "loss" : "be";
+    if (!pair || !date || !Number.isFinite(profit) || !Number.isFinite(r)) return null;
+
+    const numberOrNull = (aliases) => {
+      const value = pickRowValue(row, aliases);
+      return value === "" || !Number.isFinite(Number(value)) ? null : Number(value);
+    };
+    const takeProfit = pickRowValue(row, ["takeProfit", "tp", "止盈", "出場價格", "實際出場價格"]);
+    const exitPrice = numberOrNull(["exitPrice", "exit", "實際出場價格", "出場價格"]);
+
+    return {
+      localId: crypto.randomUUID(),
+      year: Number(pickRowValue(row, ["year", "年度", "年份"])) || Number(date.slice(0, 4)),
+      date,
+      time: normalizeTimeValue(pickRowValue(row, ["time", "時間", "交易時間"])),
+      pair,
+      direction: pickRowValue(row, ["direction", "方向", "多空"]) || "",
+      outcome,
+      profit,
+      r,
+      lots: Number(pickRowValue(row, ["lots", "lot", "手數"])) || null,
+      slPips: Number(pickRowValue(row, ["slpips", "SL pips", "止損點數", "sl點數"])) || null,
+      entry: numberOrNull(["entry", "entryprice", "__EMPTY_3", "入場", "入場價格"]),
+      stopLoss: numberOrNull(["stopLoss", "sl", "止損", "止損價格"]),
+      takeProfit: takeProfit === "" ? null : String(takeProfit),
+      exitPrice: exitPrice ?? (profit > 0 && Number.isFinite(Number(takeProfit)) ? Number(takeProfit) : null),
+      setup: String(pickRowValue(row, ["setup", "strategy", "策略", "型態"])),
+      review: String(pickRowValue(row, ["review", "lesson", "Lesson Learn", "note", "檢討", "筆記", "心得"])),
       source: sourceName,
       row: index + 2,
     };
@@ -1814,11 +2067,9 @@ async function importDataFile(file, mode = "merge") {
   } else {
     if (!window.XLSX) throw new Error("Excel 解析元件尚未載入，請連線後重整頁面，或改用 CSV／JSON。");
     const workbook = window.XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: false });
-    rows = workbook.SheetNames.flatMap((sheetName) =>
-      window.XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "", raw: true }),
-    );
+    rows = extractWorkbookRows(workbook);
   }
-  const imported = uniqueTrades(normalizeImportedRows(rows, `Import: ${file.name}`));
+  const imported = uniqueTrades(normalizeImportedTradeRows(rows, `Import: ${file.name}`));
   if (!imported.length) throw new Error("找不到有效交易。檔案至少需要日期、商品、損益與 R 欄位。");
   if (mode === "replace") {
     const confirmed = window.confirm(
@@ -1845,6 +2096,7 @@ renderChecklist();
 renderCalc();
 runReturnSimulation();
 resetTradeForm();
+attachRippleFeedback();
 render();
 
 [els.year, els.pair, els.outcome, els.window, els.search].forEach((el) => el.addEventListener("input", render));
@@ -1860,7 +2112,8 @@ window.addEventListener("resize", () => {
 });
 
 els.theme.addEventListener("click", () => {
-  document.body.classList.toggle("dark");
+  const isDark = document.body.classList.toggle("dark");
+  localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
   render();
   renderReturnSimulation();
 });
@@ -1927,7 +2180,7 @@ els.tradeForm.addEventListener("submit", (event) => {
   showToast(existingIndex >= 0 ? "交易已更新。" : "交易已新增。");
 });
 
-["date", "direction", "profit", "lots", "entry", "stopLoss", "exitPrice", "slPips"].forEach((name) => {
+["date", "time", "pair", "direction", "outcome", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips"].forEach((name) => {
   els.tradeForm.elements[name].addEventListener("input", updateTradeDerivedFields);
 });
 
@@ -1950,6 +2203,45 @@ els.checklist.addEventListener("click", (event) => {
   const pressed = button.getAttribute("aria-pressed") === "true";
   button.setAttribute("aria-pressed", String(!pressed));
   updateChecklistGate();
+});
+
+els.monthlyRows.addEventListener("click", (event) => {
+  const row = event.target.closest("[data-month]");
+  if (!row) return;
+  selectedPeriodMonth = row.dataset.month;
+  selectedPeriodWeekStart = null;
+  renderPeriodAnalysis();
+});
+
+els.monthlyRows.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const row = event.target.closest("[data-month]");
+  if (!row) return;
+  event.preventDefault();
+  selectedPeriodMonth = row.dataset.month;
+  selectedPeriodWeekStart = null;
+  renderPeriodAnalysis();
+});
+
+els.weeklyBreakdown.addEventListener("click", (event) => {
+  const row = event.target.closest("[data-week]");
+  if (!row) return;
+  selectedPeriodWeekStart = row.dataset.week;
+  renderPeriodAnalysis();
+});
+
+els.weeklyBreakdown.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const row = event.target.closest("[data-week]");
+  if (!row) return;
+  event.preventDefault();
+  selectedPeriodWeekStart = row.dataset.week;
+  renderPeriodAnalysis();
+});
+
+els.toggleReviews?.addEventListener("click", () => {
+  reviewsExpanded = !reviewsExpanded;
+  renderRows(filteredTrades());
 });
 
 els.rows.addEventListener("click", (event) => {
