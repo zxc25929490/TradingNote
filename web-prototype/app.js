@@ -87,6 +87,7 @@ const els = {
   monthlyRows: document.querySelector("#monthlyRows"),
   chartBadge: document.querySelector("#chartBadge"),
   chart: document.querySelector("#equityChart"),
+  equityLatestPoint: document.querySelector("#equityLatestPoint"),
   equityTooltip: document.querySelector("#equityTooltip"),
   crosshairX: document.querySelector("#chartCrosshairX"),
   crosshairY: document.querySelector("#chartCrosshairY"),
@@ -828,6 +829,7 @@ function renderChart(items) {
 
   if (!points.length) {
     equityChartState = null;
+    els.equityLatestPoint.hidden = true;
     return;
   }
 
@@ -896,6 +898,9 @@ function renderChart(items) {
   ctx.stroke();
 
   const last = points.at(-1);
+  els.equityLatestPoint.style.left = `${px(last.x)}px`;
+  els.equityLatestPoint.style.top = `${py(last.y)}px`;
+  els.equityLatestPoint.hidden = false;
   ctx.strokeStyle = accent2;
   ctx.lineWidth = 2;
   ctx.beginPath();

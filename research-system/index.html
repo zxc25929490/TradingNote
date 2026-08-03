@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Trading Research System</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="readability.css?v=20260802-9">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><b>TR</b><span><strong>Trading Research</strong><small>Decision Intelligence</small></span></div>
+    <a class="back" href="../web-prototype/index.html"><span aria-hidden="true">←</span> 返回 TradingNote</a>
+    <nav id="nav">
+      <button class="active" data-view="dashboard">▦ <span>研究總覽</span></button>
+      <button data-view="journal">◎ <span>回測紀錄</span></button>
+      <button data-view="differences">≠ <span>決策差異</span><em id="diffBadge">0</em></button>
+      <button data-view="rules">✓ <span>Rule Book</span></button>
+      <button data-view="mistakes">! <span>錯誤資料庫</span></button>
+      <button data-view="analytics">⌁ <span>深度分析</span></button>
+      <button data-view="reality">↔ <span>回測 vs 實盤</span></button>
+    </nav>
+    <div class="cycle">✦ <span><b>研究循環</b><small>觀察 → 驗證 → 規則化</small></span></div>
+  </aside>
+  <main>
+    <header><div><p>TRADING RESEARCH SYSTEM</p><h1 id="pageTitle">研究總覽</h1></div><div class="actions"><label class="batch-picker"><small>目前研究斷點</small><select id="batchSelect"></select></label><button id="importBreakpoint" class="secondary">⇧ 匯入備份</button><input id="importFile" type="file" accept="application/json,.json" hidden><button id="exportBreakpoint" class="secondary">⇩ 匯出備份</button><button id="addBreakpoint" class="secondary">＋ 新斷點</button><button id="addTrade">＋ 新增回測</button></div></header>
+    <section id="dashboard" class="page active">
+      <div id="metrics" class="metrics"></div>
+      <div class="grid two"><article class="panel wide"><div class="panel-head"><span><b>Equity Curve</b><small>累積 R · 回測樣本</small></span></div><div id="equityChart" class="line-chart"></div></article><article class="panel"><div class="panel-head"><span><b>Monthly R</b><small>按月份比較策略表現</small></span></div><div id="monthlyBars" class="v-bars"></div></article></div>
+      <div class="grid three"><article class="panel"><div class="panel-head"><span><b>Win / Loss</b><small>結果分布</small></span></div><div id="resultDonut" class="donut"></div></article><article class="panel"><div class="panel-head"><span><b>Mistake Distribution</b><small>最常重複的決策錯誤</small></span></div><div id="mistakeBars" class="h-bars"></div></article><article class="panel focus"><span>01</span><b>降低與 Mamba 的方向分歧</b><p>優先驗證「高週期方向」與「等待收線」兩條規則。</p></article></div>
+    </section>
+    <section id="journal" class="page"><div class="toolbar"><input id="search" placeholder="搜尋編號、市場、筆記或錯誤…"><select id="marketFilter"><option value="all">全部市場</option><option>DJ30</option><option>NAS100</option></select></div><div class="table-wrap"><table><thead><tr><th>日期 / ID</th><th>市場</th><th>模型</th><th>我的決策</th><th>Mamba</th><th>一致</th><th>信心</th><th>結果</th><th>錯誤標籤</th></tr></thead><tbody id="tradeRows"></tbody></table></div></section>
+    <section id="differences" class="page"><div class="hero"><span><small>DECISION GAP LAB</small><b>只研究「我和 Mamba 不一樣」的時刻</b><p>分歧不是錯誤本身，而是最有價值的學習樣本。</p></span><strong id="diffCount">0<small>筆決策分歧</small></strong></div><div id="differenceGrid" class="cards"></div></section>
+    <section id="rules" class="page"><div class="rule-shell"><div class="rule-list"><div class="section-title"><span><small>SYSTEM DNA</small><b>Trading Rule Book</b></span><button id="addRule">＋</button></div><div id="ruleList"></div></div><div id="ruleDetail" class="rule-detail"></div></div></section>
+    <section id="mistakes" class="page"><div class="hero"><span><small>PATTERN RECOGNITION</small><b>重複錯誤資料庫</b><p>消除會重複出現的行為模式。</p></span></div><div id="mistakeTable" class="mistake-table"></div></section>
+    <section id="analytics" class="page"><div id="analyticsCards" class="metrics four"></div><div class="grid two"><article class="panel"><div class="panel-head"><b>Expectancy by Confidence</b></div><div id="confidenceBars" class="v-bars tall"></div></article><article class="panel"><div class="panel-head"><b>Agreement Edge</b></div><div id="agreementBars" class="v-bars tall"></div></article></div></section>
+    <section id="reality" class="page">
+      <div class="hero reality-hero"><span><small>BACKTEST REALITY CHECK</small><b>同日期回測 vs 實盤績效</b><p>只比較兩邊都有資料的日期，找出策略理論與實際執行之間的落差。</p></span><div class="reality-actions"><span id="actualSource">尚未讀取實盤資料</span><button id="refreshActual" class="secondary">重新讀取 TradingNote</button><button id="importActual" class="secondary">匯入實盤 JSON</button><input id="actualFile" type="file" accept="application/json,.json" hidden></div></div>
+      <div id="realityMetrics" class="metrics four"></div>
+      <div class="grid two"><article class="panel"><div class="panel-head"><span><b>Cumulative Comparison</b><small>相同日期累積 R</small></span></div><div id="realityCurve" class="line-chart comparison-chart"></div></article><article class="panel"><div class="panel-head"><span><b>Daily R Gap</b><small>回測與實盤每日差距</small></span></div><div id="realityGapBars" class="reality-bars"></div></article></div>
+      <div class="table-wrap reality-table"><table><thead><tr><th>日期</th><th>回測筆數</th><th>回測 R</th><th>實盤筆數</th><th>實盤 R</th><th>績效差額</th><th>執行率</th></tr></thead><tbody id="realityRows"></tbody></table></div>
+    </section>
+  </main>
+  <dialog id="tradeDialog">
+    <form id="tradeForm">
+      <header><span><small id="tradeFormEyebrow">NEW RESEARCH SAMPLE</small><b id="tradeFormTitle">新增回測交易</b></span><button type="button" data-close>×</button></header>
+      <div class="form-grid">
+        <label>日期<input name="date" type="date" value="2026-08-01" required></label>
+        <label>市場<select name="market"><option>NAS100</option><option>DJ30</option><option>SPX</option></select></label>
+        <label>Session<select name="session"><option>New York</option><option>London</option><option>Asia</option></select></label>
+        <label>Setup<select name="setup"><option>突破</option><option>回撤</option></select></label>
+        <label>我的決策<select name="mine"><option>Long</option><option>Short</option><option>No Trade</option></select></label>
+        <label>Mamba 決策（選填）<select name="mentor"><option value="" selected>未記錄</option><option>Long</option><option>Short</option><option>No Trade</option></select></label>
+        <label>Mamba TP（選填）<input name="mambaTp" type="number" step=".01" placeholder="例如 3 代表 3R"></label>
+        <label>R Multiple（選填）<input name="r" type="number" step=".01" placeholder="沒有交易可留空"></label>
+        <label>Confidence<select name="confidence"><option>A</option><option>B</option><option>C</option></select></label>
+        <label class="full">錯誤標籤（逗號分隔）<input name="mistakes" placeholder="Breakout Chase, FOMO"></label>
+        <label class="full">交易筆記<textarea name="notes"></textarea></label>
+        <label class="full">Today's Lesson<textarea name="lesson"></textarea></label>
+        <div class="full screenshot-field"><span>交易截圖（選填，僅儲存在本機）</span><div class="screenshot-actions"><button id="chooseScreenshot" type="button">＋ 加入截圖</button><button id="removeScreenshot" type="button" hidden>移除截圖</button><small id="screenshotStatus">尚未加入圖片</small></div><input id="screenshotInput" name="screenshotFile" type="file" accept="image/*" hidden><img id="screenshotPreview" alt="交易截圖預覽" hidden></div>
+      </div>
+      <footer><button type="button" data-close>取消</button><button id="saveTradeButton" class="primary">儲存回測</button></footer>
+    </form>
+  </dialog>
+  <dialog id="detailDialog" class="detail"><article id="tradeDetail"></article></dialog>
+  <dialog id="ruleDialog">
+    <form id="ruleForm">
+      <header><span><small>RULE BOOK</small><b id="ruleFormTitle">新增交易規則</b></span><button type="button" data-close-rule>×</button></header>
+      <div class="form-grid">
+        <label class="full">規則標題<input name="title" required placeholder="例如：突破後等待收線確認"></label>
+        <label class="full">規則說明<textarea name="description" required placeholder="這條規則解決什麼重複問題？何時適用？"></textarea></label>
+        <label>狀態<select name="status"><option>Testing</option><option>Verified</option><option>Discarded</option></select></label>
+        <label>信心百分比<input name="confidence" type="number" min="0" max="100" value="50" required></label>
+        <label class="full">關聯交易 ID（逗號分隔）<input name="evidence" placeholder="BT-001, BT-005"></label>
+      </div>
+      <footer><button type="button" data-close-rule>取消</button><button class="primary">儲存規則</button></footer>
+    </form>
+  </dialog>
+  <script src="../web-prototype/data/trades.js"></script>
+  <script src="app.js?v=20260802-11"></script>
+</body>
+</html>

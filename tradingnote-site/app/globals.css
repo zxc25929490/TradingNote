@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 * {
   box-sizing: border-box;
 }
@@ -11,7 +13,7 @@ body,
 }
 
 body {
-  overflow: hidden;
+  overflow: auto;
   background: #f4f6f7;
 }
 

@@ -24,6 +24,7 @@
         <a href="#trades" data-page-link="trades"><span aria-hidden="true">≡</span>交易紀錄</a>
         <a href="#checklist" data-page-link="checklist"><span aria-hidden="true">✓</span>交易檢查</a>
         <a href="#calculator" data-page-link="calculator"><span aria-hidden="true">％</span>風控計算</a>
+        <a href="/research" target="_top"><span aria-hidden="true">R</span>回測研究系統</a>
       </nav>
     </aside>
 
@@ -141,6 +142,7 @@
             </div>
             <div class="chart-wrap">
               <canvas id="equityChart" width="920" height="360" aria-label="累積 R 權益曲線"></canvas>
+              <span id="equityLatestPoint" class="equity-latest-point" aria-hidden="true" hidden></span>
               <span id="chartCrosshairX" class="chart-crosshair crosshair-x" hidden></span>
               <span id="chartCrosshairY" class="chart-crosshair crosshair-y" hidden></span>
               <div id="equityTooltip" class="chart-tooltip" hidden></div>
