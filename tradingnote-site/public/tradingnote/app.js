@@ -3,6 +3,26 @@ const STORAGE_KEY = "tradingnote.localTrades";
 const DELETED_KEY = "tradingnote.deletedTrades";
 const ACCOUNT_RULES_KEY = "tradingnote.accountRules";
 const THEME_KEY = "tradingnote.theme";
+const RESEARCH_TRADE_KEY = "trading-research.trades.v1";
+const RESEARCH_RULE_KEY = "trading-research.rules.v1";
+const LEGACY_RESEARCH_TRADE_KEY = "trs.trades";
+const LEGACY_RESEARCH_RULE_KEY = "trs.rules";
+const LEGACY_RESEARCH_BATCH_KEY = "trs.batches";
+const LEGACY_RESEARCH_ACTIVE_BATCH_KEY = "trs.activeBatch";
+const DEFAULT_RESEARCH_RULES = [
+  { id: "R-001", title: "等待 K 棒收線確認突破", description: "突破只能在 5m 或 15m K 棒收線後成立，避免假突破與追價。", status: "Verified", confidence: 88, linkedTrades: ["BT-002", "BT-003", "BT-011"] },
+  { id: "R-002", title: "高週期方向不一致則 No Trade", description: "1H bias 與執行方向相反時，不以短週期訊號覆蓋。", status: "Testing", confidence: 76, linkedTrades: ["BT-006", "BT-014", "BT-016"] },
+  { id: "R-003", title: "重大消息前 30 分鐘不進場", description: "CPI、NFP、FOMC 等事件前不建立新倉位。", status: "Verified", confidence: 92, linkedTrades: ["BT-010"] },
+  { id: "R-004", title: "先比較同類指數的乾淨程度", description: "DJ30 與 NAS100 同時出現訊號時，只選結構、流動性與 RR 最清楚者。", status: "Testing", confidence: 64, linkedTrades: ["BT-004", "BT-008"] },
+];
+const DEFAULT_LEGACY_RESEARCH_RULES = DEFAULT_RESEARCH_RULES.map((rule) => ({
+  id: rule.id,
+  title: rule.title,
+  description: rule.description,
+  status: rule.status,
+  confidence: rule.confidence,
+  evidence: rule.linkedTrades,
+}));
 
 applyStoredTheme();
 
@@ -15,6 +35,7 @@ let accountRules = loadAccountRules();
 let selectedPeriodMonth = monthKey(new Date());
 let selectedPeriodWeekStart = null;
 let reviewsExpanded = false;
+let currentTradeImage = "";
 
 const els = {
   year: document.querySelector("#yearFilter"),
@@ -120,6 +141,7 @@ const els = {
   clearLocalTrades: document.querySelector("#clearLocalTrades"),
   importFile: document.querySelector("#importFileInput"),
   replaceFile: document.querySelector("#replaceFileInput"),
+  backupImport: document.querySelector("#backupImportInput"),
   exportJson: document.querySelector("#exportJsonButton"),
   toggleReviews: document.querySelector("#toggleReviewsButton"),
   tradeEmpty: document.querySelector("#tradeEmptyState"),
@@ -129,6 +151,10 @@ const els = {
   tradeOutcomePulse: document.querySelector("#tradeOutcomePulse"),
   tradeRiskPreview: document.querySelector("#tradeRiskPreview"),
   tradeSessionClock: document.querySelector("#tradeSessionClock"),
+  tradeImageInput: document.querySelector("#tradeImageInput"),
+  tradeImagePreview: document.querySelector("#tradeImagePreview"),
+  tradeImageStatus: document.querySelector("#tradeImageStatus"),
+  removeTradeImage: document.querySelector("#removeTradeImageButton"),
   toast: document.querySelector("#toast"),
   drawer: document.querySelector("#detailDrawer"),
   detail: document.querySelector("#detailContent"),
@@ -290,6 +316,24 @@ function downloadFile(name, content, type) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("圖片讀取失敗。"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function updateTradeImagePreview(image = currentTradeImage) {
+  currentTradeImage = image || "";
+  const hasImage = Boolean(currentTradeImage);
+  els.tradeImagePreview.hidden = !hasImage;
+  els.removeTradeImage.hidden = !hasImage;
+  els.tradeImagePreview.src = hasImage ? currentTradeImage : "";
+  els.tradeImageStatus.textContent = hasImage ? "已加入圖片，會保存在本機與備份 JSON。" : "尚未加入圖片";
+}
+
 function money(value) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -301,6 +345,31 @@ function money(value) {
 function signed(value, suffix = "") {
   const sign = value > 0 ? "+" : "";
   return `${sign}${Number(value || 0).toFixed(2)}${suffix}`;
+}
+
+function mambaDecisionLabel(value) {
+  const labels = {
+    Long: "Long",
+    Short: "Short",
+    "No Trade": "No Trade",
+  };
+  return labels[value] || "未記錄";
+}
+
+function mambaRLabel(value) {
+  if (value === "" || value == null) return "-";
+  return Number.isFinite(Number(value)) ? signed(Number(value), "R") : "-";
+}
+
+function mambaRClass(value) {
+  if (value === "" || value == null || !Number.isFinite(Number(value))) return "";
+  return Number(value) >= 0 ? "profit-pos" : "profit-neg";
+}
+
+function mambaAgreementLabel(trade) {
+  if (!trade.mambaDecision) return "未記錄";
+  if (trade.mambaDecision === "No Trade") return "Mamba 沒做";
+  return trade.mambaDecision === trade.direction ? "方向一致" : "方向不同";
 }
 
 function animateMetric(element, target, formatter) {
@@ -339,6 +408,99 @@ function attachRippleFeedback() {
     ripple.style.top = `${event.clientY - rect.top - size / 2}px`;
     target.appendChild(ripple);
     ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
+  });
+}
+
+function attachCursorClickEffects() {
+  document.addEventListener("pointerdown", (event) => {
+    if (!motionAllowed || event.pointerType === "touch") return;
+    const burst = document.createElement("span");
+    burst.className = "cursor-click-burst";
+    burst.style.left = `${event.clientX}px`;
+    burst.style.top = `${event.clientY}px`;
+    document.body.appendChild(burst);
+    burst.addEventListener("animationend", () => burst.remove(), { once: true });
+
+    for (let index = 0; index < 6; index += 1) {
+      const spark = document.createElement("span");
+      const angle = (Math.PI * 2 * index) / 6 + Math.random() * 0.35;
+      const distance = 14 + Math.random() * 18;
+      spark.className = "cursor-click-spark";
+      spark.style.left = `${event.clientX}px`;
+      spark.style.top = `${event.clientY}px`;
+      spark.style.setProperty("--tx", `${Math.cos(angle) * distance}px`);
+      spark.style.setProperty("--ty", `${Math.sin(angle) * distance}px`);
+      document.body.appendChild(spark);
+      spark.addEventListener("animationend", () => spark.remove(), { once: true });
+    }
+  });
+}
+
+function attachCustomCursor() {
+  if (!motionAllowed || window.matchMedia("(pointer: coarse)").matches) return;
+  const cursor = document.createElement("span");
+  cursor.className = "custom-cursor-dot";
+  document.body.appendChild(cursor);
+  document.body.classList.add("custom-cursor-enabled");
+
+  const moveCursor = (event) => {
+    if (event.pointerType === "touch") return;
+    cursor.style.left = `${event.clientX}px`;
+    cursor.style.top = `${event.clientY}px`;
+    cursor.classList.add("visible");
+    const interactive = event.target.closest("button, a, input, select, textarea, label, [tabindex]");
+    cursor.classList.toggle("interactive", Boolean(interactive));
+  };
+
+  document.addEventListener("pointermove", moveCursor);
+  document.addEventListener("pointerdown", () => cursor.classList.add("dragging"));
+  document.addEventListener("pointerup", () => cursor.classList.remove("dragging"));
+  document.addEventListener("pointercancel", () => cursor.classList.remove("dragging"));
+  document.addEventListener("pointerleave", () => cursor.classList.remove("visible"));
+  document.addEventListener("pointerenter", (event) => {
+    moveCursor(event);
+  });
+}
+
+function attachCursorTrailEffects() {
+  let lastTrailAt = 0;
+  let dragging = false;
+  document.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch") dragging = true;
+  });
+  document.addEventListener("pointerup", () => {
+    dragging = false;
+  });
+  document.addEventListener("pointercancel", () => {
+    dragging = false;
+  });
+  document.addEventListener("pointermove", (event) => {
+    if (!motionAllowed || event.pointerType === "touch") return;
+    const now = performance.now();
+    if (now - lastTrailAt < (dragging ? 14 : 30)) return;
+    lastTrailAt = now;
+
+    const dot = document.createElement("span");
+    const speed = Math.min(24, Math.abs(event.movementX) + Math.abs(event.movementY));
+    const size = (dragging ? 13 : 8) + speed * (dragging ? 0.62 : 0.32);
+    dot.className = `cursor-trail-dot ${dragging ? "dragging" : ""}`;
+    dot.style.left = `${event.clientX}px`;
+    dot.style.top = `${event.clientY}px`;
+    dot.style.width = `${size}px`;
+    dot.style.height = `${size}px`;
+    document.body.appendChild(dot);
+    dot.addEventListener("animationend", () => dot.remove(), { once: true });
+
+    if (!dragging) return;
+    const streak = document.createElement("span");
+    const angle = Math.atan2(event.movementY || 0, event.movementX || 1) * (180 / Math.PI);
+    streak.className = "cursor-drag-streak";
+    streak.style.left = `${event.clientX}px`;
+    streak.style.top = `${event.clientY}px`;
+    streak.style.width = `${42 + speed * 3}px`;
+    streak.style.rotate = `${angle}deg`;
+    document.body.appendChild(streak);
+    streak.addEventListener("animationend", () => streak.remove(), { once: true });
   });
 }
 
@@ -431,7 +593,7 @@ function baseFilteredTrades() {
     const yearOk = els.year.value === "all" || String(trade.year) === els.year.value;
     const pairOk = els.pair.value === "all" || trade.pair === els.pair.value;
     const outcomeOk = els.outcome.value === "all" || trade.outcome === els.outcome.value;
-    const haystack = `${trade.pair} ${trade.source} ${trade.setup || ""} ${trade.review || ""} ${trade.lesson || ""} ${trade.date || ""}`.toLowerCase();
+    const haystack = `${trade.pair} ${trade.source} ${trade.setup || ""} ${trade.review || ""} ${trade.lesson || ""} ${trade.mambaDecision || ""} ${trade.date || ""}`.toLowerCase();
     const queryOk = !query || haystack.includes(query);
     return yearOk && pairOk && outcomeOk && queryOk;
   });
@@ -1385,7 +1547,7 @@ function tradeReviewText(trade) {
 }
 
 function renderRows(items) {
-  const labels = ["編號", "商品", "結果", "損益", "R 倍數", "手數", "止損點數", "Entry", "SL", "TP", "策略", "來源"];
+  const labels = ["編號", "商品", "結果", "損益", "R 倍數", "手數", "止損點數", "Entry", "SL", "TP", "Mamba", "Mamba R", "策略", "來源"];
   const outcomeLabels = { win: "獲利", loss: "虧損", be: "損益兩平" };
   if (els.toggleReviews) {
     els.toggleReviews.textContent = reviewsExpanded ? "收合 Review" : "展開 Review";
@@ -1408,13 +1570,15 @@ function renderRows(items) {
           <td data-label="${labels[7]}">${trade.entry ?? "-"}</td>
           <td data-label="${labels[8]}">${trade.stopLoss ?? "-"}</td>
           <td data-label="${labels[9]}">${trade.takeProfit ?? "-"}</td>
-          <td data-label="${labels[10]}">${trade.setup || trade.checklist || "-"}</td>
-          <td data-label="${labels[11]}">${trade.date || "-"} · ${trade.origin === "local" ? "手動新增" : `第 ${trade.row} 列`}</td>
+          <td data-label="${labels[10]}"><span class="mamba-chip">${mambaDecisionLabel(trade.mambaDecision)}</span><small>${mambaAgreementLabel(trade)}</small></td>
+          <td data-label="${labels[11]}" class="${mambaRClass(trade.mambaR)}">${mambaRLabel(trade.mambaR)}</td>
+          <td data-label="${labels[12]}">${trade.setup || trade.checklist || "-"}</td>
+          <td data-label="${labels[13]}">${trade.date || "-"} · ${trade.origin === "local" ? "手動新增" : `第 ${trade.row} 列`}</td>
         </tr>`;
       if (!reviewsExpanded) return mainRow;
       return `${mainRow}
         <tr class="review-row">
-          <td colspan="12">
+          <td colspan="14">
             <span>Review</span>
             <p>${tradeReviewText(trade)}</p>
           </td>
@@ -1563,6 +1727,9 @@ function useJournalSimulationStats() {
 function openTradeDetail(trade) {
   currentDetailId = trade.id;
   const profitClass = trade.profit >= 0 ? "profit-pos" : "profit-neg";
+  const imageBlock = trade.image
+    ? `<figure class="detail-image"><img src="${trade.image}" alt="${trade.pair} 交易截圖"><figcaption>交易截圖</figcaption></figure>`
+    : "";
   els.detail.innerHTML = `
     <p class="eyebrow">${trade.origin === "local" ? "Local trade" : `${trade.source} · row ${trade.row}`}</p>
     <h2>${trade.pair} · ${trade.outcome.toUpperCase()}</h2>
@@ -1580,9 +1747,12 @@ function openTradeDetail(trade) {
       <dt>SL</dt><dd>${trade.stopLoss ?? "-"}</dd>
       <dt>TP</dt><dd>${trade.takeProfit ?? "-"}</dd>
       <dt>Exit</dt><dd>${trade.exitPrice ?? "-"}</dd>
+      <dt>Mamba</dt><dd>${mambaDecisionLabel(trade.mambaDecision)} · ${mambaAgreementLabel(trade)}</dd>
+      <dt>Mamba R</dt><dd>${mambaRLabel(trade.mambaR)}</dd>
       <dt>Setup</dt><dd>${trade.setup || trade.checklist || "-"}</dd>
       <dt>Review</dt><dd>${trade.review || trade.lesson || "尚未填寫賽後檢討。"}</dd>
     </dl>
+    ${imageBlock}
     <div class="drawer-actions">
       <button type="button" class="primary-button" data-trade-action="edit">編輯交易</button>
       <button type="button" class="ghost-button danger-button" data-trade-action="delete">刪除交易</button>
@@ -1620,6 +1790,9 @@ function createTradeFromForm(form) {
     stopLoss: numericOrNull("stopLoss"),
     takeProfit: profit > 0 ? exitPrice : null,
     exitPrice,
+    mambaDecision: String(data.get("mambaDecision") || "").trim(),
+    mambaR: numericOrNull("mambaR"),
+    image: currentTradeImage || "",
     setup: String(data.get("setup") || "").trim(),
     review: String(data.get("review") || "").trim(),
     source: "Manual Entry",
@@ -1634,6 +1807,10 @@ function resetTradeForm() {
   els.tradeForm.elements.date.value = isoDate(new Date());
   els.tradeForm.elements.time.value = new Date().toTimeString().slice(0, 5);
   els.tradeForm.elements.pair.value = "NAS100";
+  els.tradeForm.elements.mambaDecision.value = "";
+  els.tradeForm.elements.mambaR.value = "";
+  els.tradeImageInput.value = "";
+  updateTradeImagePreview("");
   delete els.tradeForm.elements.r.dataset.autoCalculated;
   els.dialogTitle.textContent = "新增交易";
   els.dialogSubtitle.textContent = "記錄核心欄位，資料會保存在這個瀏覽器。";
@@ -1729,11 +1906,13 @@ function editTrade(trade) {
     const recordedExit = String(editable.takeProfit || "").split(/[、,;/]/)[0]?.trim();
     editable.exitPrice = recordedExit && Number.isFinite(Number(recordedExit)) ? Number(recordedExit) : "";
   }
-  const fields = ["localId", "year", "date", "time", "pair", "direction", "outcome", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips", "setup", "review"];
+  const fields = ["localId", "year", "date", "time", "pair", "direction", "outcome", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips", "mambaDecision", "mambaR", "setup", "review"];
   for (const field of fields) {
     const input = els.tradeForm.elements[field];
     if (input) input.value = editable[field] ?? "";
   }
+  els.tradeImageInput.value = "";
+  updateTradeImagePreview(editable.image || "");
   delete els.tradeForm.elements.r.dataset.autoCalculated;
   delete els.tradeForm.elements.slPips.dataset.autoCalculated;
   els.tradeForm.elements.baseKey.value = trade.origin === "local" ? "" : trade.baseKey;
@@ -1807,7 +1986,7 @@ function csvEscape(value) {
 
 function exportFilteredCsv() {
   const items = filteredTrades();
-  const headers = ["id", "date", "time", "year", "pair", "direction", "outcome", "profit", "r", "lots", "slPips", "entry", "stopLoss", "takeProfit", "exitPrice", "setup", "checklist", "source", "row", "lesson", "review"];
+  const headers = ["id", "date", "time", "year", "pair", "direction", "outcome", "profit", "r", "lots", "slPips", "entry", "stopLoss", "takeProfit", "exitPrice", "mambaDecision", "mambaR", "setup", "checklist", "source", "row", "lesson", "review"];
   const rows = [
     headers.join(","),
     ...items.map((trade) => headers.map((key) => csvEscape(trade[key])).join(",")),
@@ -1824,16 +2003,69 @@ function exportFilteredCsv() {
 }
 
 function exportFullBackup() {
+  const researchTrades = JSON.parse(localStorage.getItem(RESEARCH_TRADE_KEY) || "null");
+  const researchRules = JSON.parse(localStorage.getItem(RESEARCH_RULE_KEY) || "null") || DEFAULT_RESEARCH_RULES;
+  const legacyResearchTrades = JSON.parse(localStorage.getItem(LEGACY_RESEARCH_TRADE_KEY) || "null");
+  const legacyResearchRules = JSON.parse(localStorage.getItem(LEGACY_RESEARCH_RULE_KEY) || "null") || DEFAULT_LEGACY_RESEARCH_RULES;
+  const legacyResearchBatches = JSON.parse(localStorage.getItem(LEGACY_RESEARCH_BATCH_KEY) || "null");
+  const legacyResearchActiveBatch = localStorage.getItem(LEGACY_RESEARCH_ACTIVE_BATCH_KEY);
   const backup = {
-    app: "TradingNote",
-    version: 1,
+    app: "TradingNoteAll",
+    version: 2,
     exportedAt: new Date().toISOString(),
-    localTrades,
-    deletedTrades: Array.from(deletedTrades),
-    accountRules,
+    suggestedFolder: "backups",
+    live: {
+      localTrades,
+      deletedTrades: Array.from(deletedTrades),
+      accountRules,
+    },
+    research: {
+      trades: Array.isArray(researchTrades) ? researchTrades : null,
+      rules: Array.isArray(researchRules) ? researchRules : DEFAULT_RESEARCH_RULES,
+      legacyTrades: Array.isArray(legacyResearchTrades) ? legacyResearchTrades : null,
+      legacyRules: Array.isArray(legacyResearchRules) ? legacyResearchRules : DEFAULT_LEGACY_RESEARCH_RULES,
+      legacyBatches: Array.isArray(legacyResearchBatches) ? legacyResearchBatches : null,
+      legacyActiveBatch: legacyResearchActiveBatch || null,
+    },
   };
-  downloadFile(`tradingnote-backup-${isoDate(new Date())}.json`, JSON.stringify(backup, null, 2), "application/json");
-  showToast(`已備份 ${localTrades.length} 筆本機交易與刪除紀錄。`);
+  const researchCount = (backup.research.trades?.length || 0) + (backup.research.legacyTrades?.length || 0);
+  downloadFile(`backups_tradingnote-all-${isoDate(new Date())}.json`, JSON.stringify(backup, null, 2), "application/json");
+  const ruleCount = (backup.research.rules?.length || 0) + (backup.research.legacyRules?.length || 0);
+  showToast(`已建立一鍵備份：實盤 ${localTrades.length} 筆、回測 ${researchCount} 筆、Rule Book ${ruleCount} 條。下載後可放進 backups 資料夾。`);
+}
+
+function restoreUnifiedBackup(payload) {
+  const isUnified = payload?.app === "TradingNoteAll" || payload?.live || payload?.research;
+  const livePayload = isUnified ? payload.live || {} : payload;
+  const researchPayload = isUnified ? payload.research || {} : {};
+
+  if (Array.isArray(livePayload.localTrades)) localTrades = livePayload.localTrades;
+  if (Array.isArray(livePayload.deletedTrades)) deletedTrades = new Set(livePayload.deletedTrades);
+  if (livePayload.accountRules) {
+    accountRules = { ...accountRules, ...livePayload.accountRules };
+    saveAccountRules();
+    populateAccountRulesForm();
+  }
+
+  if (Array.isArray(researchPayload.trades)) localStorage.setItem(RESEARCH_TRADE_KEY, JSON.stringify(researchPayload.trades));
+  if (Array.isArray(researchPayload.rules)) localStorage.setItem(RESEARCH_RULE_KEY, JSON.stringify(researchPayload.rules));
+  if (Array.isArray(researchPayload.legacyTrades)) localStorage.setItem(LEGACY_RESEARCH_TRADE_KEY, JSON.stringify(researchPayload.legacyTrades));
+  if (Array.isArray(researchPayload.legacyRules)) localStorage.setItem(LEGACY_RESEARCH_RULE_KEY, JSON.stringify(researchPayload.legacyRules));
+  if (Array.isArray(researchPayload.legacyBatches)) localStorage.setItem(LEGACY_RESEARCH_BATCH_KEY, JSON.stringify(researchPayload.legacyBatches));
+  if (researchPayload.legacyActiveBatch) localStorage.setItem(LEGACY_RESEARCH_ACTIVE_BATCH_KEY, researchPayload.legacyActiveBatch);
+
+  saveLocalTrades();
+  refreshAfterDataChange();
+  const researchCount = (researchPayload.trades?.length || 0) + (researchPayload.legacyTrades?.length || 0);
+  showToast(`備份匯入完成：實盤 ${localTrades.length} 筆、回測 ${researchCount} 筆。`);
+}
+
+async function importBackupFile(file) {
+  const payload = JSON.parse(await file.text());
+  const hasBackupShape = payload?.app === "TradingNoteAll" || payload?.app === "TradingNote" || payload?.live || Array.isArray(payload?.localTrades);
+  if (!hasBackupShape) throw new Error("這不是 TradingNote 備份 JSON。");
+  if (!window.confirm("匯入備份會覆蓋目前本機實盤資料，並還原備份中的回測資料。要繼續嗎？")) return;
+  restoreUnifiedBackup(payload);
 }
 
 function parseCsv(text) {
@@ -1974,6 +2206,8 @@ function normalizeImportedRows(rows, sourceName) {
       stopLoss: numberOrNull(["stopLoss", "sl", "止損", "止損價格"]),
       takeProfit: takeProfit === "" ? null : String(takeProfit),
       exitPrice: exitPrice ?? (profit > 0 && Number.isFinite(Number(takeProfit)) ? Number(takeProfit) : null),
+      mambaDecision: String(pickRowValue(row, ["mambaDecision", "mamba", "mamba有沒有做", "mamba決策", "mamba方向"])).trim(),
+      mambaR: numberOrNull(["mambaR", "mamba績效", "mamba績效R", "mambarmultiple", "mamba r"]),
       setup: String(pickRowValue(row, ["setup", "strategy", "策略", "型態"])),
       review: String(pickRowValue(row, ["review", "lesson", "note", "檢討", "筆記", "心得"])),
       source: sourceName,
@@ -2015,6 +2249,8 @@ function normalizeImportedTradeRows(rows, sourceName) {
       stopLoss: numberOrNull(["stopLoss", "sl", "止損", "止損價格"]),
       takeProfit: takeProfit === "" ? null : String(takeProfit),
       exitPrice: exitPrice ?? (profit > 0 && Number.isFinite(Number(takeProfit)) ? Number(takeProfit) : null),
+      mambaDecision: String(pickRowValue(row, ["mambaDecision", "mamba", "mamba有沒有做", "mamba決策", "mamba方向"])).trim(),
+      mambaR: numberOrNull(["mambaR", "mamba績效", "mamba績效R", "mambarmultiple", "mamba r"]),
       setup: String(pickRowValue(row, ["setup", "strategy", "策略", "型態"])),
       review: String(pickRowValue(row, ["review", "lesson", "Lesson Learn", "note", "檢討", "筆記", "心得"])),
       source: sourceName,
@@ -2050,6 +2286,11 @@ async function importDataFile(file, mode = "merge") {
   const extension = file.name.split(".").pop().toLowerCase();
   if (extension === "json") {
     const payload = JSON.parse(await file.text());
+    if (payload?.app === "TradingNoteAll" || payload?.live || payload?.research) {
+      if (!window.confirm("偵測到一鍵備份 JSON。匯入會覆蓋目前本機實盤資料，並還原備份中的回測資料。要繼續嗎？")) return;
+      restoreUnifiedBackup(payload);
+      return;
+    }
     const incoming = Array.isArray(payload) ? payload : payload.localTrades;
     if (!Array.isArray(incoming)) throw new Error("JSON 備份格式不正確。");
     const confirmed = window.confirm(`將匯入 ${incoming.length} 筆本機交易。要與現有資料合併嗎？\n選擇「取消」會用備份內容取代目前本機資料。`);
@@ -2102,6 +2343,9 @@ renderCalc();
 runReturnSimulation();
 resetTradeForm();
 attachRippleFeedback();
+attachCustomCursor();
+attachCursorClickEffects();
+attachCursorTrailEffects();
 render();
 
 [els.year, els.pair, els.outcome, els.window, els.search].forEach((el) => el.addEventListener("input", render));
@@ -2145,6 +2389,28 @@ els.newTrade.addEventListener("click", () => {
   els.tradeDialog.showModal();
 });
 els.closeTradeDialog.addEventListener("click", () => els.tradeDialog.close());
+els.tradeImageInput.addEventListener("change", async () => {
+  const [file] = els.tradeImageInput.files;
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    showToast("請選擇圖片檔。", "error");
+    els.tradeImageInput.value = "";
+    return;
+  }
+  if (file.size > 2.5 * 1024 * 1024 && !window.confirm("圖片超過 2.5MB，會讓本機備份變大。仍要加入嗎？")) {
+    els.tradeImageInput.value = "";
+    return;
+  }
+  try {
+    updateTradeImagePreview(await readFileAsDataUrl(file));
+  } catch (error) {
+    showToast(error.message || "圖片讀取失敗。", "error");
+  }
+});
+els.removeTradeImage.addEventListener("click", () => {
+  els.tradeImageInput.value = "";
+  updateTradeImagePreview("");
+});
 els.tradeForm.addEventListener("submit", (event) => {
   event.preventDefault();
   updateTradeDerivedFields();
@@ -2283,6 +2549,17 @@ els.importFile.addEventListener("change", async () => {
     showToast(error.message || "匯入失敗，請檢查檔案格式。", "error");
   } finally {
     els.importFile.value = "";
+  }
+});
+els.backupImport.addEventListener("change", async () => {
+  const [file] = els.backupImport.files;
+  if (!file) return;
+  try {
+    await importBackupFile(file);
+  } catch (error) {
+    showToast(error.message || "備份匯入失敗，請確認 JSON 格式。", "error");
+  } finally {
+    els.backupImport.value = "";
   }
 });
 els.replaceFile.addEventListener("change", async () => {

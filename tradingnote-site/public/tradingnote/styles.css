@@ -42,6 +42,27 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+body.custom-cursor-enabled,
+body.custom-cursor-enabled * {
+  cursor: none !important;
+}
+
+body.custom-cursor-enabled .modal,
+body.custom-cursor-enabled .modal * {
+  cursor: auto !important;
+}
+
+body.custom-cursor-enabled .modal button,
+body.custom-cursor-enabled .modal select,
+body.custom-cursor-enabled .modal label {
+  cursor: pointer !important;
+}
+
+body.custom-cursor-enabled .modal input,
+body.custom-cursor-enabled .modal textarea {
+  cursor: text !important;
+}
+
 button,
 input,
 select,
@@ -307,6 +328,108 @@ h2 {
   animation: button-ripple 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+.cursor-click-burst,
+.cursor-click-spark,
+.cursor-trail-dot,
+.cursor-drag-streak,
+.custom-cursor-dot {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  translate: -50% -50%;
+}
+
+.custom-cursor-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 38% 35%, #fff 0 9%, #ffe9a3 10% 23%, color-mix(in srgb, var(--accent) 72%, transparent) 44%, transparent 72%);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 68%, white);
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--accent) 10%, transparent),
+    0 0 18px color-mix(in srgb, var(--accent) 68%, transparent),
+    0 0 34px color-mix(in srgb, var(--accent-2) 42%, transparent);
+  transition:
+    width 120ms ease,
+    height 120ms ease,
+    opacity 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.custom-cursor-dot.visible {
+  opacity: 1;
+}
+
+.custom-cursor-dot.interactive {
+  width: 30px;
+  height: 30px;
+  box-shadow:
+    0 0 0 7px color-mix(in srgb, var(--accent) 12%, transparent),
+    0 0 24px color-mix(in srgb, var(--accent) 72%, transparent),
+    0 0 46px color-mix(in srgb, var(--accent-2) 48%, transparent);
+}
+
+.custom-cursor-dot.dragging {
+  width: 34px;
+  height: 34px;
+  box-shadow:
+    0 0 0 8px color-mix(in srgb, var(--accent-2) 14%, transparent),
+    0 0 28px color-mix(in srgb, var(--accent) 78%, transparent),
+    0 0 58px color-mix(in srgb, var(--accent-2) 58%, transparent);
+}
+
+.cursor-click-burst,
+.cursor-click-spark,
+.cursor-trail-dot {
+  border-radius: 999px;
+}
+
+.cursor-click-burst {
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--accent-2) 72%, white);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 0 34px color-mix(in srgb, var(--accent-2) 22%, transparent);
+  animation: cursor-click-burst 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.cursor-click-spark {
+  width: 5px;
+  height: 5px;
+  background: color-mix(in srgb, var(--accent-2) 82%, white);
+  animation: cursor-click-spark 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.cursor-trail-dot {
+  background:
+    radial-gradient(circle at 42% 38%, #fff 0 12%, color-mix(in srgb, var(--accent-2) 78%, white) 13% 26%, color-mix(in srgb, var(--accent) 54%, transparent) 48%, transparent 74%);
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--accent) 44%, transparent),
+    0 0 20px color-mix(in srgb, var(--accent-2) 26%, transparent);
+  animation: cursor-trail-fade 560ms ease-out forwards;
+}
+
+.cursor-trail-dot.dragging {
+  background:
+    radial-gradient(circle at 42% 38%, #fff 0 10%, color-mix(in srgb, var(--accent-2) 88%, white) 11% 30%, color-mix(in srgb, var(--accent) 64%, transparent) 55%, transparent 78%);
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--accent) 58%, transparent),
+    0 0 30px color-mix(in srgb, var(--accent-2) 34%, transparent);
+  animation-duration: 700ms;
+}
+
+.cursor-drag-streak {
+  height: 7px;
+  border-radius: 999px;
+  transform-origin: 100% 50%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 42%, transparent), color-mix(in srgb, var(--accent-2) 86%, white));
+  filter: blur(0.1px);
+  animation: cursor-drag-streak 620ms ease-out forwards;
+}
+
 .icon-button > :not(.button-ripple),
 .primary-button > :not(.button-ripple),
 .ghost-button > :not(.button-ripple),
@@ -487,6 +610,38 @@ input[readonly] {
 .form-hint.calculated {
   color: var(--accent);
   font-weight: 800;
+}
+
+.trade-image-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.trade-image-field > span {
+  font-weight: 800;
+}
+
+.trade-image-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.trade-image-actions small {
+  color: var(--muted);
+}
+
+#tradeImagePreview {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 70%, #000);
 }
 
 #tradeForm label {
@@ -1687,7 +1842,7 @@ canvas {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 900px;
+  min-width: 1100px;
 }
 
 th,
@@ -1768,7 +1923,9 @@ td:nth-child(8),
 th:nth-child(9),
 td:nth-child(9),
 th:nth-child(10),
-td:nth-child(10) {
+td:nth-child(10),
+th:nth-child(12),
+td:nth-child(12) {
   text-align: right;
 }
 
@@ -1795,6 +1952,18 @@ td:nth-child(10) {
 .be {
   background: rgba(242, 166, 59, 0.14);
   color: #a3640d;
+}
+
+.mamba-chip {
+  display: inline-grid;
+  place-items: center;
+  min-width: 72px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .profit-pos {
@@ -2174,6 +2343,26 @@ td:nth-child(10) {
   line-height: 1.5;
 }
 
+.detail-image {
+  margin: 22px 0 0;
+}
+
+.detail-image img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 72%, #000);
+}
+
+.detail-image figcaption {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .drawer-actions {
   margin-top: 22px;
   padding-top: 18px;
@@ -2470,6 +2659,50 @@ td:nth-child(10) {
   100% {
     opacity: 0;
     transform: scale(1);
+  }
+}
+
+@keyframes cursor-click-burst {
+  0% {
+    opacity: 0.72;
+    transform: scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.75);
+  }
+}
+
+@keyframes cursor-click-spark {
+  0% {
+    opacity: 0.9;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx), var(--ty)) scale(0.35);
+  }
+}
+
+@keyframes cursor-trail-fade {
+  0% {
+    opacity: 0.78;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.12);
+  }
+}
+
+@keyframes cursor-drag-streak {
+  0% {
+    opacity: 0.72;
+    transform: translateX(-52%) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-78%) scaleX(0.18);
   }
 }
 

@@ -38,6 +38,9 @@
         <div class="actions">
           <button id="themeToggle" class="icon-button" title="切換明暗模式">◐</button>
           <button id="exportCsvButton" class="ghost-button">匯出 CSV</button>
+          <button id="exportJsonButton" class="ghost-button" type="button">一鍵備份</button>
+          <label class="file-button" for="backupImportInput">匯入備份</label>
+          <input id="backupImportInput" class="visually-hidden" type="file" accept="application/json,.json" />
           <button id="newTradeButton" class="primary-button">＋新增交易</button>
         </div>
       </header>
@@ -416,7 +419,6 @@
               <button id="toggleReviewsButton" class="ghost-button" type="button" aria-pressed="false">展開 Review</button>
               <label class="file-button danger-button" for="replaceFileInput" title="備份後，以新 Excel／CSV 完整取代目前資料">取代來源</label>
               <input id="replaceFileInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv" />
-              <button id="exportJsonButton" class="ghost-button" type="button">完整備份</button>
             </div>
           </div>
           <div id="tradeEmptyState" class="empty-state page-empty" hidden>
@@ -437,6 +439,8 @@
                   <th>Entry</th>
                   <th>SL</th>
                   <th>TP</th>
+                  <th>Mamba</th>
+                  <th>Mamba R</th>
                   <th>策略</th>
                   <th>來源</th>
                 </tr>
@@ -565,8 +569,30 @@
             <input name="slPips" type="number" step="any" min="0" max="100000" />
             <small class="form-hint" id="slFormulaHint">自動計算：ABS（Entry − SL）</small>
           </label>
+          <label>Mamba 有沒有做
+            <select name="mambaDecision">
+              <option value="">未記錄</option>
+              <option value="Long">Long</option>
+              <option value="Short">Short</option>
+              <option value="No Trade">No Trade</option>
+            </select>
+          </label>
+          <label>Mamba 績效 R
+            <input name="mambaR" type="number" step="0.01" min="-100" max="100" />
+            <small class="form-hint">如果 Mamba 沒做，這欄可留空。</small>
+          </label>
           <label class="full">Setup <input name="setup" type="text" placeholder="AOI rejection, breakout, pullback..." /></label>
           <label class="full">Review <textarea name="review" rows="4" placeholder="進場理由、情緒、錯誤、下次要注意什麼"></textarea></label>
+          <div class="full trade-image-field">
+            <span>交易截圖（選填，會一起進入一鍵備份）</span>
+            <div class="trade-image-actions">
+              <label class="file-button" for="tradeImageInput">加入圖片</label>
+              <button id="removeTradeImageButton" class="ghost-button" type="button" hidden>移除圖片</button>
+              <small id="tradeImageStatus">尚未加入圖片</small>
+            </div>
+            <input id="tradeImageInput" class="visually-hidden" name="tradeImageFile" type="file" accept="image/*" />
+            <img id="tradeImagePreview" alt="交易截圖預覽" hidden />
+          </div>
         </div>
         <div class="modal-actions">
           <button type="button" class="ghost-button danger-button" id="clearLocalTrades">清除本機資料</button>
