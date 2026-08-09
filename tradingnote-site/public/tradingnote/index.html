@@ -38,8 +38,10 @@
           <button id="themeToggle" class="icon-button" title="切換明暗模式">◐</button>
           <button id="exportCsvButton" class="ghost-button">匯出 CSV</button>
           <button id="exportJsonButton" class="ghost-button" type="button">一鍵備份</button>
-          <label class="file-button" for="backupImportInput">匯入備份</label>
+          <label class="file-button" for="backupImportInput" title="比較現有資料，只補上缺少的紀錄">智慧匯入備份</label>
           <input id="backupImportInput" class="visually-hidden" type="file" accept="application/json,.json" />
+          <label class="file-button danger-button" for="backupForceImportInput" title="完全以備份內容取代目前本機資料">強制覆蓋</label>
+          <input id="backupForceImportInput" class="visually-hidden" type="file" accept="application/json,.json" />
           <button id="newTradeButton" class="primary-button">＋新增交易</button>
         </div>
       </header>
@@ -609,6 +611,6 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
-    <script src="app.js?v=20260727-4"></script>
+    <script src="app.js?v=20260807-3"></script>
   </body>
 </html>

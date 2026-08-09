@@ -142,6 +142,7 @@ const els = {
   importFile: document.querySelector("#importFileInput"),
   replaceFile: document.querySelector("#replaceFileInput"),
   backupImport: document.querySelector("#backupImportInput"),
+  backupForceImport: document.querySelector("#backupForceImportInput"),
   exportJson: document.querySelector("#exportJsonButton"),
   toggleReviews: document.querySelector("#toggleReviewsButton"),
   tradeEmpty: document.querySelector("#tradeEmptyState"),
@@ -286,12 +287,15 @@ function enrichTradeFields(trade) {
 }
 
 function mergeTrades() {
-  return [
+  const combined = [
     ...importedTrades
       .filter((trade) => !deletedTrades.has(baseTradeKey(trade)))
       .map((trade) => ({ ...enrichTradeFields(trade), origin: "excel", baseKey: baseTradeKey(trade) })),
     ...localTrades.map((trade) => ({ ...enrichTradeFields(trade), origin: "local" })),
-  ].map((trade, index) => ({ ...trade, id: index + 1 }));
+  ];
+  const deduplicated = new Map();
+  for (const trade of combined) deduplicated.set(smartTradeFingerprint(trade), trade);
+  return [...deduplicated.values()].map((trade, index) => ({ ...trade, id: index + 1 }));
 }
 
 function showToast(message, type = "success") {
@@ -2002,6 +2006,76 @@ function exportFilteredCsv() {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function backupTradeRecord(trade) {
+  const { id, origin, baseKey, ...record } = trade;
+  return record;
+}
+
+function fingerprintNumber(value, digits = 4) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(digits) : "";
+}
+
+function smartTradeFingerprint(trade) {
+  const date = normalizeDateValue(trade.date);
+  const time = normalizeTimeValue(trade.time);
+  const pair = String(trade.pair || trade.market || "").trim().toUpperCase();
+  const profit = fingerprintNumber(trade.profit, 2);
+  if (time) return [date, time, pair, profit].join("::");
+  return [date, pair, profit, fingerprintNumber(trade.entry, 2), fingerprintNumber(trade.r, 2)].join("::");
+}
+
+function prepareBackupTrade(trade) {
+  const record = backupTradeRecord(trade);
+  return {
+    ...record,
+    localId: record.localId || crypto.randomUUID(),
+    date: normalizeDateValue(record.date),
+    time: normalizeTimeValue(record.time),
+    pair: String(record.pair || record.market || "").trim().toUpperCase(),
+    source: record.source || "Smart backup import",
+  };
+}
+
+function mergeMissingRecords(existing, incoming, fingerprint, idKey = "id") {
+  const merged = [...existing];
+  const ids = new Set(existing.map((item) => item?.[idKey]).filter(Boolean).map(String));
+  const fingerprints = new Set(existing.map(fingerprint).filter(Boolean));
+  let added = 0;
+  for (const item of incoming) {
+    if (!item) continue;
+    const id = item[idKey] == null ? "" : String(item[idKey]);
+    const key = fingerprint(item);
+    if ((id && ids.has(id)) || (key && fingerprints.has(key))) continue;
+    merged.push(item);
+    if (id) ids.add(id);
+    if (key) fingerprints.add(key);
+    added += 1;
+  }
+  return { merged, added };
+}
+
+function researchTradeFingerprint(trade) {
+  return [trade.date, trade.market, trade.session, trade.setup, trade.mine, trade.mentor, fingerprintNumber(trade.r, 4), String(trade.notes || "").trim().toLowerCase()].join("::");
+}
+
+function ruleFingerprint(rule) {
+  return String(rule.title || rule.id || "").trim().toLowerCase();
+}
+
+function batchFingerprint(batch) {
+  return String(batch.name || batch.id || "").trim().toLowerCase();
+}
+
+function storedArray(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "null");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
 function exportFullBackup() {
   const researchTrades = JSON.parse(localStorage.getItem(RESEARCH_TRADE_KEY) || "null");
   const researchRules = JSON.parse(localStorage.getItem(RESEARCH_RULE_KEY) || "null") || DEFAULT_RESEARCH_RULES;
@@ -2009,13 +2083,15 @@ function exportFullBackup() {
   const legacyResearchRules = JSON.parse(localStorage.getItem(LEGACY_RESEARCH_RULE_KEY) || "null") || DEFAULT_LEGACY_RESEARCH_RULES;
   const legacyResearchBatches = JSON.parse(localStorage.getItem(LEGACY_RESEARCH_BATCH_KEY) || "null");
   const legacyResearchActiveBatch = localStorage.getItem(LEGACY_RESEARCH_ACTIVE_BATCH_KEY);
+  const visibleSnapshot = uniqueTrades(trades.map(backupTradeRecord));
   const backup = {
     app: "TradingNoteAll",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     suggestedFolder: "backups",
     live: {
       localTrades,
+      visibleTrades: visibleSnapshot,
       deletedTrades: Array.from(deletedTrades),
       accountRules,
     },
@@ -2031,41 +2107,91 @@ function exportFullBackup() {
   const researchCount = (backup.research.trades?.length || 0) + (backup.research.legacyTrades?.length || 0);
   downloadFile(`backups_tradingnote-all-${isoDate(new Date())}.json`, JSON.stringify(backup, null, 2), "application/json");
   const ruleCount = (backup.research.rules?.length || 0) + (backup.research.legacyRules?.length || 0);
-  showToast(`已建立一鍵備份：實盤 ${localTrades.length} 筆、回測 ${researchCount} 筆、Rule Book ${ruleCount} 條。下載後可放進 backups 資料夾。`);
+  showToast(`已建立完整快照：實盤 ${visibleSnapshot.length} 筆（已排除重複）、回測 ${researchCount} 筆、Rule Book ${ruleCount} 條。`);
 }
 
-function restoreUnifiedBackup(payload) {
+function restoreUnifiedBackup(payload, mode = "merge") {
   const isUnified = payload?.app === "TradingNoteAll" || payload?.live || payload?.research;
   const livePayload = isUnified ? payload.live || {} : payload;
   const researchPayload = isUnified ? payload.research || {} : {};
 
-  if (Array.isArray(livePayload.localTrades)) localTrades = livePayload.localTrades;
-  if (Array.isArray(livePayload.deletedTrades)) deletedTrades = new Set(livePayload.deletedTrades);
-  if (livePayload.accountRules) {
-    accountRules = { ...accountRules, ...livePayload.accountRules };
-    saveAccountRules();
-    populateAccountRulesForm();
+  const incomingTrades = Array.isArray(livePayload.visibleTrades)
+    ? livePayload.visibleTrades
+    : Array.isArray(livePayload.localTrades) ? livePayload.localTrades : [];
+  let liveAdded = 0;
+  let researchAdded = 0;
+  let rulesAdded = 0;
+
+  if (mode === "replace") {
+    localTrades = incomingTrades.map(prepareBackupTrade);
+    deletedTrades = Array.isArray(livePayload.visibleTrades)
+      ? new Set(importedTrades.map(baseTradeKey))
+      : new Set(Array.isArray(livePayload.deletedTrades) ? livePayload.deletedTrades : []);
+    if (livePayload.accountRules) accountRules = { ...accountRules, ...livePayload.accountRules };
+    if (Array.isArray(researchPayload.trades)) localStorage.setItem(RESEARCH_TRADE_KEY, JSON.stringify(researchPayload.trades));
+    if (Array.isArray(researchPayload.rules)) localStorage.setItem(RESEARCH_RULE_KEY, JSON.stringify(researchPayload.rules));
+    if (Array.isArray(researchPayload.legacyTrades)) localStorage.setItem(LEGACY_RESEARCH_TRADE_KEY, JSON.stringify(researchPayload.legacyTrades));
+    if (Array.isArray(researchPayload.legacyRules)) localStorage.setItem(LEGACY_RESEARCH_RULE_KEY, JSON.stringify(researchPayload.legacyRules));
+    if (Array.isArray(researchPayload.legacyBatches)) localStorage.setItem(LEGACY_RESEARCH_BATCH_KEY, JSON.stringify(researchPayload.legacyBatches));
+    if (researchPayload.legacyActiveBatch) localStorage.setItem(LEGACY_RESEARCH_ACTIVE_BATCH_KEY, researchPayload.legacyActiveBatch);
+  } else {
+    const visibleFingerprints = new Set(trades.map(smartTradeFingerprint));
+    const incomingUnique = [];
+    for (const trade of incomingTrades) {
+      const key = smartTradeFingerprint(trade);
+      if (!key || visibleFingerprints.has(key)) continue;
+      visibleFingerprints.add(key);
+      incomingUnique.push(prepareBackupTrade(trade));
+    }
+    localTrades.push(...incomingUnique);
+    liveAdded = incomingUnique.length;
+    if (livePayload.accountRules) accountRules = { ...livePayload.accountRules, ...accountRules };
+
+    if (Array.isArray(researchPayload.trades)) {
+      const result = mergeMissingRecords(storedArray(RESEARCH_TRADE_KEY), researchPayload.trades, researchTradeFingerprint);
+      localStorage.setItem(RESEARCH_TRADE_KEY, JSON.stringify(result.merged));
+      researchAdded += result.added;
+    }
+    if (Array.isArray(researchPayload.rules)) {
+      const result = mergeMissingRecords(storedArray(RESEARCH_RULE_KEY), researchPayload.rules, ruleFingerprint);
+      localStorage.setItem(RESEARCH_RULE_KEY, JSON.stringify(result.merged));
+      rulesAdded += result.added;
+    }
+    if (Array.isArray(researchPayload.legacyTrades)) {
+      const result = mergeMissingRecords(storedArray(LEGACY_RESEARCH_TRADE_KEY), researchPayload.legacyTrades, researchTradeFingerprint);
+      localStorage.setItem(LEGACY_RESEARCH_TRADE_KEY, JSON.stringify(result.merged));
+      researchAdded += result.added;
+    }
+    if (Array.isArray(researchPayload.legacyRules)) {
+      const result = mergeMissingRecords(storedArray(LEGACY_RESEARCH_RULE_KEY), researchPayload.legacyRules, ruleFingerprint);
+      localStorage.setItem(LEGACY_RESEARCH_RULE_KEY, JSON.stringify(result.merged));
+      rulesAdded += result.added;
+    }
+    if (Array.isArray(researchPayload.legacyBatches)) {
+      const result = mergeMissingRecords(storedArray(LEGACY_RESEARCH_BATCH_KEY), researchPayload.legacyBatches, batchFingerprint);
+      localStorage.setItem(LEGACY_RESEARCH_BATCH_KEY, JSON.stringify(result.merged));
+    }
   }
 
-  if (Array.isArray(researchPayload.trades)) localStorage.setItem(RESEARCH_TRADE_KEY, JSON.stringify(researchPayload.trades));
-  if (Array.isArray(researchPayload.rules)) localStorage.setItem(RESEARCH_RULE_KEY, JSON.stringify(researchPayload.rules));
-  if (Array.isArray(researchPayload.legacyTrades)) localStorage.setItem(LEGACY_RESEARCH_TRADE_KEY, JSON.stringify(researchPayload.legacyTrades));
-  if (Array.isArray(researchPayload.legacyRules)) localStorage.setItem(LEGACY_RESEARCH_RULE_KEY, JSON.stringify(researchPayload.legacyRules));
-  if (Array.isArray(researchPayload.legacyBatches)) localStorage.setItem(LEGACY_RESEARCH_BATCH_KEY, JSON.stringify(researchPayload.legacyBatches));
-  if (researchPayload.legacyActiveBatch) localStorage.setItem(LEGACY_RESEARCH_ACTIVE_BATCH_KEY, researchPayload.legacyActiveBatch);
-
+  saveAccountRules();
+  populateAccountRulesForm();
   saveLocalTrades();
   refreshAfterDataChange();
-  const researchCount = (researchPayload.trades?.length || 0) + (researchPayload.legacyTrades?.length || 0);
-  showToast(`備份匯入完成：實盤 ${localTrades.length} 筆、回測 ${researchCount} 筆。`);
+  showToast(mode === "replace"
+    ? `強制覆蓋完成：目前實盤 ${trades.length} 筆。`
+    : `智慧合併完成：新增實盤 ${liveAdded} 筆、回測 ${researchAdded} 筆、規則 ${rulesAdded} 條；重複資料已略過。`);
 }
 
-async function importBackupFile(file) {
+async function importBackupFile(file, mode = "merge") {
   const payload = JSON.parse(await file.text());
   const hasBackupShape = payload?.app === "TradingNoteAll" || payload?.app === "TradingNote" || payload?.live || Array.isArray(payload?.localTrades);
   if (!hasBackupShape) throw new Error("這不是 TradingNote 備份 JSON。");
-  if (!window.confirm("匯入備份會覆蓋目前本機實盤資料，並還原備份中的回測資料。要繼續嗎？")) return;
-  restoreUnifiedBackup(payload);
+  if (mode === "replace") {
+    const phrase = window.prompt("強制覆蓋會先下載目前完整備份，然後以選取檔案重建所有本機資料。\n\n請輸入「覆蓋」確認：");
+    if (phrase !== "覆蓋") return;
+    exportFullBackup();
+  }
+  restoreUnifiedBackup(payload, mode);
 }
 
 function parseCsv(text) {
@@ -2275,7 +2401,7 @@ function tradeFingerprint(trade) {
 function uniqueTrades(items) {
   const seen = new Set();
   return items.filter((trade) => {
-    const fingerprint = tradeFingerprint(trade);
+    const fingerprint = smartTradeFingerprint(trade);
     if (seen.has(fingerprint)) return false;
     seen.add(fingerprint);
     return true;
@@ -2287,23 +2413,22 @@ async function importDataFile(file, mode = "merge") {
   if (extension === "json") {
     const payload = JSON.parse(await file.text());
     if (payload?.app === "TradingNoteAll" || payload?.live || payload?.research) {
-      if (!window.confirm("偵測到一鍵備份 JSON。匯入會覆蓋目前本機實盤資料，並還原備份中的回測資料。要繼續嗎？")) return;
-      restoreUnifiedBackup(payload);
+      restoreUnifiedBackup(payload, "merge");
       return;
     }
     const incoming = Array.isArray(payload) ? payload : payload.localTrades;
     if (!Array.isArray(incoming)) throw new Error("JSON 備份格式不正確。");
-    const confirmed = window.confirm(`將匯入 ${incoming.length} 筆本機交易。要與現有資料合併嗎？\n選擇「取消」會用備份內容取代目前本機資料。`);
-    localTrades = confirmed ? [...localTrades, ...incoming] : incoming;
-    if (!confirmed && Array.isArray(payload.deletedTrades)) deletedTrades = new Set(payload.deletedTrades);
-    if (!confirmed && payload.accountRules) {
-      accountRules = { ...accountRules, ...payload.accountRules };
-      saveAccountRules();
-      populateAccountRulesForm();
-    }
+    const existing = new Set(trades.map(smartTradeFingerprint));
+    const missing = incoming.filter((trade) => {
+      const key = smartTradeFingerprint(trade);
+      if (!key || existing.has(key)) return false;
+      existing.add(key);
+      return true;
+    }).map(prepareBackupTrade);
+    localTrades.push(...missing);
     saveLocalTrades();
     refreshAfterDataChange();
-    showToast(`JSON 還原完成，共載入 ${incoming.length} 筆。`);
+    showToast(`JSON 智慧合併完成：新增 ${missing.length} 筆，略過 ${incoming.length - missing.length} 筆重複資料。`);
     return;
   }
 
@@ -2326,8 +2451,13 @@ async function importDataFile(file, mode = "merge") {
     localTrades = imported;
     deletedTrades = new Set(importedTrades.map(baseTradeKey));
   } else {
-    const existing = new Set(trades.map(tradeFingerprint));
-    localTrades.push(...imported.filter((trade) => !existing.has(tradeFingerprint(trade))));
+    const existing = new Set(trades.map(smartTradeFingerprint));
+    localTrades.push(...imported.filter((trade) => {
+      const fingerprint = smartTradeFingerprint(trade);
+      if (existing.has(fingerprint)) return false;
+      existing.add(fingerprint);
+      return true;
+    }));
   }
   saveLocalTrades();
   refreshAfterDataChange();
@@ -2560,6 +2690,17 @@ els.backupImport.addEventListener("change", async () => {
     showToast(error.message || "備份匯入失敗，請確認 JSON 格式。", "error");
   } finally {
     els.backupImport.value = "";
+  }
+});
+els.backupForceImport.addEventListener("change", async () => {
+  const [file] = els.backupForceImport.files;
+  if (!file) return;
+  try {
+    await importBackupFile(file, "replace");
+  } catch (error) {
+    showToast(error.message || "強制覆蓋失敗，請確認 JSON 格式。", "error");
+  } finally {
+    els.backupForceImport.value = "";
   }
 });
 els.replaceFile.addEventListener("change", async () => {
