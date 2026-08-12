@@ -1,6 +1,8 @@
 const importedTrades = window.TRADES || [];
 const STORAGE_KEY = "tradingnote.localTrades";
 const DELETED_KEY = "tradingnote.deletedTrades";
+const LIVE_BATCH_KEY = "tradingnote.liveBatches";
+const LIVE_ACTIVE_BATCH_KEY = "tradingnote.activeLiveBatch";
 const ACCOUNT_RULES_KEY = "tradingnote.accountRules";
 const THEME_KEY = "tradingnote.theme";
 const RESEARCH_TRADE_KEY = "trading-research.trades.v1";
@@ -28,6 +30,8 @@ applyStoredTheme();
 
 let localTrades = loadLocalTrades();
 let deletedTrades = loadDeletedTrades();
+let liveBatches = loadLiveBatches();
+let activeLiveBatch = loadActiveLiveBatch();
 let trades = mergeTrades();
 let currentDetailId = null;
 let toastTimer = null;
@@ -36,6 +40,7 @@ let selectedPeriodMonth = monthKey(new Date());
 let selectedPeriodWeekStart = null;
 let reviewsExpanded = false;
 let currentTradeImage = "";
+let monteCarloResult = null;
 
 const els = {
   year: document.querySelector("#yearFilter"),
@@ -54,10 +59,7 @@ const els = {
   tradeCount: document.querySelector("#tradeCount"),
   maxDd: document.querySelector("#maxDd"),
   lossStreak: document.querySelector("#lossStreak"),
-  profitTrend: document.querySelector("#profitTrend"),
-  rTrend: document.querySelector("#rTrend"),
-  winTrend: document.querySelector("#winTrend"),
-  ddTrend: document.querySelector("#ddTrend"),
+  periodComparisonCards: document.querySelector("#periodComparisonCards"),
   filterSummary: document.querySelector("#filterSummary"),
   resetFilters: document.querySelector("#resetFiltersButton"),
   profitFactor: document.querySelector("#profitFactor"),
@@ -116,6 +118,17 @@ const els = {
   rows: document.querySelector("#tradeRows"),
   theme: document.querySelector("#themeToggle"),
   exportCsv: document.querySelector("#exportCsvButton"),
+  liveBatch: document.querySelector("#liveBatchSelect"),
+  addLiveBatch: document.querySelector("#addLiveBatchButton"),
+  liveBatchDialog: document.querySelector("#liveBatchDialog"),
+  liveBatchForm: document.querySelector("#liveBatchForm"),
+  liveBatchName: document.querySelector("#liveBatchNameInput"),
+  liveBatchMode: document.querySelector("#liveBatchModeInput"),
+  liveBatchStart: document.querySelector("#liveBatchStartInput"),
+  liveBatchEnd: document.querySelector("#liveBatchEndInput"),
+  liveBatchPreview: document.querySelector("#liveBatchPreview"),
+  closeLiveBatchDialog: document.querySelector("#closeLiveBatchDialog"),
+  cancelLiveBatch: document.querySelector("#cancelLiveBatchButton"),
   account: document.querySelector("#accountInput"),
   risk: document.querySelector("#riskInput"),
   sl: document.querySelector("#slInput"),
@@ -127,10 +140,21 @@ const els = {
   simReward: document.querySelector("#simRewardInput"),
   simWinRate: document.querySelector("#simWinRateInput"),
   simTrades: document.querySelector("#simTradesInput"),
+  simRuns: document.querySelector("#simRunsInput"),
+  researchBreakpoint: document.querySelector("#researchBreakpointInput"),
   useJournalStats: document.querySelector("#useJournalStatsButton"),
   simulationMetrics: document.querySelector("#simulationMetrics"),
   simulationChart: document.querySelector("#simulationChart"),
   simulationFormula: document.querySelector("#simulationFormula"),
+  monteCarloMetrics: document.querySelector("#monteCarloMetrics"),
+  monteCarloChart: document.querySelector("#monteCarloChart"),
+  monteCarloFormula: document.querySelector("#monteCarloFormula"),
+  monteCarloStress: document.querySelector("#monteCarloStress"),
+  researchMonteCarloMetrics: document.querySelector("#researchMonteCarloMetrics"),
+  researchMonteCarloChart: document.querySelector("#researchMonteCarloChart"),
+  researchMonteCarloFormula: document.querySelector("#researchMonteCarloFormula"),
+  researchMonteCarloStress: document.querySelector("#researchMonteCarloStress"),
+  monteCarloCompare: document.querySelector("#monteCarloCompare"),
   checklist: document.querySelector("#checklistItems"),
   checklistScore: document.querySelector("#checklistScore"),
   tradeGate: document.querySelector("#tradeGate"),
@@ -214,6 +238,31 @@ function loadDeletedTrades() {
   }
 }
 
+function loadLiveBatches() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LIVE_BATCH_KEY) || "[]");
+    if (Array.isArray(stored) && stored.length) return stored;
+  } catch (_) {}
+  return [{ id: "live-default", name: "完整實盤", createdAt: isoDate(new Date()) }];
+}
+
+function loadActiveLiveBatch() {
+  try {
+    return localStorage.getItem(LIVE_ACTIVE_BATCH_KEY) || "live-default";
+  } catch {
+    return "live-default";
+  }
+}
+
+function saveLiveBatches() {
+  localStorage.setItem(LIVE_BATCH_KEY, JSON.stringify(liveBatches));
+  localStorage.setItem(LIVE_ACTIVE_BATCH_KEY, activeLiveBatch);
+}
+
+function liveBatchLabel(id) {
+  return liveBatches.find((batch) => batch.id === id)?.name || "完整實盤";
+}
+
 function loadAccountRules() {
   const defaults = {
     name: "FTMO Challenge",
@@ -257,6 +306,114 @@ function populateAccountRulesForm() {
   els.lossModeInput.value = accountRules.lossMode;
 }
 
+function populateLiveBatchOptions() {
+  if (!liveBatches.some((batch) => batch.id === activeLiveBatch)) activeLiveBatch = liveBatches[0]?.id || "live-default";
+  els.liveBatch.innerHTML = liveBatches.map((batch) => {
+    const count = trades.filter((trade) => trade.batchId === batch.id).length;
+    return `<option value="${batch.id}">${batch.name}（${count}）</option>`;
+  }).join("");
+  els.liveBatch.value = activeLiveBatch;
+  saveLiveBatches();
+}
+
+function historicalTradeCandidates() {
+  const seen = new Set();
+  return sortByDate(trades).filter((trade) => {
+    const key = tradeIdentityFingerprint(trade);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return Boolean(parseTradeDate(trade));
+  });
+}
+
+function liveBatchHistorySelection() {
+  if (els.liveBatchMode.value === "empty") return [];
+  const start = els.liveBatchStart.value ? new Date(`${els.liveBatchStart.value}T00:00:00`) : null;
+  const end = els.liveBatchEnd.value ? new Date(`${els.liveBatchEnd.value}T23:59:59`) : null;
+  return historicalTradeCandidates().filter((trade) => {
+    const date = parseTradeDate(trade);
+    if (!date) return false;
+    return (!start || date >= start) && (!end || date <= end);
+  });
+}
+
+function updateLiveBatchPreview() {
+  const historyMode = els.liveBatchMode.value === "history";
+  els.liveBatchStart.disabled = !historyMode;
+  els.liveBatchEnd.disabled = !historyMode;
+  if (!historyMode) {
+    els.liveBatchPreview.innerHTML = `<strong>空白斷點</strong><span>建立後會切到新斷點，之後新增交易會存到這裡。</span>`;
+    return;
+  }
+  const selected = liveBatchHistorySelection();
+  const stats = computeStats(selected);
+  els.liveBatchPreview.innerHTML = selected.length
+    ? `<strong>${selected.length} 筆 · ${signed(stats.totalR, "R")} · ${stats.winRate.toFixed(1)}% WR</strong><span>${els.liveBatchStart.value || "最早"} ~ ${els.liveBatchEnd.value || "最新"}，會複製成新斷點樣本，原始歷史不會被改動。</span>`
+    : `<strong>沒有符合日期的交易</strong><span>調整日期區間，或改成建立空白斷點。</span>`;
+}
+
+function openLiveBatchDialog() {
+  const candidates = historicalTradeCandidates();
+  const dates = candidates.map((trade) => normalizeDateValue(trade.date)).filter(Boolean).sort();
+  const fallback = `實盤斷點 ${liveBatches.length + 1}`;
+  els.liveBatchName.value = fallback;
+  els.liveBatchMode.value = candidates.length ? "history" : "empty";
+  els.liveBatchStart.value = dates[0] || "";
+  els.liveBatchEnd.value = dates.at(-1) || "";
+  els.liveBatchStart.min = dates[0] || "";
+  els.liveBatchStart.max = dates.at(-1) || "";
+  els.liveBatchEnd.min = dates[0] || "";
+  els.liveBatchEnd.max = dates.at(-1) || "";
+  updateLiveBatchPreview();
+  els.liveBatchDialog.showModal();
+}
+
+function cloneTradeForBatch(trade, batchId) {
+  const { id, origin, baseKey, row, ...record } = trade;
+  return {
+    ...record,
+    localId: crypto.randomUUID(),
+    batchId,
+    source: "Live breakpoint history copy",
+    copiedFrom: trade.localId || trade.baseKey || trade.id || "",
+  };
+}
+
+function createLiveBatchFromDialog() {
+  const fallback = `實盤斷點 ${liveBatches.length + 1}`;
+  const name = els.liveBatchName.value.trim() || fallback;
+  const id = `live-${Date.now()}`;
+  const selected = liveBatchHistorySelection();
+  if (els.liveBatchMode.value === "history" && !selected.length) {
+    showToast("這個日期區間沒有可複製的歷史交易。", "error");
+    return;
+  }
+  liveBatches.push({ id, name, createdAt: isoDate(new Date()) });
+  if (selected.length) {
+    localTrades.push(...selected.map((trade) => cloneTradeForBatch(trade, id)));
+    saveLocalTrades();
+  }
+  activeLiveBatch = id;
+  saveLiveBatches();
+  els.liveBatchDialog.close();
+  populateLiveBatchOptions();
+  render();
+  showToast(selected.length ? `已建立「${name}」，並帶入 ${selected.length} 筆歷史交易。` : `已建立空白斷點「${name}」。`);
+}
+
+function addLiveBatch() {
+  const fallback = `實盤斷點 ${liveBatches.length + 1}`;
+  const name = window.prompt("請輸入新實盤斷點名稱", fallback);
+  if (!name) return;
+  const id = `live-${Date.now()}`;
+  liveBatches.push({ id, name: name.trim() || fallback, createdAt: isoDate(new Date()) });
+  activeLiveBatch = id;
+  saveLiveBatches();
+  populateLiveBatchOptions();
+  render();
+  showToast(`已建立「${liveBatchLabel(id)}」。新增交易會存到這個斷點。`);
+}
+
 function baseTradeKey(trade) {
   return `${trade.source || "TradingNote"}::${trade.row || trade.id || ""}::${trade.date || ""}`;
 }
@@ -277,6 +434,7 @@ function enrichTradeFields(trade) {
       : null;
   return {
     ...trade,
+    batchId: trade.batchId || "live-default",
     slPips: slPips == null ? null : Number(slPips.toFixed(4)),
     lots: Number.isFinite(Number(trade.lots)) && Number(trade.lots) > 0
       ? Number(trade.lots)
@@ -524,12 +682,105 @@ function monthKey(date) {
 
 function getWeekRange(anchor = new Date()) {
   const start = new Date(anchor);
-  const day = start.getDay() || 7;
+  const day = start.getDay();
   start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - day + 1);
+  start.setDate(start.getDate() - day);
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
   return { start, end };
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function latestTradeDate(items) {
+  const dates = items.map(parseTradeDate).filter(Boolean);
+  if (!dates.length) return new Date();
+  return dates.reduce((latest, date) => (date > latest ? date : latest), dates[0]);
+}
+
+function monthRange(anchor, monthOffset = 0) {
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth() + monthOffset;
+  return {
+    start: new Date(year, month, 1),
+    end: new Date(year, month + 1, 0),
+  };
+}
+
+function shortDate(date) {
+  return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function rangeLabel(range) {
+  return `${shortDate(range.start)}-${shortDate(range.end)}`;
+}
+
+function readResearchBreakpoints() {
+  let researchTrades = [];
+  let batches = [];
+  let activeBatch = "";
+  try {
+    researchTrades = JSON.parse(localStorage.getItem(LEGACY_RESEARCH_TRADE_KEY) || "[]");
+  } catch (_) {
+    researchTrades = [];
+  }
+  try {
+    batches = JSON.parse(localStorage.getItem(LEGACY_RESEARCH_BATCH_KEY) || "[]");
+  } catch (_) {
+    batches = [];
+  }
+  try {
+    activeBatch = localStorage.getItem(LEGACY_RESEARCH_ACTIVE_BATCH_KEY) || "";
+  } catch (_) {
+    activeBatch = "";
+  }
+
+  if (!Array.isArray(researchTrades)) researchTrades = [];
+  if (!Array.isArray(batches)) batches = [];
+  const fallbackBatchId = batches[0]?.id || "default-research";
+  const batchMap = new Map(batches.map((batch) => [String(batch.id), { ...batch, trades: [] }]));
+  if (!batchMap.size && researchTrades.length) {
+    batchMap.set(fallbackBatchId, { id: fallbackBatchId, name: "回測研究資料", createdAt: "", trades: [] });
+  }
+  for (const trade of researchTrades) {
+    const batchId = String(trade.batchId || fallbackBatchId);
+    if (!batchMap.has(batchId)) batchMap.set(batchId, { id: batchId, name: batchId, createdAt: "", trades: [] });
+    batchMap.get(batchId).trades.push(trade);
+  }
+  return { activeBatch, batches: Array.from(batchMap.values()) };
+}
+
+function populateResearchBreakpointOptions() {
+  const { activeBatch, batches } = readResearchBreakpoints();
+  const currentValue = els.researchBreakpoint.dataset.ready ? els.researchBreakpoint.value : activeBatch;
+  els.researchBreakpoint.innerHTML = [
+    `<option value="">不比較回測</option>`,
+    ...batches.map((batch) => {
+      const rCount = batch.trades.filter((trade) => Number.isFinite(Number(trade.r)) && Number(trade.r) !== 0).length;
+      return `<option value="${batch.id}">${batch.name || batch.id}（${rCount} R）</option>`;
+    }),
+  ].join("");
+  if (batches.some((batch) => String(batch.id) === String(currentValue))) {
+    els.researchBreakpoint.value = currentValue;
+  } else {
+    els.researchBreakpoint.value = "";
+  }
+  els.researchBreakpoint.dataset.ready = "true";
+}
+
+function selectedResearchRValues() {
+  const selectedId = els.researchBreakpoint.value;
+  if (!selectedId) return null;
+  const selected = readResearchBreakpoints().batches.find((batch) => String(batch.id) === String(selectedId));
+  if (!selected) return null;
+  return {
+    label: selected.name || selected.id,
+    values: selected.trades.map((trade) => Number(trade.r)).filter((value) => Number.isFinite(value) && value !== 0),
+  };
 }
 
 function inRange(trade, start, end) {
@@ -577,12 +828,13 @@ function sortByDate(items) {
 
 function populateFilters(keepValues = false) {
   const current = keepValues ? { year: els.year.value, pair: els.pair.value } : {};
-  const years = ["all", ...new Set(trades.map((trade) => trade.year).filter(Boolean))].sort((a, b) => {
+  const batchTrades = trades.filter((trade) => (trade.batchId || "live-default") === activeLiveBatch);
+  const years = ["all", ...new Set(batchTrades.map((trade) => trade.year).filter(Boolean))].sort((a, b) => {
     if (a === "all") return -1;
     if (b === "all") return 1;
     return b - a;
   });
-  const pairs = ["all", ...Array.from(new Set(trades.map((trade) => trade.pair).filter(Boolean))).sort()];
+  const pairs = ["all", ...Array.from(new Set(batchTrades.map((trade) => trade.pair).filter(Boolean))).sort()];
 
   els.year.innerHTML = years.map((year) => `<option value="${year}">${year === "all" ? "All" : year}</option>`).join("");
   els.pair.innerHTML = pairs.map((pair) => `<option value="${pair}">${pair === "all" ? "All" : pair}</option>`).join("");
@@ -594,23 +846,23 @@ function populateFilters(keepValues = false) {
 function baseFilteredTrades() {
   const query = els.search.value.trim().toLowerCase();
   return trades.filter((trade) => {
+    const batchOk = (trade.batchId || "live-default") === activeLiveBatch;
     const yearOk = els.year.value === "all" || String(trade.year) === els.year.value;
     const pairOk = els.pair.value === "all" || trade.pair === els.pair.value;
     const outcomeOk = els.outcome.value === "all" || trade.outcome === els.outcome.value;
     const haystack = `${trade.pair} ${trade.source} ${trade.setup || ""} ${trade.review || ""} ${trade.lesson || ""} ${trade.mambaDecision || ""} ${trade.date || ""}`.toLowerCase();
     const queryOk = !query || haystack.includes(query);
-    return yearOk && pairOk && outcomeOk && queryOk;
+    return batchOk && yearOk && pairOk && outcomeOk && queryOk;
   });
 }
 
 function filteredTrades() {
   let items = sortByDate(baseFilteredTrades());
   if (els.window.value === "week") {
-    const { start, end } = getWeekRange();
+    const { start, end } = getWeekRange(latestTradeDate(items));
     items = items.filter((trade) => inRange(trade, start, end));
   } else if (els.window.value === "month") {
-    const now = new Date();
-    const currentMonth = monthKey(now);
+    const currentMonth = monthKey(latestTradeDate(items));
     items = items.filter((trade) => {
       const date = parseTradeDate(trade);
       return date && monthKey(date) === currentMonth;
@@ -622,31 +874,30 @@ function filteredTrades() {
   return items;
 }
 
-function metricComparisons() {
+function periodComparisons() {
   const items = sortByDate(baseFilteredTrades());
-  const now = new Date();
-  const currentWeek = getWeekRange(now);
-  const previousWeekAnchor = new Date(currentWeek.start);
-  previousWeekAnchor.setDate(previousWeekAnchor.getDate() - 7);
-  const previousWeek = getWeekRange(previousWeekAnchor);
-  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const anchor = latestTradeDate(items);
+  const currentWeek = getWeekRange(anchor);
+  const previousWeek = getWeekRange(addDays(currentWeek.start, -1));
+  const currentMonth = monthRange(anchor);
+  const previousMonth = monthRange(anchor, -1);
 
   return [
     {
       current: items.filter((trade) => inRange(trade, currentWeek.start, currentWeek.end)),
       previous: items.filter((trade) => inRange(trade, previousWeek.start, previousWeek.end)),
-      label: "較上週",
+      title: "本週 vs 上週",
+      currentLabel: "本週",
+      previousLabel: "上週",
+      range: `${rangeLabel(currentWeek)} / ${rangeLabel(previousWeek)}`,
     },
     {
-      current: items.filter((trade) => {
-        const date = parseTradeDate(trade);
-        return date && monthKey(date) === monthKey(now);
-      }),
-      previous: items.filter((trade) => {
-        const date = parseTradeDate(trade);
-        return date && monthKey(date) === monthKey(previousMonth);
-      }),
-      label: "較上月",
+      current: items.filter((trade) => inRange(trade, currentMonth.start, currentMonth.end)),
+      previous: items.filter((trade) => inRange(trade, previousMonth.start, previousMonth.end)),
+      title: "本月 vs 上月",
+      currentLabel: "本月",
+      previousLabel: "上月",
+      range: `${rangeLabel(currentMonth)} / ${rangeLabel(previousMonth)}`,
     },
   ];
 }
@@ -693,6 +944,54 @@ function computeStats(items) {
     bestPair: pairStats[0],
     worstPair: pairStats.at(-1),
   };
+}
+
+function comparisonDelta(value, formatter, inverse = false) {
+  const positive = inverse ? value <= 0 : value >= 0;
+  const state = value === 0 ? "" : positive ? "up" : "down";
+  return `<span class="trend ${state}">${value > 0 ? "↑" : value < 0 ? "↓" : "—"} ${formatter(Math.abs(value))}</span>`;
+}
+
+function renderPeriodComparisonCards() {
+  els.periodComparisonCards.innerHTML = periodComparisons().map((comparison) => {
+    const current = computeStats(comparison.current);
+    const previous = computeStats(comparison.previous);
+    const rDelta = current.totalR - previous.totalR;
+    return `
+      <article class="period-compare-card">
+        <div class="period-compare-head">
+          <div>
+            <span>${comparison.title}</span>
+            <strong>${signed(current.totalR, "R")}</strong>
+          </div>
+          <span class="period-delta-label">差 ${comparisonDelta(rDelta, (value) => `${value.toFixed(2)}R`)}</span>
+        </div>
+        <dl>
+          <div>
+            <dt>${comparison.currentLabel} R</dt>
+            <dd>${signed(current.totalR, "R")}</dd>
+          </div>
+          <div>
+            <dt>${comparison.previousLabel} R</dt>
+            <dd>${signed(previous.totalR, "R")}</dd>
+          </div>
+          <div>
+            <dt>${comparison.currentLabel}勝率</dt>
+            <dd>${current.winRate.toFixed(1)}%</dd>
+          </div>
+          <div>
+            <dt>${comparison.previousLabel}勝率</dt>
+            <dd>${previous.winRate.toFixed(1)}%</dd>
+          </div>
+        </dl>
+        <div class="period-compare-foot">
+          <span>${comparison.current.length} vs ${comparison.previous.length} trades</span>
+          <span>${comparison.currentLabel} ${current.winRate.toFixed(1)}% WR / ${comparison.previousLabel} ${previous.winRate.toFixed(1)}% WR</span>
+        </div>
+        <small>${comparison.range}</small>
+      </article>
+    `;
+  }).join("");
 }
 
 function computeDailySummaries(items) {
@@ -923,7 +1222,6 @@ function summarizePairs(items) {
 
 function renderMetrics(items) {
   const stats = computeStats(items);
-  const comparisons = metricComparisons();
   animateMetric(els.totalProfit, stats.totalProfit, money);
   els.avgProfit.textContent = `Avg ${money(items.length ? stats.totalProfit / items.length : 0)} / trade`;
   animateMetric(els.totalR, stats.totalR, (value) => signed(value, "R"));
@@ -940,29 +1238,7 @@ function renderMetrics(items) {
   els.bestPair.textContent = stats.bestPair ? `${stats.bestPair.pair} ${signed(stats.bestPair.r, "R")}` : "-";
   els.worstPair.textContent = stats.worstPair ? `${stats.worstPair.pair} ${signed(stats.worstPair.r, "R")}` : "-";
   els.chartBadge.textContent = `${items.length} trades`;
-
-  const trend = (element, valueKey, formatter, inverse = false) => {
-    element.className = "trend-comparisons";
-    element.innerHTML = comparisons.map((comparison) => {
-      if (!comparison.current.length) {
-        return `<span class="trend">${comparison.label === "較上週" ? "本週" : "本月"}無資料</span>`;
-      }
-      if (!comparison.previous.length) {
-        return `<span class="trend">${comparison.label.replace("較", "")}無資料</span>`;
-      }
-      const current = computeStats(comparison.current)[valueKey];
-      const before = computeStats(comparison.previous)[valueKey];
-      const delta = (valueKey === "maxDd" ? Math.abs(current) : current) - (valueKey === "maxDd" ? Math.abs(before) : before);
-      const positive = inverse ? delta <= 0 : delta >= 0;
-      const state = delta === 0 ? "" : positive ? "up" : "down";
-      return `<span class="trend ${state}">${delta > 0 ? "↑" : delta < 0 ? "↓" : "—"} ${formatter(Math.abs(delta))} ${comparison.label}</span>`;
-    }).join("");
-  };
-
-  trend(els.profitTrend, "totalProfit", (value) => money(value));
-  trend(els.rTrend, "totalR", (value) => `${value.toFixed(1)}R`);
-  trend(els.winTrend, "winRate", (value) => `${value.toFixed(1)}%`);
-  trend(els.ddTrend, "maxDd", (value) => `${value.toFixed(1)}R`, true);
+  renderPeriodComparisonCards();
 }
 
 function renderChart(items) {
@@ -1689,6 +1965,132 @@ function runReturnSimulation() {
     returns,
   };
   renderReturnSimulation();
+  runMonteCarloSimulation();
+}
+
+function percentile(values, ratio) {
+  if (!values.length) return 0;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const index = (sorted.length - 1) * ratio;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
+}
+
+function maxDrawdownFromBalances(balances) {
+  let peak = balances[0] || 1;
+  let maxDrawdown = 0;
+  for (const balance of balances) {
+    peak = Math.max(peak, balance);
+    maxDrawdown = Math.min(maxDrawdown, peak ? ((balance - peak) / peak) * 100 : 0);
+  }
+  return maxDrawdown;
+}
+
+function simulateMonteCarloFromRValues(rValues, { startingBalance, riskPercent, tradeCount, runCount }) {
+  const finalReturns = [];
+  const finalRValues = [];
+  const drawdowns = [];
+  const rDrawdowns = [];
+  const lossStreaks = [];
+  const lossStreakRValues = [];
+  const minEquityRValues = [];
+  let worstRun = null;
+  const checkpoints = Array.from({ length: tradeCount + 1 }, () => []);
+
+  for (let run = 0; run < runCount; run += 1) {
+    let balance = startingBalance;
+    let equityR = 0;
+    let peakR = 0;
+    let maxRDrawdown = 0;
+    let currentLossStreak = 0;
+    let maxLossStreak = 0;
+    let currentLossStreakR = 0;
+    let maxLossStreakR = 0;
+    let minEquityR = 0;
+    const balances = [balance];
+    checkpoints[0].push(0);
+    for (let tradeIndex = 1; tradeIndex <= tradeCount; tradeIndex += 1) {
+      const sampledR = rValues[Math.floor(Math.random() * rValues.length)];
+      balance += balance * (riskPercent / 100) * sampledR;
+      equityR += sampledR;
+      peakR = Math.max(peakR, equityR);
+      maxRDrawdown = Math.min(maxRDrawdown, equityR - peakR);
+      minEquityR = Math.min(minEquityR, equityR);
+      if (sampledR < 0) {
+        currentLossStreak += 1;
+        currentLossStreakR += sampledR;
+      } else {
+        currentLossStreak = 0;
+        currentLossStreakR = 0;
+      }
+      maxLossStreak = Math.max(maxLossStreak, currentLossStreak);
+      maxLossStreakR = Math.min(maxLossStreakR, currentLossStreakR);
+      balances.push(balance);
+      checkpoints[tradeIndex].push(((balance - startingBalance) / startingBalance) * 100);
+    }
+    const finalReturn = ((balance - startingBalance) / startingBalance) * 100;
+    const maxDrawdown = maxDrawdownFromBalances(balances);
+    finalReturns.push(finalReturn);
+    finalRValues.push(equityR);
+    drawdowns.push(maxDrawdown);
+    rDrawdowns.push(maxRDrawdown);
+    lossStreaks.push(maxLossStreak);
+    lossStreakRValues.push(maxLossStreakR);
+    minEquityRValues.push(minEquityR);
+    if (!worstRun || equityR < worstRun.finalR) {
+      worstRun = { finalR: equityR, finalReturn, maxRDrawdown, maxDrawdown, maxLossStreak, maxLossStreakR, minEquityR };
+    }
+  }
+
+  const p10 = checkpoints.map((values) => percentile(values, 0.1));
+  const p50 = checkpoints.map((values) => percentile(values, 0.5));
+  const p90 = checkpoints.map((values) => percentile(values, 0.9));
+  const losingRuns = finalReturns.filter((value) => value < 0).length;
+  return {
+    runCount,
+    tradeCount,
+    sampleSize: rValues.length,
+    riskPercent,
+    p10Final: percentile(finalReturns, 0.1),
+    p50Final: percentile(finalReturns, 0.5),
+    p90Final: percentile(finalReturns, 0.9),
+    medianDrawdown: percentile(drawdowns, 0.5),
+    worstDrawdown: percentile(drawdowns, 0.1),
+    losingRunRate: (losingRuns / runCount) * 100,
+    p95LossStreak: percentile(lossStreaks, 0.95),
+    p99LossStreak: percentile(lossStreaks, 0.99),
+    p95LossStreakR: percentile(lossStreakRValues, 0.05),
+    p99LossStreakR: percentile(lossStreakRValues, 0.01),
+    p95RDrawdown: percentile(rDrawdowns, 0.05),
+    p99RDrawdown: percentile(rDrawdowns, 0.01),
+    p5FinalR: percentile(finalRValues, 0.05),
+    p1FinalR: percentile(finalRValues, 0.01),
+    p5MinEquityR: percentile(minEquityRValues, 0.05),
+    p1MinEquityR: percentile(minEquityRValues, 0.01),
+    worstRun,
+    p10,
+    p50,
+    p90,
+  };
+}
+
+function runMonteCarloSimulation() {
+  const items = filteredTrades().filter((trade) => Number.isFinite(trade.r) && trade.r !== 0);
+  const rValues = items.map((trade) => trade.r);
+  const startingBalance = Math.max(1, Number(els.simBalance.value) || 100000);
+  const riskPercent = Math.max(0.01, Math.min(100, Number(els.simRisk.value) || 1));
+  const tradeCount = Math.max(10, Math.min(1000, Math.round(Number(els.simTrades.value) || 100)));
+  const runCount = Math.max(100, Math.min(5000, Math.round(Number(els.simRuns.value) || 1000)));
+  const research = selectedResearchRValues();
+  monteCarloResult = rValues.length >= 5
+    ? simulateMonteCarloFromRValues(rValues, { startingBalance, riskPercent, tradeCount, runCount })
+    : { sampleSize: rValues.length, runCount, tradeCount, riskPercent };
+  monteCarloResult.research = research?.values.length >= 5
+    ? { label: research.label, ...simulateMonteCarloFromRValues(research.values, { startingBalance, riskPercent, tradeCount, runCount }) }
+    : research ? { label: research.label, sampleSize: research.values.length } : null;
+  renderMonteCarloSimulation(monteCarloResult, rValues.length);
 }
 
 function renderReturnSimulation() {
@@ -1710,6 +2112,146 @@ function renderReturnSimulation() {
   drawLineChart(els.simulationChart, [{ values: result.returns, color, width: 3 }], { height: 300 });
 }
 
+function monteCarloMetricCards(result) {
+  const metrics = [
+    ["P10 最終報酬", `${result.p10Final >= 0 ? "+" : ""}${result.p10Final.toFixed(1)}%`, result.p10Final >= 0 ? "profit-pos" : "profit-neg"],
+    ["P50 最終報酬", `${result.p50Final >= 0 ? "+" : ""}${result.p50Final.toFixed(1)}%`, result.p50Final >= 0 ? "profit-pos" : "profit-neg"],
+    ["P90 最終報酬", `${result.p90Final >= 0 ? "+" : ""}${result.p90Final.toFixed(1)}%`, result.p90Final >= 0 ? "profit-pos" : "profit-neg"],
+    ["虧損機率", `${result.losingRunRate.toFixed(1)}%`, result.losingRunRate >= 50 ? "profit-neg" : ""],
+    ["中位最大回撤", `${result.medianDrawdown.toFixed(1)}%`, "profit-neg"],
+    ["偏差最大回撤", `${result.worstDrawdown.toFixed(1)}%`, "profit-neg"],
+  ];
+  return metrics.map(([label, value, className = ""]) => `
+    <div><span>${label}</span><strong class="${className}">${value}</strong></div>
+  `).join("");
+}
+
+function monteCarloStressBlock(result, sourceLabel) {
+  return `
+    <div class="stress-heading">
+      <div>
+        <h3>極端虧損範圍</h3>
+        <p>${sourceLabel}，觀察尾端壓力與策略走偏警戒線。</p>
+      </div>
+      <strong>${result.tradeCount} trades / run</strong>
+    </div>
+    <div class="stress-grid">
+      <div><span>95% 連敗壓力</span><strong>${Math.ceil(result.p95LossStreak)} 連敗</strong><small>${signed(result.p95LossStreakR, "R")} 連續虧損 R</small></div>
+      <div><span>99% 連敗壓力</span><strong>${Math.ceil(result.p99LossStreak)} 連敗</strong><small>${signed(result.p99LossStreakR, "R")} 連續虧損 R</small></div>
+      <div><span>95% 最大 R 回撤</span><strong>${signed(result.p95RDrawdown, "R")}</strong><small>資金低點 ${signed(result.p5MinEquityR, "R")}</small></div>
+      <div><span>99% 最大 R 回撤</span><strong>${signed(result.p99RDrawdown, "R")}</strong><small>資金低點 ${signed(result.p1MinEquityR, "R")}</small></div>
+      <div><span>5% 最差期末</span><strong>${signed(result.p5FinalR, "R")}</strong><small>100 條裡約 5 條低於此區</small></div>
+      <div><span>1% 最差期末</span><strong>${signed(result.p1FinalR, "R")}</strong><small>100 條裡約 1 條低於此區</small></div>
+    </div>
+    <div class="stress-worst">
+      <span>本次最差路徑</span>
+      <strong>${signed(result.worstRun.finalR, "R")} / ${result.worstRun.finalReturn.toFixed(1)}%</strong>
+      <small>最大 R 回撤 ${signed(result.worstRun.maxRDrawdown, "R")} · 最長 ${result.worstRun.maxLossStreak} 連敗 · 連敗段 ${signed(result.worstRun.maxLossStreakR, "R")}</small>
+    </div>
+  `;
+}
+
+function colorMonteCarloStress(container) {
+  container.querySelectorAll(".stress-grid strong, .stress-worst strong").forEach((strong) => {
+    const text = strong.textContent.trim();
+    strong.classList.toggle("profit-pos", text.startsWith("+"));
+    strong.classList.toggle("profit-neg", text.startsWith("-"));
+  });
+}
+
+function drawMonteCarloChart(canvas, result) {
+  const styles = getComputedStyle(document.body);
+  drawLineChart(canvas, [
+    { values: result.p90, color: styles.getPropertyValue("--win").trim(), width: 2, dash: [6, 6] },
+    { values: result.p50, color: styles.getPropertyValue("--accent").trim(), width: 3 },
+    { values: result.p10, color: styles.getPropertyValue("--loss").trim(), width: 2, dash: [6, 6] },
+  ], { height: 300 });
+}
+
+function renderMonteCarloPanel({ result, sampleSize = 0, metricsEl, formulaEl, chartEl, stressEl, emptyLabel, stressLabel }) {
+  if (!result || result.sampleSize < 5 || !result.worstRun) {
+    metricsEl.innerHTML = `
+      <div><span>Monte Carlo</span><strong>資料不足</strong></div>
+      <div><span>可用 R 樣本</span><strong>${sampleSize || result?.sampleSize || 0}</strong></div>
+    `;
+    stressEl.innerHTML = "";
+    formulaEl.textContent = emptyLabel;
+    drawLineChart(chartEl, [{ values: [0], color: getComputedStyle(document.body).getPropertyValue("--muted").trim(), width: 2 }], { height: 300 });
+    return;
+  }
+
+  metricsEl.innerHTML = monteCarloMetricCards(result);
+  formulaEl.textContent = `${result.runCount} runs · ${result.tradeCount} trades · ${result.sampleSize} R samples · ${result.riskPercent}% risk`;
+  stressEl.innerHTML = monteCarloStressBlock(result, stressLabel);
+  colorMonteCarloStress(stressEl);
+  drawMonteCarloChart(chartEl, result);
+}
+
+function renderMonteCarloSimulation(result, sampleSize = 0) {
+  renderMonteCarloPanel({
+    result,
+    sampleSize,
+    metricsEl: els.monteCarloMetrics,
+    formulaEl: els.monteCarloFormula,
+    chartEl: els.monteCarloChart,
+    stressEl: els.monteCarloStress,
+    emptyLabel: "至少需要 5 筆非 0R 實盤交易",
+    stressLabel: "使用目前交易紀錄 R 分布重抽樣",
+  });
+
+  renderMonteCarloPanel({
+    result: result?.research,
+    sampleSize: result?.research?.sampleSize || 0,
+    metricsEl: els.researchMonteCarloMetrics,
+    formulaEl: els.researchMonteCarloFormula,
+    chartEl: els.researchMonteCarloChart,
+    stressEl: els.researchMonteCarloStress,
+    emptyLabel: result?.research ? "回測斷點至少需要 5 筆非 0R 樣本" : "請選擇回測斷點",
+    stressLabel: result?.research?.label ? `使用回測斷點「${result.research.label}」R 分布重抽樣` : "使用回測斷點 R 分布重抽樣",
+  });
+
+  els.monteCarloCompare.innerHTML = renderResearchMonteCarloComparison(result);
+}
+
+function renderResearchMonteCarloComparison(result) {
+  if (!result?.research) {
+    return `<div class="research-compare-empty"><strong>尚未選擇回測斷點</strong><span>先在上方選擇斷點，再按重新模擬。</span></div>`;
+  }
+  if (!result.worstRun) {
+    return `<div class="research-compare-empty"><strong>實盤資料不足</strong><span>實盤至少需要 5 筆非 0R 交易，才能和回測比較。</span></div>`;
+  }
+  if (result.research.sampleSize < 5 || !result.research.worstRun) {
+    return `<div class="research-compare-empty"><strong>${result.research.label}</strong><span>回測斷點只有 ${result.research.sampleSize} 筆非 0R 樣本，至少需要 5 筆才能比較。</span></div>`;
+  }
+
+  const research = result.research;
+  const rows = [
+    ["P50 期末 R", result.p50[result.p50.length - 1], research.p50[research.p50.length - 1], "higher"],
+    ["P10 期末 R", result.p10[result.p10.length - 1], research.p10[research.p10.length - 1], "higher"],
+    ["99% 最大 R 回撤", result.p99RDrawdown, research.p99RDrawdown, "higher"],
+    ["99% 連敗壓力", result.p99LossStreak, research.p99LossStreak, "lower"],
+    ["99% 連敗段 R", result.p99LossStreakR, research.p99LossStreakR, "higher"],
+    ["虧損機率", result.losingRunRate, research.losingRunRate, "lower"],
+  ];
+  return `
+    <div class="research-compare-grid">
+      ${rows.map(([label, live, backtest, direction]) => {
+        const delta = live - backtest;
+        const improved = direction === "lower" ? delta <= 0 : delta >= 0;
+        const className = delta === 0 ? "" : improved ? "profit-pos" : "profit-neg";
+        const formatter = label.includes("機率") ? (value) => `${value.toFixed(1)}%` : label.includes("連敗壓力") ? (value) => `${Math.ceil(value)} 連敗` : (value) => signed(value, "R");
+        return `
+          <div>
+            <span>${label}</span>
+            <strong class="${className}">${formatter(live)}</strong>
+            <small>回測 ${formatter(backtest)} · 差 ${label.includes("機率") ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}pp` : label.includes("連敗壓力") ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)} 次` : signed(delta, "R")}</small>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function useJournalSimulationStats() {
   const items = filteredTrades();
   const stats = computeStats(items);
@@ -1728,11 +2270,29 @@ function useJournalSimulationStats() {
   showToast(`已帶入目前 ${items.length} 筆日誌的勝率與平均盈虧比。`);
 }
 
+function closeImagePreview() {
+  document.querySelector(".image-lightbox")?.remove();
+}
+
+function openImagePreview(src, label = "交易截圖") {
+  closeImagePreview();
+  const preview = document.createElement("div");
+  preview.className = "image-lightbox";
+  preview.innerHTML = `
+    <button type="button" class="image-lightbox-close" aria-label="關閉截圖預覽">×</button>
+    <img src="${src}" alt="${label}">
+  `;
+  preview.addEventListener("click", (event) => {
+    if (event.target === preview || event.target.closest(".image-lightbox-close")) closeImagePreview();
+  });
+  document.body.appendChild(preview);
+}
+
 function openTradeDetail(trade) {
   currentDetailId = trade.id;
   const profitClass = trade.profit >= 0 ? "profit-pos" : "profit-neg";
   const imageBlock = trade.image
-    ? `<figure class="detail-image"><img src="${trade.image}" alt="${trade.pair} 交易截圖"><figcaption>交易截圖</figcaption></figure>`
+    ? `<figure class="detail-image"><button type="button" class="detail-image-button" data-preview-image="${trade.id}" aria-label="放大交易截圖"><img src="${trade.image}" alt="${trade.pair} 交易截圖"><span>點擊放大</span></button><figcaption>交易截圖</figcaption></figure>`
     : "";
   els.detail.innerHTML = `
     <p class="eyebrow">${trade.origin === "local" ? "Local trade" : `${trade.source} · row ${trade.row}`}</p>
@@ -1796,6 +2356,7 @@ function createTradeFromForm(form) {
     exitPrice,
     mambaDecision: String(data.get("mambaDecision") || "").trim(),
     mambaR: numericOrNull("mambaR"),
+    batchId: data.get("batchId") || activeLiveBatch || "live-default",
     image: currentTradeImage || "",
     setup: String(data.get("setup") || "").trim(),
     review: String(data.get("review") || "").trim(),
@@ -1807,6 +2368,7 @@ function resetTradeForm() {
   els.tradeForm.reset();
   els.tradeForm.elements.localId.value = "";
   els.tradeForm.elements.baseKey.value = "";
+  els.tradeForm.elements.batchId.value = activeLiveBatch || "live-default";
   els.tradeForm.elements.year.value = new Date().getFullYear();
   els.tradeForm.elements.date.value = isoDate(new Date());
   els.tradeForm.elements.time.value = new Date().toTimeString().slice(0, 5);
@@ -1817,7 +2379,7 @@ function resetTradeForm() {
   updateTradeImagePreview("");
   delete els.tradeForm.elements.r.dataset.autoCalculated;
   els.dialogTitle.textContent = "新增交易";
-  els.dialogSubtitle.textContent = "記錄核心欄位，資料會保存在這個瀏覽器。";
+  els.dialogSubtitle.textContent = `記錄核心欄位，將存到「${liveBatchLabel(activeLiveBatch)}」。`;
   els.saveTrade.textContent = "儲存交易";
   updateTradeDerivedFields();
 }
@@ -1910,7 +2472,7 @@ function editTrade(trade) {
     const recordedExit = String(editable.takeProfit || "").split(/[、,;/]/)[0]?.trim();
     editable.exitPrice = recordedExit && Number.isFinite(Number(recordedExit)) ? Number(recordedExit) : "";
   }
-  const fields = ["localId", "year", "date", "time", "pair", "direction", "outcome", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips", "mambaDecision", "mambaR", "setup", "review"];
+  const fields = ["localId", "batchId", "year", "date", "time", "pair", "direction", "outcome", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips", "mambaDecision", "mambaR", "setup", "review"];
   for (const field of fields) {
     const input = els.tradeForm.elements[field];
     if (input) input.value = editable[field] ?? "";
@@ -1943,6 +2505,7 @@ function deleteTrade(trade) {
 
 function refreshAfterDataChange() {
   trades = mergeTrades();
+  populateLiveBatchOptions();
   populateFilters(true);
   render();
 }
@@ -1956,7 +2519,8 @@ function render() {
     els.window.value !== "all",
     Boolean(els.search.value.trim()),
   ].filter(Boolean).length;
-  els.filterSummary.textContent = `顯示 ${items.length} / ${trades.length} 筆交易${activeCount ? ` · ${activeCount} 個條件` : ""}`;
+  const batchTotal = trades.filter((trade) => (trade.batchId || "live-default") === activeLiveBatch).length;
+  els.filterSummary.textContent = `${liveBatchLabel(activeLiveBatch)} · 顯示 ${items.length} / ${batchTotal} 筆交易${activeCount ? ` · ${activeCount} 個條件` : ""}`;
   els.resetFilters.disabled = activeCount === 0;
   renderMetrics(items);
   renderPeriodAnalysis();
@@ -2016,13 +2580,17 @@ function fingerprintNumber(value, digits = 4) {
   return Number.isFinite(number) ? number.toFixed(digits) : "";
 }
 
-function smartTradeFingerprint(trade) {
+function tradeIdentityFingerprint(trade) {
   const date = normalizeDateValue(trade.date);
   const time = normalizeTimeValue(trade.time);
   const pair = String(trade.pair || trade.market || "").trim().toUpperCase();
   const profit = fingerprintNumber(trade.profit, 2);
   if (time) return [date, time, pair, profit].join("::");
   return [date, pair, profit, fingerprintNumber(trade.entry, 2), fingerprintNumber(trade.r, 2)].join("::");
+}
+
+function smartTradeFingerprint(trade) {
+  return `${trade.batchId || "live-default"}::${tradeIdentityFingerprint(trade)}`;
 }
 
 function prepareBackupTrade(trade) {
@@ -2033,6 +2601,7 @@ function prepareBackupTrade(trade) {
     date: normalizeDateValue(record.date),
     time: normalizeTimeValue(record.time),
     pair: String(record.pair || record.market || "").trim().toUpperCase(),
+    batchId: record.batchId || activeLiveBatch || "live-default",
     source: record.source || "Smart backup import",
   };
 }
@@ -2091,6 +2660,8 @@ function exportFullBackup() {
     suggestedFolder: "backups",
     live: {
       localTrades,
+      liveBatches,
+      activeLiveBatch,
       visibleTrades: visibleSnapshot,
       deletedTrades: Array.from(deletedTrades),
       accountRules,
@@ -2128,6 +2699,8 @@ function restoreUnifiedBackup(payload, mode = "merge") {
       ? new Set(importedTrades.map(baseTradeKey))
       : new Set(Array.isArray(livePayload.deletedTrades) ? livePayload.deletedTrades : []);
     if (livePayload.accountRules) accountRules = { ...accountRules, ...livePayload.accountRules };
+    if (Array.isArray(livePayload.liveBatches)) liveBatches = livePayload.liveBatches;
+    if (livePayload.activeLiveBatch) activeLiveBatch = livePayload.activeLiveBatch;
     if (Array.isArray(researchPayload.trades)) localStorage.setItem(RESEARCH_TRADE_KEY, JSON.stringify(researchPayload.trades));
     if (Array.isArray(researchPayload.rules)) localStorage.setItem(RESEARCH_RULE_KEY, JSON.stringify(researchPayload.rules));
     if (Array.isArray(researchPayload.legacyTrades)) localStorage.setItem(LEGACY_RESEARCH_TRADE_KEY, JSON.stringify(researchPayload.legacyTrades));
@@ -2146,6 +2719,11 @@ function restoreUnifiedBackup(payload, mode = "merge") {
     localTrades.push(...incomingUnique);
     liveAdded = incomingUnique.length;
     if (livePayload.accountRules) accountRules = { ...livePayload.accountRules, ...accountRules };
+    if (Array.isArray(livePayload.liveBatches)) {
+      const result = mergeMissingRecords(liveBatches, livePayload.liveBatches, batchFingerprint);
+      liveBatches = result.merged;
+    }
+    if (livePayload.activeLiveBatch && liveBatches.some((batch) => batch.id === livePayload.activeLiveBatch)) activeLiveBatch = livePayload.activeLiveBatch;
 
     if (Array.isArray(researchPayload.trades)) {
       const result = mergeMissingRecords(storedArray(RESEARCH_TRADE_KEY), researchPayload.trades, researchTradeFingerprint);
@@ -2176,6 +2754,8 @@ function restoreUnifiedBackup(payload, mode = "merge") {
   saveAccountRules();
   populateAccountRulesForm();
   saveLocalTrades();
+  if (!liveBatches.some((batch) => batch.id === activeLiveBatch)) activeLiveBatch = liveBatches[0]?.id || "live-default";
+  saveLiveBatches();
   refreshAfterDataChange();
   showToast(mode === "replace"
     ? `強制覆蓋完成：目前實盤 ${trades.length} 筆。`
@@ -2334,6 +2914,7 @@ function normalizeImportedRows(rows, sourceName) {
       exitPrice: exitPrice ?? (profit > 0 && Number.isFinite(Number(takeProfit)) ? Number(takeProfit) : null),
       mambaDecision: String(pickRowValue(row, ["mambaDecision", "mamba", "mamba有沒有做", "mamba決策", "mamba方向"])).trim(),
       mambaR: numberOrNull(["mambaR", "mamba績效", "mamba績效R", "mambarmultiple", "mamba r"]),
+      batchId: activeLiveBatch || "live-default",
       setup: String(pickRowValue(row, ["setup", "strategy", "策略", "型態"])),
       review: String(pickRowValue(row, ["review", "lesson", "note", "檢討", "筆記", "心得"])),
       source: sourceName,
@@ -2377,6 +2958,7 @@ function normalizeImportedTradeRows(rows, sourceName) {
       exitPrice: exitPrice ?? (profit > 0 && Number.isFinite(Number(takeProfit)) ? Number(takeProfit) : null),
       mambaDecision: String(pickRowValue(row, ["mambaDecision", "mamba", "mamba有沒有做", "mamba決策", "mamba方向"])).trim(),
       mambaR: numberOrNull(["mambaR", "mamba績效", "mamba績效R", "mambarmultiple", "mamba r"]),
+      batchId: activeLiveBatch || "live-default",
       setup: String(pickRowValue(row, ["setup", "strategy", "策略", "型態"])),
       review: String(pickRowValue(row, ["review", "lesson", "Lesson Learn", "note", "檢討", "筆記", "心得"])),
       source: sourceName,
@@ -2467,6 +3049,8 @@ async function importDataFile(file, mode = "merge") {
 }
 
 populateFilters();
+populateLiveBatchOptions();
+populateResearchBreakpointOptions();
 populateAccountRulesForm();
 renderChecklist();
 renderCalc();
@@ -2479,15 +3063,33 @@ attachCursorTrailEffects();
 render();
 
 [els.year, els.pair, els.outcome, els.window, els.search].forEach((el) => el.addEventListener("input", render));
+els.liveBatch.addEventListener("change", () => {
+  activeLiveBatch = els.liveBatch.value;
+  saveLiveBatches();
+  populateFilters();
+  render();
+  runMonteCarloSimulation();
+});
+els.addLiveBatch.addEventListener("click", openLiveBatchDialog);
+els.closeLiveBatchDialog.addEventListener("click", () => els.liveBatchDialog.close());
+els.cancelLiveBatch.addEventListener("click", () => els.liveBatchDialog.close());
+[els.liveBatchMode, els.liveBatchStart, els.liveBatchEnd].forEach((el) => el.addEventListener("input", updateLiveBatchPreview));
+els.liveBatchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  createLiveBatchFromDialog();
+});
 [els.account, els.risk, els.sl, els.pip].forEach((el) => el.addEventListener("input", renderCalc));
 els.returnSimulatorForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  populateResearchBreakpointOptions();
   runReturnSimulation();
 });
 els.useJournalStats.addEventListener("click", useJournalSimulationStats);
+els.researchBreakpoint.addEventListener("change", runMonteCarloSimulation);
 window.addEventListener("resize", () => {
   render();
   renderReturnSimulation();
+  renderMonteCarloSimulation(monteCarloResult);
 });
 
 els.theme.addEventListener("click", () => {
@@ -2495,6 +3097,7 @@ els.theme.addEventListener("click", () => {
   localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
   render();
   renderReturnSimulation();
+  renderMonteCarloSimulation(monteCarloResult);
 });
 
 els.accountRulesForm.addEventListener("submit", (event) => {
@@ -2661,12 +3264,21 @@ els.rows.addEventListener("keydown", (event) => {
 
 els.closeDrawer.addEventListener("click", closeTradeDetail);
 els.detail.addEventListener("click", (event) => {
+  const previewButton = event.target.closest("[data-preview-image]");
+  if (previewButton) {
+    const trade = trades.find((item) => String(item.id) === previewButton.dataset.previewImage);
+    if (trade?.image) openImagePreview(trade.image, `${trade.pair} 交易截圖`);
+    return;
+  }
   const action = event.target.closest("[data-trade-action]")?.dataset.tradeAction;
   if (!action || currentDetailId == null) return;
   const trade = trades.find((item) => item.id === currentDetailId);
   if (!trade) return;
   if (action === "edit") editTrade(trade);
   if (action === "delete") deleteTrade(trade);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeImagePreview();
 });
 els.exportCsv.addEventListener("click", exportFilteredCsv);
 els.exportJson.addEventListener("click", exportFullBackup);

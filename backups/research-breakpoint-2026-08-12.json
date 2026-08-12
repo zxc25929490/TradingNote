@@ -1,0 +1,338 @@
+{
+  "format": "trading-research-breakpoint",
+  "version": 2,
+  "exportedAt": "2026-08-12T00:00:00.000+08:00",
+  "breakpoint": {
+    "id": "sample-2026-0405",
+    "name": "???? 2026-0405",
+    "createdAt": "2026-04-05"
+  },
+  "trades": [
+    {
+      "id": "BT-001",
+      "date": "2026-01-05",
+      "market": "DJ30",
+      "setup": "突破",
+      "atr": 26,
+      "mine": "Long",
+      "mentor": "Long",
+      "r": 22,
+      "confidence": "A",
+      "mistakes": [],
+      "notes": "趨勢清楚，等待突破確認。",
+      "lesson": "突破後不追第一根，等回踩確認。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-002",
+      "date": "2026-01-05",
+      "market": "NAS100",
+      "setup": "突破",
+      "atr": 18,
+      "mine": "Long",
+      "mentor": "No Trade",
+      "r": 0,
+      "confidence": "B",
+      "mistakes": [
+        "Breakout Chase",
+        "Poor RR"
+      ],
+      "notes": "回撤時機晚且 SL 要更大。",
+      "lesson": "沒有合理停損就不是機會。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-003",
+      "date": "2026-01-06",
+      "market": "DJ30",
+      "setup": "突破",
+      "atr": 18,
+      "mine": "Long",
+      "mentor": "No Trade",
+      "r": 0,
+      "confidence": "B",
+      "mistakes": [
+        "Didn't Wait Candle Close"
+      ],
+      "notes": "未等收線確認。",
+      "lesson": "收線前的突破不是有效訊號。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-004",
+      "date": "2026-01-06",
+      "market": "NAS100",
+      "setup": "突破",
+      "atr": 15,
+      "mine": "Long",
+      "mentor": "No Trade",
+      "r": 2.5,
+      "confidence": "B",
+      "mistakes": [
+        "Ignored Liquidity"
+      ],
+      "notes": "應選擇更乾淨的商品。",
+      "lesson": "先比較 DJ30 與 NAS100 的結構。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-005",
+      "date": "2026-01-07",
+      "market": "NAS100",
+      "setup": "突破",
+      "atr": 12,
+      "mine": "Long",
+      "mentor": "Long",
+      "r": 4,
+      "confidence": "A",
+      "mistakes": [],
+      "notes": "流動性清掃後結構轉多。",
+      "lesson": "乾淨結構可以持有到下一個流動性。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-006",
+      "date": "2026-01-07",
+      "market": "DJ30",
+      "setup": "回撤",
+      "atr": 35,
+      "mine": "Short",
+      "mentor": "No Trade",
+      "r": -1,
+      "confidence": "C",
+      "mistakes": [
+        "Counter Trend",
+        "FOMO"
+      ],
+      "notes": "逆勢回撤失敗。",
+      "lesson": "高週期方向相反時不做。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-007",
+      "date": "2026-01-08",
+      "market": "NAS100",
+      "setup": "突破",
+      "atr": 21,
+      "mine": "Long",
+      "mentor": "Long",
+      "r": 5,
+      "confidence": "A",
+      "mistakes": [],
+      "notes": "很多 BE 是正常的。",
+      "lesson": "先保本，再讓有效突破延伸。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-008",
+      "date": "2026-01-12",
+      "market": "DJ30",
+      "setup": "突破",
+      "atr": 35,
+      "mine": "No Trade",
+      "mentor": "Long",
+      "r": 0,
+      "confidence": "B",
+      "mistakes": [
+        "Entered Too Early"
+      ],
+      "notes": "錯過確認後沒有執行。",
+      "lesson": "符合規則時必須執行。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-009",
+      "date": "2026-03-02",
+      "market": "DJ30",
+      "setup": "回撤",
+      "atr": 45,
+      "mine": "Long",
+      "mentor": "Long",
+      "r": 3.53,
+      "confidence": "A",
+      "mistakes": [],
+      "notes": "回撤至支撐，風險結構清楚。",
+      "lesson": "支撐停損比固定停損更貼近結構。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-010",
+      "date": "2026-03-03",
+      "market": "NAS100",
+      "setup": "回撤",
+      "atr": 35,
+      "mine": "Short",
+      "mentor": "No Trade",
+      "r": -1,
+      "confidence": "C",
+      "mistakes": [
+        "News Trade",
+        "Emotional Trade"
+      ],
+      "notes": "消息前強行找機會。",
+      "lesson": "重大消息前 30 分鐘不開倉。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-011",
+      "date": "2026-03-04",
+      "market": "DJ30",
+      "setup": "突破",
+      "atr": 50,
+      "mine": "Long",
+      "mentor": "Long",
+      "r": 3.25,
+      "confidence": "A",
+      "mistakes": [],
+      "notes": "突破後回測有效。",
+      "lesson": "保留突破＋回測的標準模型。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-012",
+      "date": "2026-03-05",
+      "market": "DJ30",
+      "setup": "突破",
+      "atr": 52,
+      "mine": "Long",
+      "mentor": "No Trade",
+      "r": -1,
+      "confidence": "C",
+      "mistakes": [
+        "Breakout Chase",
+        "FOMO"
+      ],
+      "notes": "連續錯過後追價。",
+      "lesson": "錯過就記錄，不補償性進場。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-013",
+      "date": "2026-03-10",
+      "market": "NAS100",
+      "setup": "突破",
+      "atr": 30,
+      "mine": "Long",
+      "mentor": "Long",
+      "r": 2.2,
+      "confidence": "B",
+      "mistakes": [],
+      "notes": "倫敦盤延續結構。",
+      "lesson": "B 級訊號只在 RR 大於 2 時執行。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-014",
+      "date": "2026-03-11",
+      "market": "DJ30",
+      "setup": "回撤",
+      "atr": 70,
+      "mine": "Long",
+      "mentor": "No Trade",
+      "r": -1,
+      "confidence": "C",
+      "mistakes": [
+        "Poor RR",
+        "Ignored Higher Timeframe"
+      ],
+      "notes": "波動過大但仍進場。",
+      "lesson": "ATR 過高時放棄。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-015",
+      "date": "2026-03-12",
+      "market": "NAS100",
+      "setup": "回撤",
+      "atr": 37,
+      "mine": "Long",
+      "mentor": "Long",
+      "r": 2.79,
+      "confidence": "A",
+      "mistakes": [],
+      "notes": "高週期與流動性方向一致。",
+      "lesson": "A 級回撤模型可承擔完整 1R。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    },
+    {
+      "id": "BT-016",
+      "date": "2026-03-13",
+      "market": "DJ30",
+      "setup": "回撤",
+      "atr": 67,
+      "mine": "Short",
+      "mentor": "No Trade",
+      "r": -1,
+      "confidence": "C",
+      "mistakes": [
+        "Counter Trend"
+      ],
+      "notes": "逆高週期做空。",
+      "lesson": "方向不一致直接 No Trade。",
+      "session": "New York",
+      "batchId": "sample-2026-0405"
+    }
+  ],
+  "rules": [
+    {
+      "id": "R-001",
+      "title": "等待 K 棒收線確認突破",
+      "description": "突破只能在 5m 或 15m K 棒收線後成立，避免假突破與追價。",
+      "status": "Verified",
+      "confidence": 88,
+      "evidence": [
+        "BT-002",
+        "BT-003",
+        "BT-011"
+      ]
+    },
+    {
+      "id": "R-002",
+      "title": "高週期方向不一致則 No Trade",
+      "description": "1H bias 與執行方向相反時，不以短週期訊號覆蓋。",
+      "status": "Testing",
+      "confidence": 76,
+      "evidence": [
+        "BT-006",
+        "BT-014",
+        "BT-016"
+      ]
+    },
+    {
+      "id": "R-003",
+      "title": "重大消息前 30 分鐘不進場",
+      "description": "CPI、NFP、FOMC 等事件前不建立新倉位。",
+      "status": "Verified",
+      "confidence": 92,
+      "evidence": [
+        "BT-010"
+      ]
+    },
+    {
+      "id": "R-004",
+      "title": "先比較同類指數的乾淨程度",
+      "description": "DJ30 與 NAS100 同時出現訊號時，只選結構、流動性與 RR 最清楚者。",
+      "status": "Testing",
+      "confidence": 64,
+      "evidence": [
+        "BT-004",
+        "BT-008"
+      ]
+    }
+  ]
+}

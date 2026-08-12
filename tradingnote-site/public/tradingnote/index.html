@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TradingNote Analytics</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=20260727-6" />
   </head>
   <body>
@@ -24,7 +25,7 @@
         <a href="#trades" data-page-link="trades"><span aria-hidden="true">≡</span>交易紀錄</a>
         <a href="#checklist" data-page-link="checklist"><span aria-hidden="true">✓</span>交易檢查</a>
         <a href="#calculator" data-page-link="calculator"><span aria-hidden="true">％</span>風控計算</a>
-        <a href="/research" target="_top"><span aria-hidden="true">R</span>回測研究系統</a>
+        <a href="../research-system/index.html"><span aria-hidden="true">R</span>回測研究系統</a>
       </nav>
     </aside>
 
@@ -35,6 +36,11 @@
           <h1 id="pageTitle">交易績效儀表板</h1>
         </div>
         <div class="actions">
+          <label class="live-batch-picker">
+            <small>目前實盤斷點</small>
+            <select id="liveBatchSelect"></select>
+          </label>
+          <button id="addLiveBatchButton" class="ghost-button" type="button">＋新斷點</button>
           <button id="themeToggle" class="icon-button" title="切換明暗模式">◐</button>
           <button id="exportCsvButton" class="ghost-button">匯出 CSV</button>
           <button id="exportJsonButton" class="ghost-button" type="button">一鍵備份</button>
@@ -87,27 +93,25 @@
             <span>總損益</span>
             <strong id="totalProfit">$0</strong>
             <small id="avgProfit">Avg $0 / trade</small>
-            <em id="profitTrend" class="trend-comparisons">—</em>
           </article>
           <article class="metric">
             <span>總 R 倍數</span>
             <strong id="totalR">0R</strong>
             <small id="avgR">Avg 0R / trade</small>
-            <em id="rTrend" class="trend-comparisons">—</em>
           </article>
           <article class="metric">
             <span>勝率</span>
             <strong id="winRate">0%</strong>
             <small id="tradeCount">0 trades</small>
-            <em id="winTrend" class="trend-comparisons">—</em>
           </article>
           <article class="metric danger">
             <span>最大回撤</span>
             <strong id="maxDd">0R</strong>
             <small id="lossStreak">0 loss streak</small>
-            <em id="ddTrend" class="trend-comparisons">—</em>
           </article>
         </section>
+
+        <section id="periodComparisonCards" class="period-compare-grid" aria-label="期間績效比較"></section>
 
         <section class="insight-grid" aria-label="Advanced metrics">
           <article class="insight">
@@ -491,21 +495,24 @@
             </div>
             <button id="useJournalStatsButton" class="ghost-button" type="button">帶入日誌數據</button>
           </div>
-          <form id="returnSimulatorForm" class="simulator-inputs">
+          <form id="returnSimulatorForm" class="simulator-inputs" novalidate>
             <label>起始資金
-              <input id="simBalanceInput" type="number" min="1" step="100" value="100000" required />
+              <input id="simBalanceInput" type="number" min="1" step="any" value="100000" required />
             </label>
             <label>每筆風險 %
-              <input id="simRiskInput" type="number" min="0.01" max="100" step="0.1" value="1" required />
+              <input id="simRiskInput" type="number" min="0.01" max="100" step="any" value="1" required />
             </label>
             <label>平均盈虧比
-              <input id="simRewardInput" type="number" min="0.01" step="0.1" value="1.5" required />
+              <input id="simRewardInput" type="number" min="0.01" step="any" value="1.5" required />
             </label>
             <label>勝率 %
-              <input id="simWinRateInput" type="number" min="0" max="100" step="0.1" value="50" required />
+              <input id="simWinRateInput" type="number" min="0" max="100" step="any" value="50" required />
             </label>
             <label>模擬筆數
               <input id="simTradesInput" type="number" min="10" max="1000" step="10" value="100" required />
+            </label>
+            <label>Monte Carlo 次數
+              <input id="simRunsInput" type="number" min="100" max="5000" step="any" value="1000" required />
             </label>
             <button class="primary-button simulator-run" type="submit">重新模擬</button>
           </form>
@@ -513,6 +520,58 @@
           <div class="simulation-chart-wrap">
             <div class="chart-legend"><span><i></i>帳戶報酬率</span><strong id="simulationFormula"></strong></div>
             <canvas id="simulationChart" aria-label="模擬交易資金曲線"></canvas>
+          </div>
+          <div class="monte-carlo-layout">
+            <section class="monte-carlo-panel live-panel">
+              <div class="mc-panel-head">
+                <div>
+                  <h3>實盤 Monte Carlo</h3>
+                  <p>使用目前交易紀錄篩選後的 R 分布。</p>
+                </div>
+                <strong id="monteCarloFormula"></strong>
+              </div>
+              <div id="monteCarloMetrics" class="simulation-metrics monte-carlo-metrics"></div>
+              <div class="simulation-chart-wrap monte-carlo-wrap">
+                <div class="chart-legend monte-carlo-legend">
+                  <span><i></i>實盤區間</span>
+                </div>
+                <canvas id="monteCarloChart" aria-label="實盤 Monte Carlo 資金曲線區間"></canvas>
+              </div>
+              <div id="monteCarloStress" class="monte-carlo-stress"></div>
+            </section>
+
+            <section class="monte-carlo-panel research-panel">
+              <div class="mc-panel-head">
+                <div>
+                  <h3>回測 Monte Carlo</h3>
+                  <p>選擇研究系統斷點，用該斷點 R 分布模擬。</p>
+                </div>
+                <label class="research-batch-picker">回測斷點
+                  <select id="researchBreakpointInput">
+                    <option value="">不比較回測</option>
+                  </select>
+                </label>
+                <strong id="researchMonteCarloFormula"></strong>
+              </div>
+              <div id="researchMonteCarloMetrics" class="simulation-metrics monte-carlo-metrics"></div>
+              <div class="simulation-chart-wrap monte-carlo-wrap">
+                <div class="chart-legend monte-carlo-legend">
+                  <span><i></i>回測區間</span>
+                </div>
+                <canvas id="researchMonteCarloChart" aria-label="回測 Monte Carlo 資金曲線區間"></canvas>
+              </div>
+              <div id="researchMonteCarloStress" class="monte-carlo-stress"></div>
+            </section>
+
+            <section class="monte-carlo-panel compare-panel">
+              <div class="mc-panel-head">
+                <div>
+                  <h3>實盤 vs 回測比較</h3>
+                  <p>看實盤是否比回測的尾端風險更差。</p>
+                </div>
+              </div>
+              <div id="monteCarloCompare" class="research-compare"></div>
+            </section>
           </div>
           <p class="simulation-note">此結果是隨機情境，不是獲利保證；實際交易還會受到滑價、手續費、連續虧損與執行差異影響。</p>
         </section>
@@ -523,6 +582,7 @@
       <form id="tradeForm" method="dialog">
         <input name="localId" type="hidden" />
         <input name="baseKey" type="hidden" />
+        <input name="batchId" type="hidden" />
         <div class="trade-command-strip" aria-hidden="true">
           <span class="signal-pill" id="tradeOutcomePulse">READY</span>
           <span class="signal-line"></span>
@@ -598,6 +658,34 @@
         <div class="modal-actions">
           <button type="button" class="ghost-button danger-button" id="clearLocalTrades">清除本機資料</button>
           <button type="submit" class="primary-button" id="saveTradeButton">儲存交易</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="liveBatchDialog" class="modal compact-modal">
+      <form id="liveBatchForm" method="dialog">
+        <div class="modal-heading">
+          <div>
+            <h2>新增實盤斷點</h2>
+            <p>建立空白斷點，或從歷史交易日期區間複製一份做樣本。</p>
+          </div>
+          <button class="icon-button" value="cancel" type="button" id="closeLiveBatchDialog">×</button>
+        </div>
+        <div class="form-grid">
+          <label class="full">斷點名稱 <input id="liveBatchNameInput" type="text" maxlength="36" required /></label>
+          <label class="full">建立方式
+            <select id="liveBatchModeInput">
+              <option value="history">從歷史資料複製</option>
+              <option value="empty">建立空白斷點</option>
+            </select>
+          </label>
+          <label>開始日期 <input id="liveBatchStartInput" type="date" /></label>
+          <label>結束日期 <input id="liveBatchEndInput" type="date" /></label>
+          <div class="full batch-preview" id="liveBatchPreview">選擇日期後會顯示可帶入的歷史績效。</div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="ghost-button" id="cancelLiveBatchButton">取消</button>
+          <button type="submit" class="primary-button">建立斷點</button>
         </div>
       </form>
     </dialog>
