@@ -7,6 +7,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="readability.css?v=20260802-9">
+  <link rel="stylesheet" href="research-ui.css?v=20260817-3">
 </head>
 <body>
   <aside class="sidebar">
@@ -24,7 +25,32 @@
     <div class="cycle">✦ <span><b>研究循環</b><small>觀察 → 驗證 → 規則化</small></span></div>
   </aside>
   <main>
-    <header><div><p>TRADING RESEARCH SYSTEM</p><h1 id="pageTitle">研究總覽</h1></div><div class="actions"><label class="batch-picker"><small>目前研究斷點</small><select id="batchSelect"></select></label><button id="importBreakpoint" class="secondary">⇧ 匯入備份</button><input id="importFile" type="file" accept="application/json,.json" hidden><button id="exportBreakpoint" class="secondary">⇩ 匯出備份</button><button id="addBreakpoint" class="secondary">＋ 新斷點</button><button id="addTrade">＋ 新增回測</button></div></header>
+    <header>
+      <div><p>TRADING RESEARCH SYSTEM</p><h1 id="pageTitle">研究總覽</h1></div>
+      <div class="actions">
+        <div class="batch-control" id="batchControl">
+          <label class="batch-picker"><small>目前研究斷點</small><select id="batchSelect" aria-label="選擇研究斷點"></select></label>
+          <details class="research-menu" id="breakpointMenu">
+            <summary class="secondary menu-more" aria-label="管理研究斷點" title="斷點管理"><span class="dot-menu-icon" aria-hidden="true"><i></i><i></i><i></i></span></summary>
+            <div class="research-menu-popover">
+              <div class="menu-heading"><b>斷點管理</b><small>建立或清理不同研究階段</small></div>
+              <button id="addBreakpoint" class="menu-action" type="button"><i aria-hidden="true">＋</i><span><b>新增斷點</b><small>建立一個全新的研究樣本</small></span></button>
+              <button id="deleteBreakpoint" class="menu-action danger" type="button"><i aria-hidden="true">×</i><span><b>刪除目前斷點</b><small id="deleteBreakpointHint">會一併移除其中的回測紀錄</small></span></button>
+            </div>
+          </details>
+        </div>
+        <details class="research-menu" id="backupMenu">
+          <summary class="secondary menu-label">備份管理</summary>
+          <div class="research-menu-popover">
+            <div class="menu-heading"><b>匯入與匯出</b><small>備份目前斷點或載入舊研究</small></div>
+            <button id="importBreakpoint" class="menu-action" type="button"><i aria-hidden="true">⇩</i><span><b>匯入備份</b><small>從檔案載入並建立新斷點</small></span></button>
+            <input id="importFile" type="file" accept="application/json,.json" hidden>
+            <button id="exportBreakpoint" class="menu-action" type="button"><i aria-hidden="true">⇧</i><span><b>匯出備份</b><small>下載目前斷點的完整資料</small></span></button>
+          </div>
+        </details>
+        <button id="addTrade">＋ 新增回測</button>
+      </div>
+    </header>
     <section id="dashboard" class="page active">
       <div id="metrics" class="metrics"></div>
       <div class="grid two"><article class="panel wide"><div class="panel-head"><span><b>Equity Curve</b><small>累積 R · 回測樣本</small></span></div><div id="equityChart" class="line-chart"></div></article><article class="panel"><div class="panel-head"><span><b>Monthly R</b><small>按月份比較策略表現</small></span></div><div id="monthlyBars" class="v-bars"></div></article></div>
@@ -78,6 +104,6 @@
     </form>
   </dialog>
   <script src="../web-prototype/data/trades.js"></script>
-  <script src="app.js?v=20260802-11"></script>
+  <script src="app.js?v=20260817-2"></script>
 </body>
 </html>
