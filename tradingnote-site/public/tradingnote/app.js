@@ -119,7 +119,12 @@ const els = {
   theme: document.querySelector("#themeToggle"),
   exportCsv: document.querySelector("#exportCsvButton"),
   liveBatch: document.querySelector("#liveBatchSelect"),
+  liveBatchControl: document.querySelector("#liveBatchControl"),
+  breakpointMenu: document.querySelector("#breakpointMenu"),
+  dataMenu: document.querySelector("#dataMenu"),
   addLiveBatch: document.querySelector("#addLiveBatchButton"),
+  deleteLiveBatch: document.querySelector("#deleteLiveBatchButton"),
+  deleteLiveBatchHint: document.querySelector("#deleteLiveBatchHint"),
   liveBatchDialog: document.querySelector("#liveBatchDialog"),
   liveBatchForm: document.querySelector("#liveBatchForm"),
   liveBatchName: document.querySelector("#liveBatchNameInput"),
@@ -313,6 +318,12 @@ function populateLiveBatchOptions() {
     return `<option value="${batch.id}">${batch.name}（${count}）</option>`;
   }).join("");
   els.liveBatch.value = activeLiveBatch;
+  const activeCount = trades.filter((trade) => trade.batchId === activeLiveBatch).length;
+  const canDelete = liveBatches.length > 1;
+  els.deleteLiveBatch.disabled = !canDelete;
+  els.deleteLiveBatchHint.textContent = canDelete
+    ? `會一併移除其中 ${activeCount} 筆交易`
+    : "至少需要保留一個斷點";
   saveLiveBatches();
 }
 
@@ -399,6 +410,47 @@ function createLiveBatchFromDialog() {
   populateLiveBatchOptions();
   render();
   showToast(selected.length ? `已建立「${name}」，並帶入 ${selected.length} 筆歷史交易。` : `已建立空白斷點「${name}」。`);
+}
+
+function closeActionMenus() {
+  [els.breakpointMenu, els.dataMenu].forEach((menu) => {
+    if (menu) menu.open = false;
+  });
+}
+
+function animateBatchControl() {
+  els.liveBatchControl.classList.remove("batch-updated");
+  requestAnimationFrame(() => els.liveBatchControl.classList.add("batch-updated"));
+}
+
+function deleteActiveLiveBatch() {
+  const batch = liveBatches.find((item) => item.id === activeLiveBatch);
+  if (!batch) return;
+  if (liveBatches.length <= 1) {
+    showToast("至少需要保留一個斷點。", "error");
+    return;
+  }
+
+  const batchTrades = trades.filter((trade) => (trade.batchId || "live-default") === batch.id);
+  const confirmed = window.confirm(
+    `確定刪除斷點「${batch.name}」？\n\n其中 ${batchTrades.length} 筆交易會一併移除。建議先從「資料管理」下載完整備份。`,
+  );
+  if (!confirmed) return;
+
+  const deletedIndex = liveBatches.findIndex((item) => item.id === batch.id);
+  localTrades = localTrades.filter((trade) => (trade.batchId || "live-default") !== batch.id);
+  batchTrades
+    .filter((trade) => trade.origin === "excel" && trade.baseKey)
+    .forEach((trade) => deletedTrades.add(trade.baseKey));
+  liveBatches = liveBatches.filter((item) => item.id !== batch.id);
+  activeLiveBatch = liveBatches[Math.min(deletedIndex, liveBatches.length - 1)]?.id || liveBatches[0].id;
+
+  saveLocalTrades();
+  saveLiveBatches();
+  closeActionMenus();
+  refreshAfterDataChange();
+  animateBatchControl();
+  showToast(`已刪除斷點「${batch.name}」與其中 ${batchTrades.length} 筆交易。`);
 }
 
 function addLiveBatch() {
@@ -3069,14 +3121,34 @@ els.liveBatch.addEventListener("change", () => {
   populateFilters();
   render();
   runMonteCarloSimulation();
+  animateBatchControl();
 });
-els.addLiveBatch.addEventListener("click", openLiveBatchDialog);
+els.addLiveBatch.addEventListener("click", () => {
+  closeActionMenus();
+  openLiveBatchDialog();
+});
+els.deleteLiveBatch.addEventListener("click", deleteActiveLiveBatch);
 els.closeLiveBatchDialog.addEventListener("click", () => els.liveBatchDialog.close());
 els.cancelLiveBatch.addEventListener("click", () => els.liveBatchDialog.close());
 [els.liveBatchMode, els.liveBatchStart, els.liveBatchEnd].forEach((el) => el.addEventListener("input", updateLiveBatchPreview));
 els.liveBatchForm.addEventListener("submit", (event) => {
   event.preventDefault();
   createLiveBatchFromDialog();
+  animateBatchControl();
+});
+[els.breakpointMenu, els.dataMenu].forEach((menu) => {
+  menu.addEventListener("toggle", () => {
+    if (!menu.open) return;
+    [els.breakpointMenu, els.dataMenu].forEach((other) => {
+      if (other !== menu) other.open = false;
+    });
+  });
+});
+els.dataMenu.addEventListener("click", (event) => {
+  if (event.target.closest(".menu-action")) window.setTimeout(closeActionMenus, 120);
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".action-menu")) closeActionMenus();
 });
 [els.account, els.risk, els.sl, els.pip].forEach((el) => el.addEventListener("input", renderCalc));
 els.returnSimulatorForm.addEventListener("submit", (event) => {

@@ -206,6 +206,21 @@ h2 {
   gap: 10px;
 }
 
+.live-batch-control {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.live-batch-control.batch-updated {
+  animation: batch-updated 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .live-batch-picker,
 .research-batch-picker {
   display: flex;
@@ -224,6 +239,145 @@ h2 {
   background: var(--surface);
   color: var(--text);
   padding: 8px 10px;
+}
+
+.live-batch-control .live-batch-picker {
+  padding-left: 4px;
+}
+
+.action-menu {
+  position: relative;
+  z-index: 7;
+}
+
+.action-menu[open] {
+  z-index: 9;
+}
+
+.action-menu summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  list-style: none;
+  user-select: none;
+}
+
+.action-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.action-menu summary span {
+  color: var(--muted);
+  transition: transform 180ms ease;
+}
+
+.action-menu[open] summary {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  color: var(--accent);
+}
+
+.action-menu[open] summary span {
+  transform: rotate(180deg);
+}
+
+.action-menu-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(330px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, var(--accent) 16%);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+  transform-origin: top right;
+  animation: menu-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.menu-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 15px 16px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.menu-heading strong {
+  font-size: 13px;
+}
+
+.menu-heading span,
+.menu-action small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.menu-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 68%, transparent);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease, padding-left 150ms ease;
+}
+
+.menu-action:last-child {
+  border-bottom: 0;
+}
+
+.menu-action:hover,
+.menu-action:focus-visible {
+  padding-left: 18px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  outline: 0;
+}
+
+.menu-action > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menu-icon {
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.danger-menu-action {
+  color: var(--loss);
+}
+
+.danger-menu-action .menu-icon {
+  background: color-mix(in srgb, var(--loss) 10%, var(--surface-2));
+  color: var(--loss);
+}
+
+.menu-action:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.menu-action:disabled:hover {
+  padding-left: 14px;
+  background: transparent;
 }
 
 .icon-button,
@@ -2805,6 +2959,14 @@ td:nth-child(12) {
 }
 
 @media (max-width: 1180px) {
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .actions {
+    justify-content: flex-end;
+  }
+
   .insight-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -2871,6 +3033,23 @@ td:nth-child(12) {
     flex-direction: column;
   }
 
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .live-batch-control {
+    flex: 1 1 440px;
+  }
+
+  .live-batch-picker {
+    flex: 1 1 auto;
+  }
+
+  .live-batch-picker select {
+    width: 100%;
+  }
+
   .metric-grid,
   .panel-grid,
   .bottom-grid,
@@ -2886,6 +3065,18 @@ td:nth-child(12) {
 }
 
 @media (max-width: 760px) {
+  .shell {
+    padding: 16px;
+  }
+
+  .live-batch-control {
+    flex: 1 1 100%;
+  }
+
+  .data-menu {
+    margin-left: auto;
+  }
+
   .monte-carlo-layout {
     grid-template-columns: 1fr;
   }
@@ -2896,6 +3087,85 @@ td:nth-child(12) {
 }
 
 @media (max-width: 560px) {
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    padding: 13px 14px 0;
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    backdrop-filter: blur(16px);
+  }
+
+  .brand {
+    margin-bottom: 10px;
+  }
+
+  nav {
+    margin-top: 0;
+    gap: 3px;
+  }
+
+  nav a {
+    flex: 0 0 auto;
+    min-height: 42px;
+    padding: 9px 10px;
+  }
+
+  .shell {
+    padding: 12px;
+  }
+
+  .topbar {
+    gap: 14px;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px minmax(118px, auto);
+    gap: 8px;
+  }
+
+  .live-batch-control {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+  }
+
+  .live-batch-picker select {
+    min-width: 0;
+  }
+
+  .action-menu-popover {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    max-height: min(72dvh, 520px);
+    overflow-y: auto;
+    transform-origin: bottom center;
+    animation-name: menu-in-mobile;
+  }
+
+  .breakpoint-menu .action-menu-popover {
+    bottom: 12px;
+  }
+
+  .data-menu {
+    margin-left: 0;
+  }
+
+  .data-menu summary,
+  #newTradeButton {
+    width: 100%;
+  }
+
+  .filters {
+    z-index: 4;
+  }
+
   .metric-grid,
   .insight-grid,
   .period-stats,
@@ -3059,6 +3329,42 @@ td:nth-child(12) {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes menu-in-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes batch-updated {
+  0% {
+    border-color: color-mix(in srgb, var(--accent) 72%, var(--line));
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 30%, transparent);
+    transform: scale(0.985);
+  }
+  65% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+  100% {
+    transform: scale(1);
   }
 }
 

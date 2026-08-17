@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TradingNote Analytics</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260727-6" />
+    <link rel="stylesheet" href="styles.css?v=20260817-1" />
   </head>
   <body>
     <aside class="sidebar">
@@ -36,18 +36,59 @@
           <h1 id="pageTitle">交易績效儀表板</h1>
         </div>
         <div class="actions">
-          <label class="live-batch-picker">
-            <small>目前實盤斷點</small>
-            <select id="liveBatchSelect"></select>
-          </label>
-          <button id="addLiveBatchButton" class="ghost-button" type="button">＋新斷點</button>
-          <button id="themeToggle" class="icon-button" title="切換明暗模式">◐</button>
-          <button id="exportCsvButton" class="ghost-button">匯出 CSV</button>
-          <button id="exportJsonButton" class="ghost-button" type="button">一鍵備份</button>
-          <label class="file-button" for="backupImportInput" title="比較現有資料，只補上缺少的紀錄">智慧匯入備份</label>
-          <input id="backupImportInput" class="visually-hidden" type="file" accept="application/json,.json" />
-          <label class="file-button danger-button" for="backupForceImportInput" title="完全以備份內容取代目前本機資料">強制覆蓋</label>
-          <input id="backupForceImportInput" class="visually-hidden" type="file" accept="application/json,.json" />
+          <div class="live-batch-control" id="liveBatchControl">
+            <label class="live-batch-picker">
+              <small>目前實盤斷點</small>
+              <select id="liveBatchSelect" aria-label="選擇實盤斷點"></select>
+            </label>
+            <details class="action-menu breakpoint-menu" id="breakpointMenu">
+              <summary class="ghost-button" aria-label="管理斷點">斷點管理 <span aria-hidden="true">⌄</span></summary>
+              <div class="action-menu-popover" role="menu">
+                <div class="menu-heading">
+                  <strong>斷點管理</strong>
+                  <span>建立、切換或清理不同階段資料</span>
+                </div>
+                <button id="addLiveBatchButton" class="menu-action" type="button" role="menuitem">
+                  <span class="menu-icon" aria-hidden="true">＋</span>
+                  <span><strong>新增斷點</strong><small>建立空白斷點或複製歷史區間</small></span>
+                </button>
+                <button id="deleteLiveBatchButton" class="menu-action danger-menu-action" type="button" role="menuitem">
+                  <span class="menu-icon" aria-hidden="true">×</span>
+                  <span><strong>刪除目前斷點</strong><small id="deleteLiveBatchHint">會一併移除其中的交易</small></span>
+                </button>
+              </div>
+            </details>
+          </div>
+
+          <details class="action-menu data-menu" id="dataMenu">
+            <summary class="ghost-button" aria-label="資料與備份管理">資料管理 <span aria-hidden="true">⌄</span></summary>
+            <div class="action-menu-popover" role="menu">
+              <div class="menu-heading">
+                <strong>資料與備份</strong>
+                <span>匯出、備份與還原都收在這裡</span>
+              </div>
+              <button id="exportCsvButton" class="menu-action" type="button" role="menuitem">
+                <span class="menu-icon" aria-hidden="true">CSV</span>
+                <span><strong>匯出目前篩選</strong><small>下載目前畫面中的交易資料</small></span>
+              </button>
+              <button id="exportJsonButton" class="menu-action" type="button" role="menuitem">
+                <span class="menu-icon" aria-hidden="true">↓</span>
+                <span><strong>完整備份</strong><small>包含所有斷點、設定與研究資料</small></span>
+              </button>
+              <label class="menu-action" for="backupImportInput" role="menuitem">
+                <span class="menu-icon" aria-hidden="true">＋</span>
+                <span><strong>智慧匯入備份</strong><small>只補上目前缺少的紀錄</small></span>
+              </label>
+              <input id="backupImportInput" class="visually-hidden" type="file" accept="application/json,.json" />
+              <label class="menu-action danger-menu-action" for="backupForceImportInput" role="menuitem">
+                <span class="menu-icon" aria-hidden="true">!</span>
+                <span><strong>強制覆蓋</strong><small>用備份內容重建本機資料</small></span>
+              </label>
+              <input id="backupForceImportInput" class="visually-hidden" type="file" accept="application/json,.json" />
+            </div>
+          </details>
+
+          <button id="themeToggle" class="icon-button" title="切換明暗模式" aria-label="切換明暗模式">◐</button>
           <button id="newTradeButton" class="primary-button">＋新增交易</button>
         </div>
       </header>
@@ -699,6 +740,6 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
-    <script src="app.js?v=20260807-3"></script>
+    <script src="app.js?v=20260817-1"></script>
   </body>
 </html>
