@@ -23,12 +23,48 @@ const defaultRules=[
  {id:'R-004',title:'先比較同類指數的乾淨程度',description:'DJ30 與 NAS100 同時出現訊號時，只選結構、流動性與 RR 最清楚者。',status:'Testing',confidence:64,evidence:['BT-004','BT-008']}
 ];
 const rec={'Breakout Chase':'要求收線＋回測確認，錯過後禁止追價。','Poor RR':'低於 2R 的計畫不建立交易。','Counter Trend':'固定顯示 1H bias，方向衝突直接 No Trade。','FOMO':'錯過的交易只截圖，不追價。','News Trade':'重大數據前後 30 分鐘鎖定為禁入區。','Ignored Liquidity':'進場前標記最近的流動性。','Entered Too Early':'把確認條件加入進場前檢查。',"Didn't Wait Candle Close":'設定收線提醒，收線前不下單。','Emotional Trade':'連續兩筆虧損後休息 30 分鐘。','Ignored Higher Timeframe':'先完成 1H/4H bias。'};
+function normalizeRuleTitle(value){return String(value||'').normalize('NFKC').trim().toLowerCase().replace(/\s+/g,' ')}
+function ruleContentKey(rule){return normalizeRuleTitle(rule?.title)||`id:${String(rule?.id||'').trim().toLowerCase()}`}
+function mergeRuleEvidence(first=[],second=[]){return[...new Set([...first,...second].map(String).map(value=>value.trim()).filter(Boolean))]}
+function dedupeRules(list){
+ const unique=[],byKey=new Map();
+ for(const source of Array.isArray(list)?list:[]){
+  const rule={...source,evidence:Array.isArray(source?.evidence)?source.evidence:[]},key=ruleContentKey(rule),existing=byKey.get(key);
+  if(!existing){byKey.set(key,rule);unique.push(rule);continue}
+  existing.evidence=mergeRuleEvidence(existing.evidence,rule.evidence);
+  existing.confidence=Math.max(Number(existing.confidence)||0,Number(rule.confidence)||0);
+  if(!existing.description&&rule.description)existing.description=rule.description;
+ }
+ return unique;
+}
+function mergeImportedRules(incoming,idMap,stamp){
+ const byKey=new Map(rules.map(rule=>[ruleContentKey(rule),rule])),usedIds=new Set(rules.map(rule=>String(rule.id))),sourceRules=Array.isArray(incoming)?incoming:[];
+ let added=0,merged=0;
+ sourceRules.forEach((source,index)=>{
+  const mappedEvidence=mergeRuleEvidence([],source.evidence||[]).map(tradeId=>idMap.get(String(tradeId))||String(tradeId)),key=ruleContentKey(source),existing=byKey.get(key);
+  if(existing){const before=existing.evidence.length;existing.evidence=mergeRuleEvidence(existing.evidence,mappedEvidence);if(existing.evidence.length>before)merged++;return}
+  let id=String(source.id||`R-IMPORT-${index+1}`);if(usedIds.has(id))id=`R-I${String(stamp).slice(-5)}-${index+1}`;usedIds.add(id);
+  const rule={...source,id,evidence:mappedEvidence};rules.push(rule);byKey.set(key,rule);added++;
+ });
+ return{added,merged,skipped:sourceRules.length-added};
+}
+function researchTradeCoreKey(trade){const rawR=trade?.r,r=rawR===''||rawR==null||!Number.isFinite(Number(rawR))?null:Number(rawR);return JSON.stringify([trade?.date||'',trade?.market||'',trade?.session||'',trade?.setup||'',trade?.mine||'',trade?.mentor||'',r,trade?.confidence||'',Array.isArray(trade?.mistakes)?[...trade.mistakes].sort():[],trade?.notes||'',trade?.lesson||''])}
+function researchBackupFingerprint(backup){
+ const name=String(backup?.breakpoint?.name||'').replace(/（匯入）$/,'').trim().toLowerCase(),createdAt=String(backup?.breakpoint?.createdAt||''),tradeKeys=(Array.isArray(backup?.trades)?backup.trades:[]).map(researchTradeCoreKey).sort(),text=JSON.stringify([name,createdAt,tradeKeys]);
+ let hash=2166136261;for(let index=0;index<text.length;index++)hash=Math.imul(hash^text.charCodeAt(index),16777619);return`research-${(hash>>>0).toString(16).padStart(8,'0')}`;
+}
+function mapBackupTradeIdsToBatch(backupTrades,batchTrades){
+ const pools=new Map();for(const trade of batchTrades){const key=researchTradeCoreKey(trade),items=pools.get(key)||[];items.push(String(trade.id));pools.set(key,items)}
+ const idMap=new Map();for(const trade of backupTrades){const sourceId=String(trade.id),direct=batchTrades.find(item=>String(item.sourceTradeId||'')===sourceId),pool=pools.get(researchTradeCoreKey(trade))||[],targetId=direct?.id||pool.shift();if(targetId)idMap.set(sourceId,String(targetId))}return idMap;
+}
 const storedTrades=JSON.parse(localStorage.getItem('trs.trades')||'null')||sample;
 let batches=JSON.parse(localStorage.getItem('trs.batches')||'null')||[{id:'sample-2026-0405',name:'回測樣本 2026-0405',createdAt:'2026-04-05'}];
 let activeBatch=localStorage.getItem('trs.activeBatch')||batches[0].id;
 let allTrades=storedTrades.map(t=>({...t,batchId:t.batchId||batches[0].id}));
 let trades=[];
-let rules=JSON.parse(localStorage.getItem('trs.rules')||'null')||defaultRules;
+const storedRules=JSON.parse(localStorage.getItem('trs.rules')||'null')||defaultRules;
+let rules=dedupeRules(storedRules);
+if(rules.length!==storedRules.length)localStorage.setItem('trs.rules',JSON.stringify(rules));
 let activeRule=rules[0]?.id;
 let editingTradeId=null;
 let actualTrades=[];
@@ -40,6 +76,19 @@ function renderBatchSelect(){const select=$('#batchSelect');select.innerHTML=bat
 function closeResearchMenus(){$$('.research-menu').forEach(menu=>menu.open=false)}
 function animateBatchControl(){const control=$('#batchControl');control.classList.remove('batch-updated');requestAnimationFrame(()=>control.classList.add('batch-updated'))}
 function deleteActiveBreakpoint(){const batch=batches.find(item=>item.id===activeBatch);if(!batch)return;if(batches.length<=1){alert('至少需要保留一個研究斷點。');return}const count=allTrades.filter(t=>t.batchId===batch.id).length;if(!confirm(`確定刪除研究斷點「${batch.name}」？\n\n其中 ${count} 筆回測紀錄會一併移除。建議先從「備份管理」匯出備份。`))return;const index=batches.findIndex(item=>item.id===batch.id);allTrades=allTrades.filter(t=>t.batchId!==batch.id);batches=batches.filter(item=>item.id!==batch.id);activeBatch=batches[Math.min(index,batches.length-1)]?.id||batches[0].id;closeResearchMenus();syncBatch();render();animateBatchControl()}
+async function importResearchBreakpointFile(file){
+ const backup=JSON.parse(await file.text());
+ if(backup.format!=='trading-research-breakpoint'||!backup.breakpoint||!Array.isArray(backup.trades))throw new Error('這不是有效的 Trading Research 斷點備份');
+ const stamp=Date.now(),sourceFingerprint=researchBackupFingerprint(backup),matchingBatch=batches.find(batch=>batch.sourceFingerprint===sourceFingerprint||researchBackupFingerprint({breakpoint:batch,trades:allTrades.filter(trade=>trade.batchId===batch.id)})===sourceFingerprint);
+ if(matchingBatch){const batchTrades=allTrades.filter(trade=>trade.batchId===matchingBatch.id),idMap=mapBackupTradeIdsToBatch(backup.trades,batchTrades),ruleResult=mergeImportedRules(backup.rules,idMap,stamp);matchingBatch.sourceFingerprint=sourceFingerprint;activeBatch=matchingBatch.id;localStorage.setItem('trs.rules',JSON.stringify(rules));syncBatch();render();alert(`這份備份已存在於「${matchingBatch.name}」，未建立重複斷點。Rule Book 新增 ${ruleResult.added} 條、合併 ${ruleResult.merged} 條。`);return}
+ const newBatchId=`batch-import-${stamp}`,usedTradeIds=new Set(allTrades.map(t=>String(t.id))),idMap=new Map();
+ const importedTrades=backup.trades.map((trade,index)=>{const sourceTradeId=String(trade.id||`BT-IMPORT-${index+1}`);let id=sourceTradeId;if(usedTradeIds.has(id))id=`BT-I${String(stamp).slice(-5)}-${String(index+1).padStart(3,'0')}`;usedTradeIds.add(id);idMap.set(sourceTradeId,id);return{...trade,id,sourceTradeId,batchId:newBatchId}});
+ const ruleResult=mergeImportedRules(backup.rules,idMap,stamp);
+ const sourceName=String(backup.breakpoint.name||file.name.replace(/\.json$/i,'')).replace(/（匯入）$/,'');
+ batches.push({id:newBatchId,name:`${sourceName}（匯入）`,createdAt:backup.breakpoint.createdAt||new Date().toISOString().slice(0,10),importedAt:new Date().toISOString(),sourceFingerprint});
+ allTrades.push(...importedTrades);activeBatch=newBatchId;localStorage.setItem('trs.rules',JSON.stringify(rules));syncBatch();render();
+ alert(`匯入完成：${importedTrades.length} 筆交易已放入新斷點；Rule Book 新增 ${ruleResult.added} 條、合併 ${ruleResult.merged} 條，重複規則未再次建立。`);
+}
 function groups(list,key){return Object.values(list.reduce((a,t)=>{const k=key(t);a[k]??={name:k,items:[],r:0};a[k].items.push(t);a[k].r+=t.r;return a},{}))}
 function mistakeData(){return groups(trades.flatMap(t=>t.mistakes.map(name=>({...t,name}))),t=>t.name).map(g=>{const completed=g.items.filter(hasR);return{name:g.name,count:g.items.length,avg:completed.length?completed.reduce((s,t)=>s+t.r,0)/completed.length:0,win:completed.length?completed.filter(t=>t.r>0).length/completed.length*100:0,last:g.items.map(t=>t.date).sort().at(-1)}}).sort((a,b)=>b.count-a.count)}
 function normalizeRealityDate(value){if(value==null||value==='')return'';if(typeof value==='number'&&value>20000)return new Date(Date.UTC(1899,11,30+value)).toISOString().slice(0,10);const text=String(value).trim(),ymd=text.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/),mdy=text.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);if(ymd)return`${ymd[1]}-${ymd[2].padStart(2,'0')}-${ymd[3].padStart(2,'0')}`;if(mdy)return`${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`;const parsed=new Date(text);return Number.isNaN(parsed.getTime())?'':parsed.toISOString().slice(0,10)}
@@ -119,8 +168,9 @@ $('#importActual').onclick=()=>$('#actualFile').click();
 loadActual();
 $('#actualFile').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{const imported=normalizeActual(JSON.parse(await file.text()));if(!imported.length)throw new Error('JSON 中找不到同時具有日期與 R 的實盤紀錄');actualTrades=imported;actualSourceLabel=`已匯入 ${file.name}（${imported.length} 筆有 R）`;localStorage.setItem('trs.actualTrades',JSON.stringify(imported));renderReality()}catch(error){alert(`匯入失敗：${error.message}`)}finally{event.target.value=''}};
 const titles={dashboard:'研究總覽',reality:'回測 vs 實盤',journal:'回測紀錄',differences:'決策差異',rules:'Rule Book',mistakes:'錯誤資料庫',analytics:'深度分析'};$$('#nav button').forEach(b=>b.onclick=()=>{$$('#nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$$('.page').forEach(x=>x.classList.remove('active'));$('#'+b.dataset.view).classList.add('active');$('#pageTitle').textContent=titles[b.dataset.view]});
-$('#search').oninput=renderTable;$('#marketFilter').onchange=renderTable;$('#batchSelect').onchange=e=>{activeBatch=e.target.value;syncBatch();render()};$('#importBreakpoint').onclick=()=>$('#importFile').click();$('#importFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const backup=JSON.parse(await file.text());if(backup.format!=='trading-research-breakpoint'||!backup.breakpoint||!Array.isArray(backup.trades))throw new Error('這不是有效的 Trading Research 斷點備份');const stamp=Date.now(),newBatchId=`batch-import-${stamp}`,usedTradeIds=new Set(allTrades.map(t=>t.id)),idMap=new Map();const importedTrades=backup.trades.map((trade,index)=>{let id=String(trade.id||`BT-IMPORT-${index+1}`);if(usedTradeIds.has(id))id=`BT-I${String(stamp).slice(-5)}-${String(index+1).padStart(3,'0')}`;usedTradeIds.add(id);idMap.set(String(trade.id),id);return{...trade,id,batchId:newBatchId}});const usedRuleIds=new Set(rules.map(r=>r.id)),importedRules=(Array.isArray(backup.rules)?backup.rules:[]).map((rule,index)=>{let id=String(rule.id||`R-IMPORT-${index+1}`);if(usedRuleIds.has(id))id=`R-I${String(stamp).slice(-5)}-${index+1}`;usedRuleIds.add(id);return{...rule,id,evidence:(rule.evidence||[]).map(tradeId=>idMap.get(String(tradeId))||String(tradeId))}});batches.push({id:newBatchId,name:`${backup.breakpoint.name||file.name.replace(/\.json$/i,'')}（匯入）`,createdAt:backup.breakpoint.createdAt||new Date().toISOString().slice(0,10),importedAt:new Date().toISOString()});allTrades.push(...importedTrades);rules.push(...importedRules);activeBatch=newBatchId;localStorage.setItem('trs.rules',JSON.stringify(rules));syncBatch();render();alert(`匯入完成：${importedTrades.length} 筆交易，已建立新的研究斷點。`)}catch(error){alert(`匯入失敗：${error.message}`)}finally{e.target.value=''}};$('#exportBreakpoint').onclick=()=>{const batch=batches.find(b=>b.id===activeBatch),backup={format:'trading-research-breakpoint',version:2,exportedAt:new Date().toISOString(),breakpoint:batch,trades,rules};const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a'),safeName=(batch?.name||'research-breakpoint').replace(/[\\/:*?"<>|]/g,'-');link.href=url;link.download=`${safeName}_${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('#addBreakpoint').onclick=()=>{const fallback=`研究斷點 ${batches.length+1}`,name=prompt('請輸入新斷點名稱（例如：等待收線規則 v2）',fallback);if(!name)return;const id=`batch-${Date.now()}`;batches.push({id,name:name.trim()||fallback,createdAt:new Date().toISOString().slice(0,10)});activeBatch=id;syncBatch();render()};$('#addTrade').onclick=()=>$('#tradeDialog').showModal();$$('[data-close]').forEach(b=>b.onclick=()=>$('#tradeDialog').close());$('#tradeForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),r=Number(f.get('r')),item={id:`BT-${Date.now().toString().slice(-6)}`,batchId:activeBatch,date:f.get('date'),market:f.get('market'),session:f.get('session'),setup:f.get('setup'),atr:0,mine:f.get('mine'),mentor:f.get('mentor'),r,confidence:f.get('confidence'),mistakes:String(f.get('mistakes')).split(',').map(x=>x.trim()).filter(Boolean),notes:f.get('notes'),lesson:f.get('lesson')};allTrades.unshift(item);syncBatch();$('#tradeDialog').close();e.target.reset();render()};$('#addRule').onclick=()=>{rules.push({id:`R-${String(rules.length+1).padStart(3,'0')}`,title:'新研究規則',description:'填寫這條規則要解決的重複決策問題。',status:'Testing',confidence:50,evidence:[]});localStorage.setItem('trs.rules',JSON.stringify(rules));activeRule=rules.at(-1).id;renderRules()};syncBatch();render();
+$('#search').oninput=renderTable;$('#marketFilter').onchange=renderTable;$('#batchSelect').onchange=e=>{activeBatch=e.target.value;syncBatch();render()};$('#importBreakpoint').onclick=()=>$('#importFile').click();$('#exportBreakpoint').onclick=()=>{const batch=batches.find(b=>b.id===activeBatch),backup={format:'trading-research-breakpoint',version:2,exportedAt:new Date().toISOString(),breakpoint:batch,trades,rules};const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a'),safeName=(batch?.name||'research-breakpoint').replace(/[\\/:*?"<>|]/g,'-');link.href=url;link.download=`${safeName}_${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('#addBreakpoint').onclick=()=>{const fallback=`研究斷點 ${batches.length+1}`,name=prompt('請輸入新斷點名稱（例如：等待收線規則 v2）',fallback);if(!name)return;const id=`batch-${Date.now()}`;batches.push({id,name:name.trim()||fallback,createdAt:new Date().toISOString().slice(0,10)});activeBatch=id;syncBatch();render()};$('#addTrade').onclick=()=>$('#tradeDialog').showModal();$$('[data-close]').forEach(b=>b.onclick=()=>$('#tradeDialog').close());$('#tradeForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),r=Number(f.get('r')),item={id:`BT-${Date.now().toString().slice(-6)}`,batchId:activeBatch,date:f.get('date'),market:f.get('market'),session:f.get('session'),setup:f.get('setup'),atr:0,mine:f.get('mine'),mentor:f.get('mentor'),r,confidence:f.get('confidence'),mistakes:String(f.get('mistakes')).split(',').map(x=>x.trim()).filter(Boolean),notes:f.get('notes'),lesson:f.get('lesson')};allTrades.unshift(item);syncBatch();$('#tradeDialog').close();e.target.reset();render()};$('#addRule').onclick=()=>{rules.push({id:`R-${String(rules.length+1).padStart(3,'0')}`,title:'新研究規則',description:'填寫這條規則要解決的重複決策問題。',status:'Testing',confidence:50,evidence:[]});localStorage.setItem('trs.rules',JSON.stringify(rules));activeRule=rules.at(-1).id;renderRules()};syncBatch();render();
 
+$('#importFile').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{await importResearchBreakpointFile(file)}catch(error){alert(`匯入失敗：${error.message}`)}finally{event.target.value=''}};
 const originalImportBreakpoint=$('#importBreakpoint').onclick;
 $('#importBreakpoint').onclick=event=>{closeResearchMenus();originalImportBreakpoint.call(event.currentTarget,event)};
 const originalExportBreakpoint=$('#exportBreakpoint').onclick;

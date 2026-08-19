@@ -2722,6 +2722,170 @@ td:nth-child(12) {
   width: min(560px, calc(100vw - 28px));
 }
 
+.mt4-import-modal {
+  width: min(820px, calc(100vw - 28px));
+}
+
+.mt4-import-guide {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mt4-import-guide span {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mt4-import-guide b {
+  display: inline-grid;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.mt4-import-guide code {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+.mt4-paste-label {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mt4-import-textarea {
+  width: 100%;
+  min-height: 240px;
+  resize: vertical;
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
+  background: color-mix(in srgb, var(--surface-2) 92%, #000);
+  font: 12px/1.55 "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  white-space: pre;
+}
+
+.mt4-import-preview {
+  margin-top: 12px;
+}
+
+.move-trades-modal {
+  width: min(760px, calc(100vw - 28px));
+}
+
+.move-trades-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.move-select-all {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.move-select-all input,
+.move-trade-row input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+}
+
+.move-trades-list {
+  display: grid;
+  max-height: min(44vh, 420px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+}
+
+.move-trade-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--line);
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.move-trade-row:last-child {
+  border-bottom: 0;
+}
+
+.move-trade-row:hover {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.move-trade-row span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.move-trade-row b,
+.move-trade-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.move-trade-row small {
+  color: var(--muted);
+}
+
+.move-trades-preview {
+  margin-top: 12px;
+}
+
+.detail-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 22px 0 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.detail-section-heading span {
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.detail-section-heading small {
+  color: var(--muted);
+}
+
+.ea-detail-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ea-detail-list {
+  margin-top: 10px;
+}
+
 .batch-preview {
   display: grid;
   gap: 6px;
@@ -3310,6 +3474,27 @@ td:nth-child(12) {
 
   .trade-command-strip {
     grid-template-columns: 1fr;
+  }
+
+  .mt4-import-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .move-trades-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .move-trade-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .move-trade-row > strong {
+    grid-column: 2;
+  }
+
+  .mt4-import-textarea {
+    min-height: 210px;
   }
 
   .signal-line {

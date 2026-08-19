@@ -3,6 +3,7 @@ const STORAGE_KEY = "tradingnote.localTrades";
 const DELETED_KEY = "tradingnote.deletedTrades";
 const LIVE_BATCH_KEY = "tradingnote.liveBatches";
 const LIVE_ACTIVE_BATCH_KEY = "tradingnote.activeLiveBatch";
+const ALL_LIVE_BATCH_ID = "live-all";
 const ACCOUNT_RULES_KEY = "tradingnote.accountRules";
 const THEME_KEY = "tradingnote.theme";
 const RESEARCH_TRADE_KEY = "trading-research.trades.v1";
@@ -41,6 +42,7 @@ let selectedPeriodWeekStart = null;
 let reviewsExpanded = false;
 let currentTradeImage = "";
 let monteCarloResult = null;
+let moveTradeCandidates = new Map();
 
 const els = {
   year: document.querySelector("#yearFilter"),
@@ -173,6 +175,24 @@ const els = {
   backupImport: document.querySelector("#backupImportInput"),
   backupForceImport: document.querySelector("#backupForceImportInput"),
   exportJson: document.querySelector("#exportJsonButton"),
+  moveTrades: document.querySelector("#moveTradesButton"),
+  moveTradesDialog: document.querySelector("#moveTradesDialog"),
+  moveTradesForm: document.querySelector("#moveTradesForm"),
+  moveTradesSubtitle: document.querySelector("#moveTradesSubtitle"),
+  moveTradesTarget: document.querySelector("#moveTradesTarget"),
+  moveTradesSelectAll: document.querySelector("#moveTradesSelectAll"),
+  moveTradesList: document.querySelector("#moveTradesList"),
+  moveTradesPreview: document.querySelector("#moveTradesPreview"),
+  closeMoveTradesDialog: document.querySelector("#closeMoveTradesDialog"),
+  cancelMoveTrades: document.querySelector("#cancelMoveTradesButton"),
+  confirmMoveTrades: document.querySelector("#confirmMoveTradesButton"),
+  openMt4Import: document.querySelector("#openMt4ImportButton"),
+  mt4ImportDialog: document.querySelector("#mt4ImportDialog"),
+  mt4ImportForm: document.querySelector("#mt4ImportForm"),
+  mt4Paste: document.querySelector("#mt4PasteInput"),
+  mt4ImportPreview: document.querySelector("#mt4ImportPreview"),
+  closeMt4ImportDialog: document.querySelector("#closeMt4ImportDialog"),
+  cancelMt4Import: document.querySelector("#cancelMt4ImportButton"),
   toggleReviews: document.querySelector("#toggleReviewsButton"),
   tradeEmpty: document.querySelector("#tradeEmptyState"),
   dialogTitle: document.querySelector("#tradeDialogTitle"),
@@ -246,9 +266,13 @@ function loadDeletedTrades() {
 function loadLiveBatches() {
   try {
     const stored = JSON.parse(localStorage.getItem(LIVE_BATCH_KEY) || "[]");
-    if (Array.isArray(stored) && stored.length) return stored;
+    if (Array.isArray(stored) && stored.length) {
+      return stored.map((batch) => batch.id === "live-default" && batch.name === "完整實盤"
+        ? { ...batch, name: "主要紀錄" }
+        : batch);
+    }
   } catch (_) {}
-  return [{ id: "live-default", name: "完整實盤", createdAt: isoDate(new Date()) }];
+  return [{ id: "live-default", name: "主要紀錄", createdAt: isoDate(new Date()) }];
 }
 
 function loadActiveLiveBatch() {
@@ -265,7 +289,32 @@ function saveLiveBatches() {
 }
 
 function liveBatchLabel(id) {
-  return liveBatches.find((batch) => batch.id === id)?.name || "完整實盤";
+  if (id === ALL_LIVE_BATCH_ID) return "完整紀錄";
+  return liveBatches.find((batch) => batch.id === id)?.name || "主要紀錄";
+}
+
+function isAllLiveView() {
+  return activeLiveBatch === ALL_LIVE_BATCH_ID;
+}
+
+function uniqueAcrossLiveBatches(items = trades) {
+  const unique = new Map();
+  for (const trade of items) {
+    const key = tradeIdentityFingerprint(trade);
+    if (key) unique.set(key, trade);
+  }
+  return [...unique.values()];
+}
+
+function tradesForActiveView(items = trades) {
+  if (isAllLiveView()) return uniqueAcrossLiveBatches(items);
+  return items.filter((trade) => (trade.batchId || "live-default") === activeLiveBatch);
+}
+
+function requireWritableLiveBatch() {
+  if (!isAllLiveView()) return true;
+  showToast("完整紀錄是所有斷點的彙總檢視；請先切換到一個斷點再新增、匯入、編輯或刪除交易。", "error");
+  return false;
 }
 
 function loadAccountRules() {
@@ -312,16 +361,24 @@ function populateAccountRulesForm() {
 }
 
 function populateLiveBatchOptions() {
-  if (!liveBatches.some((batch) => batch.id === activeLiveBatch)) activeLiveBatch = liveBatches[0]?.id || "live-default";
-  els.liveBatch.innerHTML = liveBatches.map((batch) => {
+  if (activeLiveBatch !== ALL_LIVE_BATCH_ID && !liveBatches.some((batch) => batch.id === activeLiveBatch)) {
+    activeLiveBatch = liveBatches[0]?.id || "live-default";
+  }
+  const aggregateCount = uniqueAcrossLiveBatches().length;
+  els.liveBatch.innerHTML = `<option value="${ALL_LIVE_BATCH_ID}">完整紀錄（全部斷點 · ${aggregateCount}）</option>` + liveBatches.map((batch) => {
     const count = trades.filter((trade) => trade.batchId === batch.id).length;
     return `<option value="${batch.id}">${batch.name}（${count}）</option>`;
   }).join("");
   els.liveBatch.value = activeLiveBatch;
-  const activeCount = trades.filter((trade) => trade.batchId === activeLiveBatch).length;
-  const canDelete = liveBatches.length > 1;
+  const activeCount = tradesForActiveView().length;
+  const canDelete = !isAllLiveView() && liveBatches.length > 1;
   els.deleteLiveBatch.disabled = !canDelete;
-  els.deleteLiveBatchHint.textContent = canDelete
+  els.moveTrades.disabled = isAllLiveView();
+  els.newTrade.disabled = isAllLiveView();
+  els.openMt4Import.disabled = isAllLiveView();
+  els.deleteLiveBatchHint.textContent = isAllLiveView()
+    ? `只讀彙總，共 ${activeCount} 筆去重交易；請切換到斷點管理資料`
+    : canDelete
     ? `會一併移除其中 ${activeCount} 筆交易`
     : "至少需要保留一個斷點";
   saveLiveBatches();
@@ -471,10 +528,16 @@ function baseTradeKey(trade) {
 }
 
 function enrichTradeFields(trade) {
-  const entry = Number(trade.entry);
-  const stopLoss = Number(trade.stopLoss);
+  const entry = Number.isFinite(Number(trade.entry)) && Number(trade.entry) > 0 ? Number(trade.entry) : null;
+  const stopLoss = Number.isFinite(Number(trade.stopLoss)) && Number(trade.stopLoss) > 0 ? Number(trade.stopLoss) : null;
+  const takeProfit = Number.isFinite(Number(trade.takeProfit)) && Number(trade.takeProfit) > 0 ? Number(trade.takeProfit) : null;
+  const initialRiskMoney = Number.isFinite(Number(trade.initialRiskMoney)) && Number(trade.initialRiskMoney) > 0
+    ? Number(trade.initialRiskMoney)
+    : null;
+  const isEaTrade = Boolean(trade.externalId || trade.source === "TradingNote MT4 EA");
+  const riskUnavailable = Boolean(trade.riskUnavailable || (isEaTrade && (!stopLoss || !initialRiskMoney)));
   const derivedSlPips =
-    Number.isFinite(entry) && Number.isFinite(stopLoss) && entry !== stopLoss
+    entry && stopLoss && entry !== stopLoss
       ? Math.abs(entry - stopLoss)
       : null;
   const slPips = Number.isFinite(Number(trade.slPips)) && Number(trade.slPips) > 0
@@ -487,7 +550,20 @@ function enrichTradeFields(trade) {
   return {
     ...trade,
     batchId: trade.batchId || "live-default",
-    slPips: slPips == null ? null : Number(slPips.toFixed(4)),
+    entry,
+    stopLoss,
+    takeProfit,
+    initialRiskMoney,
+    r: riskUnavailable ? null : trade.r,
+    grossR: riskUnavailable ? null : trade.grossR,
+    mfeR: riskUnavailable ? null : trade.mfeR,
+    maeR: riskUnavailable ? null : trade.maeR,
+    exitEfficiencyPct: riskUnavailable ? null : trade.exitEfficiencyPct,
+    riskUnavailable,
+    captureQuality: riskUnavailable && (!trade.captureQuality || trade.captureQuality === "complete")
+      ? "missing_initial_sl"
+      : trade.captureQuality,
+    slPips: riskUnavailable || slPips == null ? null : Number(slPips.toFixed(4)),
     lots: Number.isFinite(Number(trade.lots)) && Number(trade.lots) > 0
       ? Number(trade.lots)
       : derivedLots == null
@@ -880,7 +956,7 @@ function sortByDate(items) {
 
 function populateFilters(keepValues = false) {
   const current = keepValues ? { year: els.year.value, pair: els.pair.value } : {};
-  const batchTrades = trades.filter((trade) => (trade.batchId || "live-default") === activeLiveBatch);
+  const batchTrades = tradesForActiveView();
   const years = ["all", ...new Set(batchTrades.map((trade) => trade.year).filter(Boolean))].sort((a, b) => {
     if (a === "all") return -1;
     if (b === "all") return 1;
@@ -897,14 +973,13 @@ function populateFilters(keepValues = false) {
 
 function baseFilteredTrades() {
   const query = els.search.value.trim().toLowerCase();
-  return trades.filter((trade) => {
-    const batchOk = (trade.batchId || "live-default") === activeLiveBatch;
+  return tradesForActiveView().filter((trade) => {
     const yearOk = els.year.value === "all" || String(trade.year) === els.year.value;
     const pairOk = els.pair.value === "all" || trade.pair === els.pair.value;
     const outcomeOk = els.outcome.value === "all" || trade.outcome === els.outcome.value;
     const haystack = `${trade.pair} ${trade.source} ${trade.setup || ""} ${trade.review || ""} ${trade.lesson || ""} ${trade.mambaDecision || ""} ${trade.date || ""}`.toLowerCase();
     const queryOk = !query || haystack.includes(query);
-    return batchOk && yearOk && pairOk && outcomeOk && queryOk;
+    return yearOk && pairOk && outcomeOk && queryOk;
   });
 }
 
@@ -963,36 +1038,41 @@ function computeStats(items) {
   let currentWin = 0;
   let bestWin = 0;
 
-  for (const trade of items) {
-    equity += trade.r;
+  const rItems = items.filter((trade) => !trade.riskUnavailable && trade.r != null && Number.isFinite(Number(trade.r)));
+  for (const trade of rItems) {
+    const tradeR = Number(trade.r);
+    equity += tradeR;
     peak = Math.max(peak, equity);
     maxDd = Math.min(maxDd, equity - peak);
-    currentLoss = trade.r < 0 ? currentLoss + 1 : 0;
+    currentLoss = tradeR < 0 ? currentLoss + 1 : 0;
     worstLoss = Math.max(worstLoss, currentLoss);
-    currentWin = trade.r > 0 ? currentWin + 1 : 0;
+    currentWin = tradeR > 0 ? currentWin + 1 : 0;
     bestWin = Math.max(bestWin, currentWin);
   }
 
   const wins = items.filter((trade) => trade.profit > 0);
   const losses = items.filter((trade) => trade.profit < 0);
+  const rWins = rItems.filter((trade) => Number(trade.r) > 0);
+  const rLosses = rItems.filter((trade) => Number(trade.r) < 0);
   const decided = wins.length + losses.length;
   const totalProfit = items.reduce((sum, trade) => sum + trade.profit, 0);
-  const totalR = items.reduce((sum, trade) => sum + trade.r, 0);
-  const grossWinR = wins.reduce((sum, trade) => sum + trade.r, 0);
-  const grossLossR = Math.abs(losses.reduce((sum, trade) => sum + trade.r, 0));
+  const totalR = rItems.reduce((sum, trade) => sum + Number(trade.r), 0);
+  const grossWinR = rWins.reduce((sum, trade) => sum + Number(trade.r), 0);
+  const grossLossR = Math.abs(rLosses.reduce((sum, trade) => sum + Number(trade.r), 0));
   const pairStats = summarizePairs(items);
 
   return {
     totalProfit,
     totalR,
+    rTradeCount: rItems.length,
     winRate: decided ? (wins.length / decided) * 100 : 0,
     maxDd,
     worstLoss,
     bestWin,
     profitFactor: grossLossR ? grossWinR / grossLossR : grossWinR ? Infinity : 0,
-    expectancy: items.length ? totalR / items.length : 0,
-    averageWin: wins.length ? grossWinR / wins.length : 0,
-    averageLoss: losses.length ? -grossLossR / losses.length : 0,
+    expectancy: rItems.length ? totalR / rItems.length : 0,
+    averageWin: rWins.length ? grossWinR / rWins.length : 0,
+    averageLoss: rLosses.length ? -grossLossR / rLosses.length : 0,
     bestPair: pairStats[0],
     worstPair: pairStats.at(-1),
   };
@@ -1277,7 +1357,9 @@ function renderMetrics(items) {
   animateMetric(els.totalProfit, stats.totalProfit, money);
   els.avgProfit.textContent = `Avg ${money(items.length ? stats.totalProfit / items.length : 0)} / trade`;
   animateMetric(els.totalR, stats.totalR, (value) => signed(value, "R"));
-  els.avgR.textContent = `Avg ${signed(items.length ? stats.totalR / items.length : 0, "R")} / trade`;
+  els.avgR.textContent = stats.rTradeCount
+    ? `Avg ${signed(stats.totalR / stats.rTradeCount, "R")} / R trade`
+    : "Avg - / R trade";
   animateMetric(els.winRate, stats.winRate, (value) => `${value.toFixed(1)}%`);
   els.tradeCount.textContent = `${items.length} trades`;
   animateMetric(els.maxDd, stats.maxDd, (value) => signed(value, "R"));
@@ -1611,7 +1693,7 @@ function renderPeriodStats(target, items) {
 }
 
 function tradesForMonth(key) {
-  return trades.filter((trade) => {
+  return baseFilteredTrades().filter((trade) => {
     const date = parseTradeDate(trade);
     return date && monthKey(date) === key;
   });
@@ -1657,7 +1739,7 @@ function renderWeeklyBreakdown(rows) {
 
 function getMonthlyRows() {
   const grouped = new Map();
-  for (const trade of trades) {
+  for (const trade of baseFilteredTrades()) {
     const date = parseTradeDate(trade);
     if (!date) continue;
     const key = monthKey(date);
@@ -1896,7 +1978,7 @@ function renderRows(items) {
           <td data-label="${labels[1]}"><strong>${trade.pair}</strong></td>
           <td data-label="${labels[2]}"><span class="pill ${trade.outcome}">${outcomeLabels[trade.outcome] || trade.outcome.toUpperCase()}</span></td>
           <td data-label="${labels[3]}" class="${profitClass}">${money(trade.profit)}</td>
-          <td data-label="${labels[4]}">${signed(trade.r, "R")}</td>
+          <td data-label="${labels[4]}">${tradeRLabel(trade)}</td>
           <td data-label="${labels[5]}">${trade.lots ?? "-"}</td>
           <td data-label="${labels[6]}">${trade.slPips ?? "-"}</td>
           <td data-label="${labels[7]}">${trade.entry ?? "-"}</td>
@@ -2343,6 +2425,34 @@ function openImagePreview(src, label = "交易截圖") {
 function openTradeDetail(trade) {
   currentDetailId = trade.id;
   const profitClass = trade.profit >= 0 ? "profit-pos" : "profit-neg";
+  const metric = (value, suffix = "", digits = 2) => Number.isFinite(Number(value))
+    ? `${Number(value).toFixed(digits)}${suffix}`
+    : "-";
+  const hasMt4Metrics = Boolean(trade.externalId || trade.source === "TradingNote MT4 EA");
+  const mt4Metrics = hasMt4Metrics ? `
+    <div class="detail-section-heading">
+      <span>MT4 EA 執行分析</span>
+      <small>${trade.account || "-"} · Ticket ${trade.ticket || "-"}</small>
+    </div>
+    <div class="detail-stats ea-detail-stats">
+      <div><span>MFE</span><strong class="profit-pos">${metric(trade.mfeR, "R")}</strong></div>
+      <div><span>MAE</span><strong class="profit-neg">${metric(trade.maeR, "R")}</strong></div>
+      <div><span>出場效率</span><strong>${metric(trade.exitEfficiencyPct, "%", 1)}</strong></div>
+      <div><span>Gross R</span><strong>${metric(trade.grossR, "R")}</strong></div>
+    </div>
+    <dl class="detail-list ea-detail-list">
+      <dt>Gross P/L</dt><dd>${trade.grossProfit == null ? "-" : money(trade.grossProfit)}</dd>
+      <dt>Commission</dt><dd>${trade.commission == null ? "-" : money(trade.commission)}</dd>
+      <dt>Swap</dt><dd>${trade.swap == null ? "-" : money(trade.swap)}</dd>
+      <dt>初始風險</dt><dd>${trade.initialRiskMoney == null ? "-" : money(trade.initialRiskMoney)}</dd>
+      <dt>Spread</dt><dd>進 ${metric(trade.entrySpreadPoints, " pt", 1)} · 出 ${metric(trade.exitSpreadPoints, " pt", 1)} · 最大 ${metric(trade.maxSpreadPoints, " pt", 1)}</dd>
+      <dt>估算 Spread 成本</dt><dd>${trade.spreadCostEstimate == null ? "-" : money(trade.spreadCostEstimate)}</dd>
+      <dt>出場原因／滑價</dt><dd>${trade.exitReason || "-"} · ${metric(trade.exitSlippagePoints, " pt", 1)}</dd>
+      <dt>市場環境</dt><dd>${[trade.regime, trade.volatility, trade.htfAlignment].filter(Boolean).join(" · ") || "-"}</dd>
+      <dt>Session</dt><dd>${trade.session || "-"}${trade.brokerUtcOffset == null ? "" : ` · UTC${Number(trade.brokerUtcOffset) >= 0 ? "+" : ""}${trade.brokerUtcOffset}`}</dd>
+      <dt>資料品質</dt><dd>${captureQualityLabel(trade.captureQuality)}</dd>
+    </dl>
+  ` : "";
   const imageBlock = trade.image
     ? `<figure class="detail-image"><button type="button" class="detail-image-button" data-preview-image="${trade.id}" aria-label="放大交易截圖"><img src="${trade.image}" alt="${trade.pair} 交易截圖"><span>點擊放大</span></button><figcaption>交易截圖</figcaption></figure>`
     : "";
@@ -2351,12 +2461,13 @@ function openTradeDetail(trade) {
     <h2>${trade.pair} · ${trade.outcome.toUpperCase()}</h2>
     <div class="detail-stats">
       <div><span>P/L</span><strong class="${profitClass}">${money(trade.profit)}</strong></div>
-      <div><span>R</span><strong>${signed(trade.r, "R")}</strong></div>
+      <div><span>R</span><strong>${tradeRLabel(trade)}</strong></div>
       <div><span>Lots</span><strong>${trade.lots ?? "-"}</strong></div>
       <div><span>SL pips</span><strong>${trade.slPips ?? "-"}</strong></div>
     </div>
     <dl class="detail-list">
       <dt>Date</dt><dd>${trade.date || "-"} ${trade.time || ""}</dd>
+      <dt>斷點</dt><dd>${liveBatchLabel(trade.batchId)}</dd>
       <dt>Year</dt><dd>${trade.year || "-"}</dd>
       <dt>Direction</dt><dd>${trade.direction || "-"}</dd>
       <dt>Entry</dt><dd>${trade.entry ?? "-"}</dd>
@@ -2368,11 +2479,14 @@ function openTradeDetail(trade) {
       <dt>Setup</dt><dd>${trade.setup || trade.checklist || "-"}</dd>
       <dt>Review</dt><dd>${trade.review || trade.lesson || "尚未填寫賽後檢討。"}</dd>
     </dl>
+    ${mt4Metrics}
     ${imageBlock}
-    <div class="drawer-actions">
-      <button type="button" class="primary-button" data-trade-action="edit">編輯交易</button>
-      <button type="button" class="ghost-button danger-button" data-trade-action="delete">刪除交易</button>
-    </div>
+    ${isAllLiveView()
+      ? `<div class="drawer-actions"><p class="form-hint">完整紀錄為只讀彙總；請切換到「${liveBatchLabel(trade.batchId)}」後再編輯或刪除。</p></div>`
+      : `<div class="drawer-actions">
+          <button type="button" class="primary-button" data-trade-action="edit">編輯交易</button>
+          <button type="button" class="ghost-button danger-button" data-trade-action="delete">刪除交易</button>
+        </div>`}
   `;
   els.drawer.classList.add("open");
   els.drawer.setAttribute("aria-hidden", "false");
@@ -2571,7 +2685,7 @@ function render() {
     els.window.value !== "all",
     Boolean(els.search.value.trim()),
   ].filter(Boolean).length;
-  const batchTotal = trades.filter((trade) => (trade.batchId || "live-default") === activeLiveBatch).length;
+  const batchTotal = tradesForActiveView().length;
   els.filterSummary.textContent = `${liveBatchLabel(activeLiveBatch)} · 顯示 ${items.length} / ${batchTotal} 筆交易${activeCount ? ` · ${activeCount} 個條件` : ""}`;
   els.resetFilters.disabled = activeCount === 0;
   renderMetrics(items);
@@ -2606,10 +2720,12 @@ function csvEscape(value) {
 
 function exportFilteredCsv() {
   const items = filteredTrades();
-  const headers = ["id", "date", "time", "year", "pair", "direction", "outcome", "profit", "r", "lots", "slPips", "entry", "stopLoss", "takeProfit", "exitPrice", "mambaDecision", "mambaR", "setup", "checklist", "source", "row", "lesson", "review"];
+  const headers = ["id", "breakpointId", "breakpointName", "externalId", "account", "ticket", "magicNumber", "date", "time", "closeTime", "year", "pair", "direction", "outcome", "profit", "r", "grossProfit", "commission", "swap", "lots", "slPips", "entry", "stopLoss", "takeProfit", "exitPrice", "initialRiskMoney", "grossR", "mfeR", "maeR", "exitEfficiencyPct", "entrySpreadPoints", "exitSpreadPoints", "maxSpreadPoints", "spreadCostEstimate", "exitReason", "exitSlippagePoints", "regime", "volatility", "htfAlignment", "session", "captureQuality", "mambaDecision", "mambaR", "setup", "checklist", "source", "row", "lesson", "review"];
   const rows = [
     headers.join(","),
-    ...items.map((trade) => headers.map((key) => csvEscape(trade[key])).join(",")),
+    ...items.map((trade) => headers.map((key) => csvEscape(
+      key === "breakpointId" ? trade.batchId : key === "breakpointName" ? liveBatchLabel(trade.batchId) : trade[key],
+    )).join(",")),
   ];
   const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -2633,6 +2749,11 @@ function fingerprintNumber(value, digits = 4) {
 }
 
 function tradeIdentityFingerprint(trade) {
+  const externalId = String(trade.externalId || "").trim();
+  if (externalId) return externalId;
+  if (trade.ticket != null && String(trade.ticket).trim()) {
+    return `MT4:${String(trade.account || "unknown").trim()}:${String(trade.ticket).trim()}`;
+  }
   const date = normalizeDateValue(trade.date);
   const time = normalizeTimeValue(trade.time);
   const pair = String(trade.pair || trade.market || "").trim().toUpperCase();
@@ -2656,6 +2777,118 @@ function prepareBackupTrade(trade) {
     batchId: record.batchId || activeLiveBatch || "live-default",
     source: record.source || "Smart backup import",
   };
+}
+
+function tradeRLabel(trade) {
+  return trade.riskUnavailable || trade.r == null || !Number.isFinite(Number(trade.r)) ? "-" : signed(trade.r, "R");
+}
+
+function captureQualityLabel(value) {
+  const labels = {
+    complete: "完整",
+    attached_mid_trade: "EA 於持倉中途啟動",
+    resumed_after_restart: "EA 重啟後續記",
+    missing_initial_sl: "缺少初始 SL，無法計算 R / MFE / MAE",
+  };
+  if (!value) return "未標記";
+  return String(value).split("+").map((part) => labels[part] || part).join(" · ");
+}
+
+function moveTradeKey(trade) {
+  const value = trade.origin === "local" ? trade.localId : trade.baseKey;
+  return `${trade.origin === "local" ? "local" : "excel"}:${encodeURIComponent(String(value || ""))}`;
+}
+
+function selectedMoveTradeKeys() {
+  return [...els.moveTradesList.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+}
+
+function updateMoveTradesPreview() {
+  const selected = selectedMoveTradeKeys();
+  const target = liveBatches.find((batch) => batch.id === els.moveTradesTarget.value);
+  els.confirmMoveTrades.disabled = !selected.length || !target;
+  els.moveTradesSelectAll.checked = Boolean(moveTradeCandidates.size) && selected.length === moveTradeCandidates.size;
+  els.moveTradesSelectAll.indeterminate = selected.length > 0 && selected.length < moveTradeCandidates.size;
+  els.moveTradesPreview.innerHTML = selected.length
+    ? `<strong>${selected.length} 筆交易 → ${target?.name || "請選擇目的斷點"}</strong><span>完成後會切換到目的斷點；若目的地已有同一筆交易，會合併而不產生副本。</span>`
+    : "<strong>尚未選擇交易</strong><span>移動後原始交易不會同時留在兩個斷點。</span>";
+}
+
+function openMoveTradesDialog() {
+  if (!requireWritableLiveBatch()) return;
+  const candidates = sortByDate(tradesInActiveBatch()).reverse();
+  moveTradeCandidates = new Map(candidates.map((trade) => [moveTradeKey(trade), trade]));
+  const targets = liveBatches.filter((batch) => batch.id !== activeLiveBatch);
+  els.moveTradesSubtitle.textContent = `來源：${liveBatchLabel(activeLiveBatch)}（${candidates.length} 筆）`;
+  els.moveTradesTarget.innerHTML = targets.length
+    ? targets.map((batch) => `<option value="${batch.id}">${batch.name}</option>`).join("")
+    : '<option value="">請先建立另一個斷點</option>';
+  els.moveTradesTarget.disabled = !targets.length;
+  els.moveTradesSelectAll.checked = false;
+  els.moveTradesSelectAll.disabled = !candidates.length;
+  els.moveTradesList.innerHTML = candidates.length
+    ? candidates.map((trade) => `
+      <label class="move-trade-row">
+        <input type="checkbox" value="${moveTradeKey(trade)}" />
+        <span><b>${trade.date || "-"} · ${trade.pair || "-"}</b><small>${trade.direction || "-"} · ${tradeRLabel(trade)} · ${trade.source || "Manual Entry"}</small></span>
+        <strong class="${Number(trade.profit) >= 0 ? "profit-pos" : "profit-neg"}">${money(trade.profit)}</strong>
+      </label>`).join("")
+    : '<div class="empty-state"><strong>目前斷點沒有交易</strong><span>切換到有交易的斷點後再使用批次移動。</span></div>';
+  updateMoveTradesPreview();
+  els.moveTradesDialog.showModal();
+}
+
+function moveSelectedTradesToBreakpoint() {
+  const keys = selectedMoveTradeKeys();
+  const targetBatchId = els.moveTradesTarget.value;
+  if (!keys.length || !targetBatchId || targetBatchId === activeLiveBatch) return { moved: 0, merged: 0 };
+  const destinationKeys = new Set(
+    trades
+      .filter((trade) => (trade.batchId || "live-default") === targetBatchId)
+      .map((trade) => smartTradeFingerprint({ ...trade, batchId: targetBatchId })),
+  );
+  let moved = 0;
+  let merged = 0;
+  for (const key of keys) {
+    const trade = moveTradeCandidates.get(key);
+    if (!trade) continue;
+    const destinationKey = smartTradeFingerprint({ ...trade, batchId: targetBatchId });
+    const alreadyExists = destinationKeys.has(destinationKey);
+    if (trade.origin === "local") {
+      const index = localTrades.findIndex((item) => item.localId === trade.localId);
+      if (index < 0) continue;
+      if (alreadyExists) localTrades.splice(index, 1);
+      else localTrades[index] = { ...localTrades[index], batchId: targetBatchId };
+    } else {
+      if (!alreadyExists) localTrades.push(cloneTradeForBatch(trade, targetBatchId));
+      if (trade.baseKey) deletedTrades.add(trade.baseKey);
+    }
+    destinationKeys.add(destinationKey);
+    if (alreadyExists) merged += 1;
+    else moved += 1;
+  }
+  saveLocalTrades();
+  activeLiveBatch = targetBatchId;
+  saveLiveBatches();
+  els.moveTradesDialog.close();
+  refreshAfterDataChange();
+  animateBatchControl();
+  return { moved, merged };
+}
+
+function prepareTradeForActiveBatch(trade, fallbackSource = "Import") {
+  if (isAllLiveView()) throw new Error("請先切換到一個斷點，再匯入交易資料。");
+  const { localId, batchId, ...record } = trade || {};
+  return prepareBackupTrade({
+    ...record,
+    localId: crypto.randomUUID(),
+    batchId: activeLiveBatch || "live-default",
+    source: record.source || fallbackSource,
+  });
+}
+
+function tradesInActiveBatch(items = trades) {
+  return items.filter((trade) => (trade.batchId || "live-default") === activeLiveBatch);
 }
 
 function mergeMissingRecords(existing, incoming, fingerprint, idKey = "id") {
@@ -2730,7 +2963,7 @@ function exportFullBackup() {
   const researchCount = (backup.research.trades?.length || 0) + (backup.research.legacyTrades?.length || 0);
   downloadFile(`backups_tradingnote-all-${isoDate(new Date())}.json`, JSON.stringify(backup, null, 2), "application/json");
   const ruleCount = (backup.research.rules?.length || 0) + (backup.research.legacyRules?.length || 0);
-  showToast(`已建立完整快照：實盤 ${visibleSnapshot.length} 筆（已排除重複）、回測 ${researchCount} 筆、Rule Book ${ruleCount} 條。`);
+  showToast(`已建立完整快照：${liveBatches.length} 個實盤斷點、${visibleSnapshot.length} 筆斷點交易、回測 ${researchCount} 筆、Rule Book ${ruleCount} 條。`);
 }
 
 function restoreUnifiedBackup(payload, mode = "merge") {
@@ -2775,7 +3008,9 @@ function restoreUnifiedBackup(payload, mode = "merge") {
       const result = mergeMissingRecords(liveBatches, livePayload.liveBatches, batchFingerprint);
       liveBatches = result.merged;
     }
-    if (livePayload.activeLiveBatch && liveBatches.some((batch) => batch.id === livePayload.activeLiveBatch)) activeLiveBatch = livePayload.activeLiveBatch;
+    if (livePayload.activeLiveBatch === ALL_LIVE_BATCH_ID || (livePayload.activeLiveBatch && liveBatches.some((batch) => batch.id === livePayload.activeLiveBatch))) {
+      activeLiveBatch = livePayload.activeLiveBatch;
+    }
 
     if (Array.isArray(researchPayload.trades)) {
       const result = mergeMissingRecords(storedArray(RESEARCH_TRADE_KEY), researchPayload.trades, researchTradeFingerprint);
@@ -2806,7 +3041,9 @@ function restoreUnifiedBackup(payload, mode = "merge") {
   saveAccountRules();
   populateAccountRulesForm();
   saveLocalTrades();
-  if (!liveBatches.some((batch) => batch.id === activeLiveBatch)) activeLiveBatch = liveBatches[0]?.id || "live-default";
+  if (activeLiveBatch !== ALL_LIVE_BATCH_ID && !liveBatches.some((batch) => batch.id === activeLiveBatch)) {
+    activeLiveBatch = liveBatches[0]?.id || "live-default";
+  }
   saveLiveBatches();
   refreshAfterDataChange();
   showToast(mode === "replace"
@@ -2858,6 +3095,151 @@ function parseCsv(text) {
   if (rows.length < 2) return [];
   const headers = rows[0].map((value) => value.trim());
   return rows.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
+}
+
+function parseMt4Journal(text) {
+  const lines = String(text || "")
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\r$/, ""))
+    .filter((line) => line.trim() !== "");
+  if (lines.length < 2) return [];
+  const headers = lines[0].split("\t").map((value) => value.trim());
+  const normalized = new Set(headers.map(normalizeHeader));
+  if (!normalized.has("ticket") || !normalized.has("account") || !normalized.has("symbol")) {
+    throw new Error("這不是 TradingNote MT4 EA 記錄：找不到 account、ticket 或 symbol 標題欄。");
+  }
+  return lines.slice(1).map((line) => {
+    const values = line.split("\t");
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+  });
+}
+
+function mt4Number(row, aliases) {
+  const value = pickRowValue(row, aliases);
+  if (value === "" || value == null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function mt4PositiveNumber(row, aliases) {
+  const number = mt4Number(row, aliases);
+  return number != null && number > 0 ? number : null;
+}
+
+function normalizeMt4JournalRows(rows) {
+  return rows.map((row, index) => {
+    const account = String(pickRowValue(row, ["account"]) || "unknown").trim();
+    const ticket = String(pickRowValue(row, ["ticket"]) || "").trim();
+    const pair = String(pickRowValue(row, ["symbol", "pair"]) || "").trim().toUpperCase();
+    const date = normalizeDateValue(pickRowValue(row, ["date", "open_date"]));
+    const time = normalizeTimeValue(pickRowValue(row, ["time", "open_time"]));
+    const profit = mt4Number(row, ["net_profit", "profit"]);
+    const netR = mt4Number(row, ["net_r", "r"]);
+    if (!ticket || !pair || !date || profit == null) return null;
+    const directionRaw = String(pickRowValue(row, ["direction", "type"])).trim().toLowerCase();
+    const direction = directionRaw === "buy" || directionRaw === "long" ? "Long" : directionRaw === "sell" || directionRaw === "short" ? "Short" : directionRaw;
+    const comment = String(pickRowValue(row, ["comment", "order_comment"])).trim();
+    const rawCaptureQuality = String(pickRowValue(row, ["capture_quality"])).trim();
+    const stopLoss = mt4PositiveNumber(row, ["stop_loss", "sl"]);
+    const takeProfit = mt4PositiveNumber(row, ["take_profit", "tp"]);
+    const initialRiskMoney = mt4PositiveNumber(row, ["initial_risk_money"]);
+    const slPips = mt4PositiveNumber(row, ["initial_risk_points", "sl_points", "slpips"]);
+    const riskMissing = netR == null || stopLoss == null || initialRiskMoney == null || slPips == null;
+    const captureQuality = riskMissing
+      ? rawCaptureQuality && rawCaptureQuality !== "complete"
+        ? `${rawCaptureQuality}+missing_initial_sl`
+        : "missing_initial_sl"
+      : rawCaptureQuality || "complete";
+    const autoReview = [
+      comment && `MT4 Comment: ${comment}`,
+      riskMissing && "EA：下單時沒有有效初始 SL，無法計算 R。",
+      captureQuality && captureQuality !== "complete" && `資料品質：${captureQualityLabel(captureQuality)}`,
+    ].filter(Boolean).join(" · ");
+    return {
+      localId: crypto.randomUUID(),
+      externalId: `MT4:${account}:${ticket}`,
+      account,
+      ticket,
+      magicNumber: mt4Number(row, ["magic", "magic_number"]),
+      year: Number(date.slice(0, 4)),
+      date,
+      time,
+      closeTime: String(pickRowValue(row, ["close_time"])).trim(),
+      pair,
+      direction,
+      outcome: profit > 0 ? "win" : profit < 0 ? "loss" : "be",
+      profit,
+      r: riskMissing ? null : netR,
+      riskUnavailable: riskMissing,
+      grossProfit: mt4Number(row, ["gross_profit"]),
+      commission: mt4Number(row, ["commission"]),
+      swap: mt4Number(row, ["swap"]),
+      lots: mt4Number(row, ["lots"]),
+      slPips: riskMissing ? null : slPips,
+      entry: mt4Number(row, ["entry", "open_price"]),
+      stopLoss,
+      takeProfit,
+      exitPrice: mt4Number(row, ["exit_price", "close_price"]),
+      initialRiskMoney: riskMissing ? null : initialRiskMoney,
+      grossR: riskMissing ? null : mt4Number(row, ["gross_r"]),
+      mfeR: riskMissing ? null : mt4Number(row, ["mfe_r"]),
+      maeR: riskMissing ? null : mt4Number(row, ["mae_r"]),
+      exitEfficiencyPct: riskMissing ? null : mt4Number(row, ["exit_efficiency_pct"]),
+      entrySpreadPoints: mt4Number(row, ["entry_spread_points"]),
+      exitSpreadPoints: mt4Number(row, ["exit_spread_points"]),
+      maxSpreadPoints: mt4Number(row, ["max_spread_points"]),
+      spreadCostEstimate: mt4Number(row, ["spread_cost_estimate"]),
+      exitReason: String(pickRowValue(row, ["exit_reason"])).trim(),
+      exitSlippagePoints: mt4Number(row, ["exit_slippage_points"]),
+      regime: String(pickRowValue(row, ["regime"])).trim(),
+      volatility: String(pickRowValue(row, ["volatility"])).trim(),
+      htfAlignment: String(pickRowValue(row, ["htf_alignment"])).trim(),
+      session: String(pickRowValue(row, ["session"])).trim(),
+      brokerUtcOffset: mt4Number(row, ["broker_utc_offset"]),
+      captureQuality,
+      batchId: activeLiveBatch || "live-default",
+      setup: String(pickRowValue(row, ["setup", "regime"])).trim(),
+      review: autoReview,
+      source: "TradingNote MT4 EA",
+      row: index + 2,
+    };
+  }).filter(Boolean);
+}
+
+function mt4JournalPreview() {
+  const text = els.mt4Paste.value;
+  if (!text.trim()) {
+    els.mt4ImportPreview.innerHTML = "<strong>等待貼上</strong><span>貼上 EA 記錄後，這裡會先顯示可辨識的交易筆數。</span>";
+    return;
+  }
+  try {
+    const rows = parseMt4Journal(text);
+    const tradesInPaste = normalizeMt4JournalRows(rows);
+    const uniqueIds = new Set(tradesInPaste.map((trade) => trade.externalId));
+    els.mt4ImportPreview.innerHTML = `<strong>${uniqueIds.size} 筆可匯入交易</strong><span>原始 ${rows.length} 列；帳號＋Ticket 相同的資料只會保留一筆。</span>`;
+  } catch (error) {
+    els.mt4ImportPreview.innerHTML = `<strong>格式無法辨識</strong><span>${error.message}</span>`;
+  }
+}
+
+function importMt4JournalText(text) {
+  if (isAllLiveView()) throw new Error("完整紀錄不能直接匯入；請先選擇要存入的斷點。");
+  const rows = parseMt4Journal(text);
+  const normalized = normalizeMt4JournalRows(rows);
+  if (!normalized.length) throw new Error("沒有找到可匯入的已平倉交易。");
+  const existing = new Set(tradesInActiveBatch().map(smartTradeFingerprint));
+  const incoming = [];
+  for (const trade of normalized) {
+    const key = smartTradeFingerprint(trade);
+    if (!key || existing.has(key)) continue;
+    existing.add(key);
+    incoming.push(trade);
+  }
+  localTrades.push(...incoming);
+  saveLocalTrades();
+  refreshAfterDataChange();
+  return { added: incoming.length, skipped: normalized.length - incoming.length };
 }
 
 function normalizeHeader(value) {
@@ -3050,21 +3432,25 @@ async function importDataFile(file, mode = "merge") {
       restoreUnifiedBackup(payload, "merge");
       return;
     }
+    if (isAllLiveView()) throw new Error("完整紀錄不能直接匯入；請先選擇要存入的斷點。");
     const incoming = Array.isArray(payload) ? payload : payload.localTrades;
     if (!Array.isArray(incoming)) throw new Error("JSON 備份格式不正確。");
-    const existing = new Set(trades.map(smartTradeFingerprint));
-    const missing = incoming.filter((trade) => {
+    const prepared = incoming.map((trade) => prepareTradeForActiveBatch(trade, `Import: ${file.name}`));
+    const existing = new Set(tradesInActiveBatch().map(smartTradeFingerprint));
+    const missing = prepared.filter((trade) => {
       const key = smartTradeFingerprint(trade);
       if (!key || existing.has(key)) return false;
       existing.add(key);
       return true;
-    }).map(prepareBackupTrade);
+    });
     localTrades.push(...missing);
     saveLocalTrades();
     refreshAfterDataChange();
     showToast(`JSON 智慧合併完成：新增 ${missing.length} 筆，略過 ${incoming.length - missing.length} 筆重複資料。`);
     return;
   }
+
+  if (isAllLiveView()) throw new Error("完整紀錄不能直接匯入；請先選擇要存入的斷點。");
 
   let rows;
   if (extension === "csv") {
@@ -3077,15 +3463,19 @@ async function importDataFile(file, mode = "merge") {
   const imported = uniqueTrades(normalizeImportedTradeRows(rows, `Import: ${file.name}`));
   if (!imported.length) throw new Error("找不到有效交易。檔案至少需要日期、商品、損益與 R 欄位。");
   if (mode === "replace") {
+    const currentBatchCount = tradesInActiveBatch().length;
     const confirmed = window.confirm(
-      `即將以「${file.name}」的 ${imported.length} 筆交易，取代目前顯示的 ${trades.length} 筆資料。\n\n系統會先下載完整 JSON 備份，確定繼續嗎？`,
+      `即將以「${file.name}」的 ${imported.length} 筆交易，取代斷點「${liveBatchLabel(activeLiveBatch)}」中的 ${currentBatchCount} 筆資料。\n\n其他斷點不會受影響；系統會先下載完整 JSON 備份，確定繼續嗎？`,
     );
     if (!confirmed) return;
     exportFullBackup();
-    localTrades = imported;
-    deletedTrades = new Set(importedTrades.map(baseTradeKey));
+    localTrades = [
+      ...localTrades.filter((trade) => (trade.batchId || "live-default") !== activeLiveBatch),
+      ...imported,
+    ];
+    if (activeLiveBatch === "live-default") deletedTrades = new Set(importedTrades.map(baseTradeKey));
   } else {
-    const existing = new Set(trades.map(smartTradeFingerprint));
+    const existing = new Set(tradesInActiveBatch().map(smartTradeFingerprint));
     localTrades.push(...imported.filter((trade) => {
       const fingerprint = smartTradeFingerprint(trade);
       if (existing.has(fingerprint)) return false;
@@ -3096,8 +3486,8 @@ async function importDataFile(file, mode = "merge") {
   saveLocalTrades();
   refreshAfterDataChange();
   showToast(mode === "replace"
-    ? `來源已取代為 ${file.name}，共 ${imported.length} 筆交易。`
-    : "合併匯入完成，已自動略過重複交易。");
+    ? `「${liveBatchLabel(activeLiveBatch)}」已取代為 ${file.name}，共 ${imported.length} 筆交易；其他斷點未變更。`
+    : `已合併至「${liveBatchLabel(activeLiveBatch)}」，並自動略過此斷點內的重複交易。`);
 }
 
 populateFilters();
@@ -3128,6 +3518,22 @@ els.addLiveBatch.addEventListener("click", () => {
   openLiveBatchDialog();
 });
 els.deleteLiveBatch.addEventListener("click", deleteActiveLiveBatch);
+els.moveTrades.addEventListener("click", openMoveTradesDialog);
+els.closeMoveTradesDialog.addEventListener("click", () => els.moveTradesDialog.close());
+els.cancelMoveTrades.addEventListener("click", () => els.moveTradesDialog.close());
+els.moveTradesTarget.addEventListener("change", updateMoveTradesPreview);
+els.moveTradesList.addEventListener("change", updateMoveTradesPreview);
+els.moveTradesSelectAll.addEventListener("change", () => {
+  els.moveTradesList.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+    input.checked = els.moveTradesSelectAll.checked;
+  });
+  updateMoveTradesPreview();
+});
+els.moveTradesForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const result = moveSelectedTradesToBreakpoint();
+  showToast(`交易移動完成：移動 ${result.moved} 筆、合併 ${result.merged} 筆重複資料。`);
+});
 els.closeLiveBatchDialog.addEventListener("click", () => els.liveBatchDialog.close());
 els.cancelLiveBatch.addEventListener("click", () => els.liveBatchDialog.close());
 [els.liveBatchMode, els.liveBatchStart, els.liveBatchEnd].forEach((el) => el.addEventListener("input", updateLiveBatchPreview));
@@ -3190,6 +3596,7 @@ els.accountRulesForm.addEventListener("submit", (event) => {
 });
 
 els.newTrade.addEventListener("click", () => {
+  if (!requireWritableLiveBatch()) return;
   resetTradeForm();
   els.tradeDialog.showModal();
 });
@@ -3218,6 +3625,7 @@ els.removeTradeImage.addEventListener("click", () => {
 });
 els.tradeForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (!requireWritableLiveBatch()) return;
   updateTradeDerivedFields();
   if (els.tradeForm.elements.r.value === "") {
     showToast("請先填入損益、手數與止損點數，才能計算 R 倍數。", "error");
@@ -3247,7 +3655,7 @@ els.tradeForm.addEventListener("submit", (event) => {
   const replacedBaseKey = els.tradeForm.elements.baseKey.value;
   if (replacedBaseKey) deletedTrades.add(replacedBaseKey);
   const existingIndex = localTrades.findIndex((item) => item.localId === trade.localId);
-  if (existingIndex >= 0) localTrades[existingIndex] = trade;
+  if (existingIndex >= 0) localTrades[existingIndex] = { ...localTrades[existingIndex], ...trade };
   else localTrades.push(trade);
   saveLocalTrades();
   els.tradeDialog.close();
@@ -3344,6 +3752,7 @@ els.detail.addEventListener("click", (event) => {
   }
   const action = event.target.closest("[data-trade-action]")?.dataset.tradeAction;
   if (!action || currentDetailId == null) return;
+  if (!requireWritableLiveBatch()) return;
   const trade = trades.find((item) => item.id === currentDetailId);
   if (!trade) return;
   if (action === "edit") editTrade(trade);
@@ -3354,6 +3763,28 @@ document.addEventListener("keydown", (event) => {
 });
 els.exportCsv.addEventListener("click", exportFilteredCsv);
 els.exportJson.addEventListener("click", exportFullBackup);
+els.openMt4Import.addEventListener("click", () => {
+  if (!requireWritableLiveBatch()) return;
+  closeActionMenus();
+  els.mt4Paste.value = "";
+  mt4JournalPreview();
+  els.mt4ImportDialog.showModal();
+  window.setTimeout(() => els.mt4Paste.focus(), 80);
+});
+els.mt4Paste.addEventListener("input", mt4JournalPreview);
+els.closeMt4ImportDialog.addEventListener("click", () => els.mt4ImportDialog.close());
+els.cancelMt4Import.addEventListener("click", () => els.mt4ImportDialog.close());
+els.mt4ImportForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  try {
+    const result = importMt4JournalText(els.mt4Paste.value);
+    els.mt4ImportDialog.close();
+    showToast(`MT4 匯入完成：新增 ${result.added} 筆，略過 ${result.skipped} 筆重複 Ticket。`);
+  } catch (error) {
+    showToast(error.message || "MT4 記錄匯入失敗。", "error");
+    els.mt4Paste.focus();
+  }
+});
 els.importFile.addEventListener("change", async () => {
   const [file] = els.importFile.files;
   if (!file) return;

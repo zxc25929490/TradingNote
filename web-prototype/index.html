@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TradingNote Analytics</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260817-4" />
+    <link rel="stylesheet" href="styles.css?v=20260819-1" />
   </head>
   <body>
     <aside class="sidebar">
@@ -74,6 +74,10 @@
               <button id="exportJsonButton" class="menu-action" type="button" role="menuitem">
                 <span class="menu-icon" aria-hidden="true">⇧</span>
                 <span><strong>完整備份</strong><small>包含所有斷點、設定與研究資料</small></span>
+              </button>
+              <button id="openMt4ImportButton" class="menu-action" type="button" role="menuitem">
+                <span class="menu-icon" aria-hidden="true">MT4</span>
+                <span><strong>貼上 MT4 EA 記錄</strong><small>從記事本複製後智慧合併，Ticket 重複會略過</small></span>
               </button>
               <label class="menu-action" for="backupImportInput" role="menuitem">
                 <span class="menu-icon" aria-hidden="true">⇩</span>
@@ -462,6 +466,7 @@
               <input id="searchInput" type="search" placeholder="搜尋商品、策略或筆記" aria-label="搜尋交易" />
               <label class="file-button" for="importFileInput">合併匯入</label>
               <input id="importFileInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv,.json" />
+              <button id="moveTradesButton" class="ghost-button" type="button">移動交易</button>
               <button id="toggleReviewsButton" class="ghost-button" type="button" aria-pressed="false">展開 Review</button>
               <label class="file-button danger-button" for="replaceFileInput" title="備份後，以新 Excel／CSV 完整取代目前資料">取代來源</label>
               <input id="replaceFileInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv" />
@@ -731,6 +736,62 @@
       </form>
     </dialog>
 
+    <dialog id="mt4ImportDialog" class="modal mt4-import-modal">
+      <form id="mt4ImportForm" method="dialog">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">MT4 JOURNAL BRIDGE</p>
+            <h2>貼上 EA 交易記錄</h2>
+            <p>在記事本全選複製，貼到下方即可。系統會依帳號與 Ticket 自動略過重複交易。</p>
+          </div>
+          <button class="icon-button" value="cancel" type="button" id="closeMt4ImportDialog" aria-label="關閉">×</button>
+        </div>
+        <div class="mt4-import-guide">
+          <span><b>1</b> MT4：檔案 → 開啟資料夾 → MQL4 → Files</span>
+          <span><b>2</b> 打開 <code>TradingNote_MT4_Journal.tsv</code> 並複製全部</span>
+          <span><b>3</b> 貼上、匯入，之後可手動清空記事本</span>
+        </div>
+        <label class="mt4-paste-label" for="mt4PasteInput">記事本內容</label>
+        <textarea id="mt4PasteInput" class="mt4-import-textarea" rows="13" spellcheck="false" placeholder="record_version&#9;source&#9;account&#9;ticket&#9;...&#10;1&#9;TradingNote MT4 EA&#9;123456&#9;987654&#9;..."></textarea>
+        <div id="mt4ImportPreview" class="batch-preview mt4-import-preview">
+          <strong>等待貼上</strong>
+          <span>必須包含 EA 產生的標題列；空白內容不會改動網站資料。</span>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="ghost-button" id="cancelMt4ImportButton">取消</button>
+          <button type="submit" class="primary-button" id="importMt4PasteButton">智慧合併</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="moveTradesDialog" class="modal move-trades-modal">
+      <form id="moveTradesForm" method="dialog">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">BREAKPOINT ORGANIZER</p>
+            <h2>移動交易到其他斷點</h2>
+            <p id="moveTradesSubtitle">勾選目前斷點中的交易，再選擇目的斷點。</p>
+          </div>
+          <button class="icon-button" value="cancel" type="button" id="closeMoveTradesDialog" aria-label="關閉">×</button>
+        </div>
+        <div class="move-trades-toolbar">
+          <label>目的斷點
+            <select id="moveTradesTarget" required></select>
+          </label>
+          <label class="move-select-all"><input id="moveTradesSelectAll" type="checkbox" /> 全選目前交易</label>
+        </div>
+        <div id="moveTradesList" class="move-trades-list"></div>
+        <div id="moveTradesPreview" class="batch-preview move-trades-preview">
+          <strong>尚未選擇交易</strong>
+          <span>移動後原始交易不會同時留在兩個斷點。</span>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="ghost-button" id="cancelMoveTradesButton">取消</button>
+          <button type="submit" class="primary-button" id="confirmMoveTradesButton">移動所選交易</button>
+        </div>
+      </form>
+    </dialog>
+
     <aside id="detailDrawer" class="drawer" aria-hidden="true">
       <button id="closeDrawer" class="icon-button drawer-close" title="關閉">×</button>
       <div id="detailContent"></div>
@@ -740,6 +801,6 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
-    <script src="app.js?v=20260817-2"></script>
+    <script src="app.js?v=20260819-3"></script>
   </body>
 </html>
