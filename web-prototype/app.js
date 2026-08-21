@@ -162,6 +162,14 @@ const els = {
   researchMonteCarloFormula: document.querySelector("#researchMonteCarloFormula"),
   researchMonteCarloStress: document.querySelector("#researchMonteCarloStress"),
   monteCarloCompare: document.querySelector("#monteCarloCompare"),
+  researchLabBreakpoint: document.querySelector("#researchLabBreakpoint"),
+  researchLabMarket: document.querySelector("#researchLabMarket"),
+  researchLabEmpty: document.querySelector("#researchLabEmpty"),
+  researchLabContent: document.querySelector("#researchLabContent"),
+  researchLabMetrics: document.querySelector("#researchLabMetrics"),
+  researchMarketRows: document.querySelector("#researchMarketRows"),
+  researchDateRows: document.querySelector("#researchDateRows"),
+  researchLabInsight: document.querySelector("#researchLabInsight"),
   checklist: document.querySelector("#checklistItems"),
   checklistScore: document.querySelector("#checklistScore"),
   tradeGate: document.querySelector("#tradeGate"),
@@ -227,6 +235,7 @@ const pageTitles = {
   review: "交易複盤中心",
   period: "週/月績效分析",
   trades: "交易紀錄",
+  "research-lab": "回測 vs 實盤研究室",
   checklist: "交易前檢查表",
   calculator: "風控手數計算",
 };
@@ -580,7 +589,7 @@ function mergeTrades() {
     ...localTrades.map((trade) => ({ ...enrichTradeFields(trade), origin: "local" })),
   ];
   const deduplicated = new Map();
-  for (const trade of combined) deduplicated.set(smartTradeFingerprint(trade), trade);
+  for (const trade of consolidateMt4Trades(combined)) deduplicated.set(smartTradeFingerprint(trade), trade);
   return [...deduplicated.values()].map((trade, index) => ({ ...trade, id: index + 1 }));
 }
 
@@ -909,6 +918,127 @@ function selectedResearchRValues() {
     label: selected.name || selected.id,
     values: selected.trades.map((trade) => Number(trade.r)).filter((value) => Number.isFinite(value) && value !== 0),
   };
+}
+
+function researchTradeMarket(trade) {
+  return String(trade.pair || trade.market || "未設定").trim().toUpperCase();
+}
+
+function researchRTrades(items) {
+  return items.filter((trade) => !trade.riskUnavailable && Number.isFinite(Number(trade.r)));
+}
+
+function researchSummary(items) {
+  const valid = researchRTrades(items);
+  const values = valid.map((trade) => Number(trade.r));
+  const totalR = values.reduce((sum, value) => sum + value, 0);
+  let equity = 0;
+  let peak = 0;
+  let maxDrawdown = 0;
+  for (const value of values) {
+    equity += value;
+    peak = Math.max(peak, equity);
+    maxDrawdown = Math.min(maxDrawdown, equity - peak);
+  }
+  return {
+    count: valid.length,
+    totalR,
+    avgR: valid.length ? totalR / valid.length : 0,
+    winRate: valid.length ? valid.filter((trade) => Number(trade.r) > 0).length / valid.length * 100 : 0,
+    maxDrawdown,
+  };
+}
+
+function researchMetricCard(label, liveValue, backtestValue, formatter, better = "higher") {
+  const gap = liveValue - backtestValue;
+  const favorable = better === "higher" ? gap >= 0 : gap <= 0;
+  return `<article class="research-metric-card">
+    <span>${label}</span>
+    <div><strong>${formatter(liveValue)}</strong><small>實盤</small></div>
+    <div><strong>${formatter(backtestValue)}</strong><small>回測</small></div>
+    <em class="${favorable ? "profit-pos" : "profit-neg"}">${signed(gap, label.includes("勝率") ? "%" : label.includes("樣本") ? " 筆" : "R")} 差距</em>
+  </article>`;
+}
+
+function populateResearchLabControls() {
+  if (!els.researchLabBreakpoint || !els.researchLabMarket) return;
+  const { activeBatch, batches } = readResearchBreakpoints();
+  const previous = els.researchLabBreakpoint.value || activeBatch;
+  els.researchLabBreakpoint.innerHTML = [
+    `<option value="">請選擇回測斷點</option>`,
+    ...batches.map((batch) => `<option value="${batch.id}">${batch.name || batch.id}（${batch.trades.length} 筆）</option>`),
+  ].join("");
+  els.researchLabBreakpoint.value = batches.some((batch) => String(batch.id) === String(previous)) ? previous : "";
+  if (els.researchBreakpoint && [...els.researchBreakpoint.options].some((option) => option.value === els.researchLabBreakpoint.value)) {
+    els.researchBreakpoint.value = els.researchLabBreakpoint.value;
+  }
+  const selected = batches.find((batch) => String(batch.id) === String(els.researchLabBreakpoint.value));
+  const previousMarket = els.researchLabMarket.value || "all";
+  const markets = [...new Set([
+    ...tradesForActiveView().map(researchTradeMarket),
+    ...(selected?.trades || []).map(researchTradeMarket),
+  ])].filter(Boolean).sort();
+  els.researchLabMarket.innerHTML = [`<option value="all">全部商品</option>`, ...markets.map((market) => `<option value="${market}">${market}</option>`)].join("");
+  els.researchLabMarket.value = markets.includes(previousMarket) ? previousMarket : "all";
+}
+
+function renderResearchLab() {
+  if (!els.researchLabBreakpoint) return;
+  const selected = readResearchBreakpoints().batches.find((batch) => String(batch.id) === String(els.researchLabBreakpoint.value));
+  const hasSelection = Boolean(selected);
+  els.researchLabEmpty.hidden = hasSelection;
+  els.researchLabContent.hidden = !hasSelection;
+  if (!selected) return;
+  const market = els.researchLabMarket.value;
+  const matchesMarket = (trade) => market === "all" || researchTradeMarket(trade) === market;
+  const live = sortByDate(tradesForActiveView().filter(matchesMarket));
+  const backtest = sortByDate(selected.trades.filter(matchesMarket));
+  const liveStats = researchSummary(live);
+  const backtestStats = researchSummary(backtest);
+  els.researchLabMetrics.innerHTML = [
+    researchMetricCard("樣本數", liveStats.count, backtestStats.count, (value) => String(value)),
+    researchMetricCard("平均 R", liveStats.avgR, backtestStats.avgR, (value) => signed(value, "R")),
+    researchMetricCard("勝率", liveStats.winRate, backtestStats.winRate, (value) => `${value.toFixed(1)}%`),
+    researchMetricCard("最大回撤", liveStats.maxDrawdown, backtestStats.maxDrawdown, (value) => signed(value, "R"), "higher"),
+  ].join("");
+
+  const markets = [...new Set([...live.map(researchTradeMarket), ...backtest.map(researchTradeMarket)])].sort();
+  const marketComparisons = markets.map((name) => {
+    const liveMarket = researchSummary(live.filter((trade) => researchTradeMarket(trade) === name));
+    const backtestMarket = researchSummary(backtest.filter((trade) => researchTradeMarket(trade) === name));
+    return { name, live: liveMarket, backtest: backtestMarket, gap: liveMarket.avgR - backtestMarket.avgR };
+  });
+  els.researchMarketRows.innerHTML = marketComparisons.length
+    ? marketComparisons.map((item) => `<tr><td><strong>${item.name}</strong></td><td>${item.live.count}</td><td>${signed(item.live.avgR, "R")}</td><td>${item.backtest.count}</td><td>${signed(item.backtest.avgR, "R")}</td><td class="${item.gap >= 0 ? "profit-pos" : "profit-neg"}">${signed(item.gap, "R")}</td></tr>`).join("")
+    : `<tr><td colspan="6">目前沒有可比較的商品資料。</td></tr>`;
+
+  const groupDates = (items) => items.reduce((map, trade) => {
+    const date = normalizeDateValue(trade.date);
+    if (!date) return map;
+    const current = map.get(date) || { count: 0, r: 0 };
+    current.count += 1;
+    if (!trade.riskUnavailable && Number.isFinite(Number(trade.r))) current.r += Number(trade.r);
+    map.set(date, current);
+    return map;
+  }, new Map());
+  const liveDates = groupDates(live);
+  const backtestDates = groupDates(backtest);
+  const pairedDates = [...liveDates.keys()].filter((date) => backtestDates.has(date)).sort().reverse();
+  els.researchDateRows.innerHTML = pairedDates.length
+    ? pairedDates.map((date) => {
+      const liveDay = liveDates.get(date);
+      const backtestDay = backtestDates.get(date);
+      const gap = liveDay.r - backtestDay.r;
+      return `<tr><td><strong>${date}</strong></td><td>${liveDay.count}</td><td>${signed(liveDay.r, "R")}</td><td>${backtestDay.count}</td><td>${signed(backtestDay.r, "R")}</td><td class="${gap >= 0 ? "profit-pos" : "profit-neg"}">${signed(gap, "R")}</td></tr>`;
+    }).join("")
+    : `<tr><td colspan="6">目前沒有同日期資料；仍可使用上方整體與商品比較。</td></tr>`;
+
+  const weakest = marketComparisons.filter((item) => item.live.count && item.backtest.count).sort((a, b) => a.gap - b.gap)[0];
+  const expectancyGap = liveStats.avgR - backtestStats.avgR;
+  els.researchLabInsight.innerHTML = `
+    <div class="research-verdict ${expectancyGap >= 0 ? "positive" : "negative"}"><span>整體執行落差</span><strong>${signed(expectancyGap, "R / trade")}</strong><p>${expectancyGap >= 0 ? "實盤目前守住或超過回測期望值。" : "實盤期望值低於回測，優先檢查進場、出場與漏單。"}</p></div>
+    <div class="research-focus"><span>優先研究商品</span><strong>${weakest?.name || "樣本不足"}</strong><p>${weakest ? `實盤比回測低 ${Math.abs(weakest.gap).toFixed(2)}R / trade。` : "至少需要一個兩邊都有紀錄的商品。"}</p></div>
+    <div class="research-focus"><span>同日期配對</span><strong>${pairedDates.length} 天</strong><p>用相同市場環境檢查策略與實際執行差異。</p></div>`;
 }
 
 function inRange(trade, start, end) {
@@ -1961,7 +2091,7 @@ function tradeReviewText(trade) {
 }
 
 function renderRows(items) {
-  const labels = ["編號", "商品", "結果", "損益", "R 倍數", "手數", "止損點數", "Entry", "SL", "TP", "Mamba", "Mamba R", "策略", "來源"];
+  const labels = ["日期", "編號", "商品", "結果", "損益", "R 倍數", "手數", "止損點數", "Entry", "SL", "TP", "Mamba", "Mamba R", "策略", "來源"];
   const outcomeLabels = { win: "獲利", loss: "虧損", be: "損益兩平" };
   if (els.toggleReviews) {
     els.toggleReviews.textContent = reviewsExpanded ? "收合 Review" : "展開 Review";
@@ -1974,25 +2104,26 @@ function renderRows(items) {
       const profitClass = trade.profit >= 0 ? "profit-pos" : "profit-neg";
       const mainRow = `
         <tr data-id="${trade.id}" tabindex="0">
-          <td data-label="${labels[0]}">${trade.id}</td>
-          <td data-label="${labels[1]}"><strong>${trade.pair}</strong></td>
-          <td data-label="${labels[2]}"><span class="pill ${trade.outcome}">${outcomeLabels[trade.outcome] || trade.outcome.toUpperCase()}</span></td>
-          <td data-label="${labels[3]}" class="${profitClass}">${money(trade.profit)}</td>
-          <td data-label="${labels[4]}">${tradeRLabel(trade)}</td>
-          <td data-label="${labels[5]}">${trade.lots ?? "-"}</td>
-          <td data-label="${labels[6]}">${trade.slPips ?? "-"}</td>
-          <td data-label="${labels[7]}">${trade.entry ?? "-"}</td>
-          <td data-label="${labels[8]}">${trade.stopLoss ?? "-"}</td>
-          <td data-label="${labels[9]}">${trade.takeProfit ?? "-"}</td>
-          <td data-label="${labels[10]}"><span class="mamba-chip">${mambaDecisionLabel(trade.mambaDecision)}</span><small>${mambaAgreementLabel(trade)}</small></td>
-          <td data-label="${labels[11]}" class="${mambaRClass(trade.mambaR)}">${mambaRLabel(trade.mambaR)}</td>
-          <td data-label="${labels[12]}">${trade.setup || trade.checklist || "-"}</td>
-          <td data-label="${labels[13]}">${trade.date || "-"} · ${trade.origin === "local" ? "手動新增" : `第 ${trade.row} 列`}</td>
+          <td data-label="${labels[0]}"><strong>${trade.date || "-"}</strong><small>${trade.time || ""}</small></td>
+          <td data-label="${labels[1]}">${trade.id}</td>
+          <td data-label="${labels[2]}"><strong>${trade.pair}</strong></td>
+          <td data-label="${labels[3]}"><span class="pill ${trade.outcome}">${outcomeLabels[trade.outcome] || trade.outcome.toUpperCase()}</span></td>
+          <td data-label="${labels[4]}" class="${profitClass}">${money(trade.profit)}</td>
+          <td data-label="${labels[5]}">${tradeRLabel(trade)}</td>
+          <td data-label="${labels[6]}">${trade.lots ?? "-"}</td>
+          <td data-label="${labels[7]}">${trade.slPips ?? "-"}</td>
+          <td data-label="${labels[8]}">${trade.entry ?? "-"}</td>
+          <td data-label="${labels[9]}">${trade.stopLoss ?? "-"}</td>
+          <td data-label="${labels[10]}">${trade.takeProfit ?? "-"}</td>
+          <td data-label="${labels[11]}"><span class="mamba-chip">${mambaDecisionLabel(trade.mambaDecision)}</span><small>${mambaAgreementLabel(trade)}</small></td>
+          <td data-label="${labels[12]}" class="${mambaRClass(trade.mambaR)}">${mambaRLabel(trade.mambaR)}</td>
+          <td data-label="${labels[13]}">${trade.setup || trade.checklist || "-"}</td>
+          <td data-label="${labels[14]}">${trade.origin === "local" ? (trade.partialExitCount > 1 ? `MT4 分批出場 · ${trade.partialExitCount} 段` : "手動新增") : `第 ${trade.row} 列`}</td>
         </tr>`;
       if (!reviewsExpanded) return mainRow;
       return `${mainRow}
         <tr class="review-row">
-          <td colspan="14">
+          <td colspan="15">
             <span>Review</span>
             <p>${tradeReviewText(trade)}</p>
           </td>
@@ -2697,6 +2828,8 @@ function render() {
   renderReview(items);
   renderPairBars(items);
   renderRows(items);
+  populateResearchLabControls();
+  renderResearchLab();
   els.tradeEmpty.hidden = items.length !== 0;
   document.querySelector(".table-wrap").hidden = items.length === 0;
 }
@@ -2709,7 +2842,8 @@ function setPage(pageName) {
   if (window.location.hash !== `#${nextPage}`) {
     history.replaceState(null, "", `#${nextPage}`);
   }
-  if (nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review") render();
+  if (nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "research-lab") render();
+  if (nextPage === "research-lab") window.requestAnimationFrame(() => renderMonteCarloSimulation(monteCarloResult));
   if (nextPage === "calculator") renderReturnSimulation();
 }
 
@@ -3207,6 +3341,106 @@ function normalizeMt4JournalRows(rows) {
   }).filter(Boolean);
 }
 
+function isMt4Trade(trade) {
+  return Boolean(trade && (trade.source === "TradingNote MT4 EA" || String(trade.externalId || "").startsWith("MT4:" ) || String(trade.externalId || "").startsWith("MT4-GROUP:")));
+}
+
+function mt4PositionGroupKey(trade) {
+  if (!isMt4Trade(trade)) return "";
+  const account = String(trade.account || "unknown").trim();
+  const pair = String(trade.pair || trade.market || "").trim().toUpperCase();
+  const direction = String(trade.direction || "").trim().toLowerCase();
+  const date = normalizeDateValue(trade.date);
+  const time = normalizeTimeValue(trade.time);
+  const entry = fingerprintNumber(trade.entry, 2);
+  if (!date || !time || !pair) return `ticket:${account}:${trade.ticket || trade.externalId || trade.localId}`;
+  return [account, date, time, pair, direction, entry].join("::");
+}
+
+function mt4TradeLegs(trade) {
+  return Array.isArray(trade.partialExits) && trade.partialExits.length ? trade.partialExits : [trade];
+}
+
+function mt4WeightedValue(legs, field, weightField = "lots") {
+  let total = 0;
+  let weight = 0;
+  for (const leg of legs) {
+    const value = Number(leg[field]);
+    const legWeight = Number(leg[weightField]);
+    if (!Number.isFinite(value) || !Number.isFinite(legWeight) || legWeight <= 0) continue;
+    total += value * legWeight;
+    weight += legWeight;
+  }
+  return weight ? Number((total / weight).toFixed(6)) : null;
+}
+
+function consolidateMt4Position(positions) {
+  const legsByTicket = new Map();
+  for (const position of positions) {
+    for (const leg of mt4TradeLegs(position)) {
+      const key = `${leg.account || "unknown"}:${leg.ticket || leg.externalId || leg.localId}`;
+      if (!legsByTicket.has(key)) legsByTicket.set(key, { ...leg, partialExits: undefined });
+    }
+  }
+  const legs = [...legsByTicket.values()];
+  const base = positions.find((trade) => Array.isArray(trade.partialExits)) || legs[0] || positions[0];
+  const sum = (field) => legs.reduce((total, leg) => total + (Number.isFinite(Number(leg[field])) ? Number(leg[field]) : 0), 0);
+  const lots = sum("lots");
+  const profit = sum("profit");
+  const riskUnavailable = legs.some((leg) => leg.riskUnavailable || !Number.isFinite(Number(leg.initialRiskMoney)) || Number(leg.initialRiskMoney) <= 0);
+  const initialRiskMoney = riskUnavailable ? null : sum("initialRiskMoney");
+  const tickets = legs.map((leg) => String(leg.ticket || "")).filter(Boolean);
+  const closeTimes = legs.map((leg) => String(leg.closeTime || "")).filter(Boolean).sort();
+  const groupKey = mt4PositionGroupKey(base || legs[0]);
+  const reviews = [...new Set(legs.map((leg) => String(leg.review || "").trim()).filter(Boolean))];
+  return {
+    ...base,
+    localId: base?.localId || crypto.randomUUID(),
+    externalId: `MT4-GROUP:${groupKey}`,
+    ticket: tickets.join(", "),
+    partialExitTickets: tickets,
+    partialExitCount: legs.length,
+    partialExits: legs,
+    closeTime: closeTimes.at(-1) || base?.closeTime || "",
+    lots: Number(lots.toFixed(4)),
+    profit: Number(profit.toFixed(2)),
+    grossProfit: Number(sum("grossProfit").toFixed(2)),
+    commission: Number(sum("commission").toFixed(2)),
+    swap: Number(sum("swap").toFixed(2)),
+    initialRiskMoney,
+    r: riskUnavailable ? null : Number((profit / initialRiskMoney).toFixed(6)),
+    grossR: riskUnavailable ? null : Number((sum("grossProfit") / initialRiskMoney).toFixed(6)),
+    entry: mt4WeightedValue(legs, "entry"),
+    exitPrice: mt4WeightedValue(legs, "exitPrice"),
+    entrySpreadPoints: mt4WeightedValue(legs, "entrySpreadPoints"),
+    exitSpreadPoints: mt4WeightedValue(legs, "exitSpreadPoints"),
+    maxSpreadPoints: Math.max(...legs.map((leg) => Number(leg.maxSpreadPoints)).filter(Number.isFinite), 0),
+    spreadCostEstimate: Number(sum("spreadCostEstimate").toFixed(2)),
+    outcome: profit > 0 ? "win" : profit < 0 ? "loss" : "be",
+    riskUnavailable,
+    captureQuality: riskUnavailable ? "missing_initial_sl" : legs.every((leg) => !leg.captureQuality || leg.captureQuality === "complete") ? "complete" : "partial_capture",
+    exitReason: legs.length > 1 ? "partial_exit" : base?.exitReason,
+    review: [`MT4 分批出場已合併：${legs.length} 段（Ticket ${tickets.join("、")}）`, ...reviews].join(" · "),
+    source: "TradingNote MT4 EA",
+  };
+}
+
+function consolidateMt4Trades(items) {
+  const groups = new Map();
+  const other = [];
+  for (const trade of items) {
+    const positionKey = mt4PositionGroupKey(trade);
+    if (!positionKey) {
+      other.push(trade);
+      continue;
+    }
+    const key = `${trade.batchId || "live-default"}::${positionKey}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(trade);
+  }
+  return [...other, ...[...groups.values()].map(consolidateMt4Position)];
+}
+
 function mt4JournalPreview() {
   const text = els.mt4Paste.value;
   if (!text.trim()) {
@@ -3216,8 +3450,9 @@ function mt4JournalPreview() {
   try {
     const rows = parseMt4Journal(text);
     const tradesInPaste = normalizeMt4JournalRows(rows);
-    const uniqueIds = new Set(tradesInPaste.map((trade) => trade.externalId));
-    els.mt4ImportPreview.innerHTML = `<strong>${uniqueIds.size} 筆可匯入交易</strong><span>原始 ${rows.length} 列；帳號＋Ticket 相同的資料只會保留一筆。</span>`;
+    const positions = consolidateMt4Trades(tradesInPaste);
+    const exitCount = new Set(tradesInPaste.map((trade) => trade.externalId)).size;
+    els.mt4ImportPreview.innerHTML = `<strong>${positions.length} 組交易 · ${exitCount} 段出場</strong><span>相同帳號、商品、方向、開倉時間與開倉價會自動合併；原始 Ticket 仍會保留。</span>`;
   } catch (error) {
     els.mt4ImportPreview.innerHTML = `<strong>格式無法辨識</strong><span>${error.message}</span>`;
   }
@@ -3228,18 +3463,28 @@ function importMt4JournalText(text) {
   const rows = parseMt4Journal(text);
   const normalized = normalizeMt4JournalRows(rows);
   if (!normalized.length) throw new Error("沒有找到可匯入的已平倉交易。");
-  const existing = new Set(tradesInActiveBatch().map(smartTradeFingerprint));
-  const incoming = [];
+  const groupedIncoming = new Map();
   for (const trade of normalized) {
-    const key = smartTradeFingerprint(trade);
-    if (!key || existing.has(key)) continue;
-    existing.add(key);
-    incoming.push(trade);
+    const key = mt4PositionGroupKey(trade);
+    if (!groupedIncoming.has(key)) groupedIncoming.set(key, []);
+    groupedIncoming.get(key).push(trade);
   }
-  localTrades.push(...incoming);
+  let added = 0;
+  let skipped = 0;
+  for (const [groupKey, incomingLegs] of groupedIncoming) {
+    const existingPositions = localTrades.filter((trade) => trade.batchId === activeLiveBatch && mt4PositionGroupKey(trade) === groupKey);
+    const existingTickets = new Set(existingPositions.flatMap(mt4TradeLegs).map((leg) => `${leg.account || "unknown"}:${leg.ticket || leg.externalId}`));
+    const uniqueIncoming = [...new Map(incomingLegs.map((leg) => [`${leg.account || "unknown"}:${leg.ticket || leg.externalId}`, leg])).values()];
+    const newLegs = uniqueIncoming.filter((leg) => !existingTickets.has(`${leg.account || "unknown"}:${leg.ticket || leg.externalId}`));
+    skipped += incomingLegs.length - newLegs.length;
+    if (!newLegs.length) continue;
+    localTrades = localTrades.filter((trade) => !(trade.batchId === activeLiveBatch && mt4PositionGroupKey(trade) === groupKey));
+    localTrades.push(consolidateMt4Position([...existingPositions, ...newLegs]));
+    added += 1;
+  }
   saveLocalTrades();
   refreshAfterDataChange();
-  return { added: incoming.length, skipped: normalized.length - incoming.length };
+  return { added, skipped };
 }
 
 function normalizeHeader(value) {
@@ -3779,7 +4024,7 @@ els.mt4ImportForm.addEventListener("submit", (event) => {
   try {
     const result = importMt4JournalText(els.mt4Paste.value);
     els.mt4ImportDialog.close();
-    showToast(`MT4 匯入完成：新增 ${result.added} 筆，略過 ${result.skipped} 筆重複 Ticket。`);
+    showToast(`MT4 匯入完成：新增／更新 ${result.added} 組交易，略過 ${result.skipped} 段重複出場。`);
   } catch (error) {
     showToast(error.message || "MT4 記錄匯入失敗。", "error");
     els.mt4Paste.focus();
@@ -3868,6 +4113,13 @@ els.profitModes.forEach((button) => {
     renderAnalytics(filteredTrades());
   });
 });
+
+els.researchLabBreakpoint?.addEventListener("change", () => {
+  populateResearchLabControls();
+  renderResearchLab();
+  runMonteCarloSimulation();
+});
+els.researchLabMarket?.addEventListener("change", renderResearchLab);
 
 els.calendarHeatmap.addEventListener("click", (event) => {
   const cell = event.target.closest("[data-date]");

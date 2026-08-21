@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TradingNote Analytics</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260819-1" />
+    <link rel="stylesheet" href="styles.css?v=20260820-1" />
   </head>
   <body>
     <aside class="sidebar">
@@ -23,6 +23,7 @@
         <a href="#review" data-page-link="review"><span aria-hidden="true">◎</span>交易複盤</a>
         <a href="#period" data-page-link="period"><span aria-hidden="true">▦</span>週月績效</a>
         <a href="#trades" data-page-link="trades"><span aria-hidden="true">≡</span>交易紀錄</a>
+        <a href="#research-lab" data-page-link="research-lab"><span aria-hidden="true">⇄</span>回測實盤研究</a>
         <a href="#checklist" data-page-link="checklist"><span aria-hidden="true">✓</span>交易檢查</a>
         <a href="#calculator" data-page-link="calculator"><span aria-hidden="true">％</span>風控計算</a>
         <a href="../research-system/index.html"><span aria-hidden="true">R</span>回測研究系統</a>
@@ -77,7 +78,7 @@
               </button>
               <button id="openMt4ImportButton" class="menu-action" type="button" role="menuitem">
                 <span class="menu-icon" aria-hidden="true">MT4</span>
-                <span><strong>貼上 MT4 EA 記錄</strong><small>從記事本複製後智慧合併，Ticket 重複會略過</small></span>
+                <span><strong>貼上 MT4 EA 記錄</strong><small>同開倉時間的分批出場會自動合併</small></span>
               </button>
               <label class="menu-action" for="backupImportInput" role="menuitem">
                 <span class="menu-icon" aria-hidden="true">⇩</span>
@@ -480,6 +481,7 @@
             <table>
               <thead>
                 <tr>
+                  <th>日期</th>
                   <th>#</th>
                   <th>商品</th>
                   <th>結果</th>
@@ -498,6 +500,100 @@
               </thead>
               <tbody id="tradeRows"></tbody>
             </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="research-lab" class="page" data-page="research-lab">
+        <section class="panel research-lab-panel">
+          <div class="panel-heading research-lab-heading">
+            <div>
+              <p class="eyebrow">BACKTEST × LIVE EXECUTION</p>
+              <h2>回測 vs 實盤研究室</h2>
+              <p>選擇一個回測斷點，從整體績效、商品與同日期執行差異找出策略落差。</p>
+            </div>
+            <div class="research-lab-controls">
+              <label>回測斷點
+                <select id="researchLabBreakpoint"></select>
+              </label>
+              <label>商品
+                <select id="researchLabMarket"><option value="all">全部商品</option></select>
+              </label>
+            </div>
+          </div>
+          <div id="researchLabEmpty" class="empty-state page-empty" hidden>
+            <strong>尚未選擇回測斷點</strong>
+            <span>先到回測研究系統建立或匯入樣本，再回來選擇比較。</span>
+          </div>
+          <div id="researchLabContent">
+            <div id="researchLabMetrics" class="research-lab-metrics"></div>
+            <div class="research-lab-grid">
+              <article class="research-study-card">
+                <div class="panel-heading compact"><div><h3>商品落差</h3><p>同商品的實盤與回測期望值差距。</p></div></div>
+                <div class="table-wrap research-table-wrap">
+                  <table>
+                    <thead><tr><th>商品</th><th>實盤筆數</th><th>實盤 Avg R</th><th>回測筆數</th><th>回測 Avg R</th><th>落差</th></tr></thead>
+                    <tbody id="researchMarketRows"></tbody>
+                  </table>
+                </div>
+              </article>
+              <article class="research-study-card">
+                <div class="panel-heading compact"><div><h3>研究結論</h3><p>快速定位回測優勢是否在實盤流失。</p></div></div>
+                <div id="researchLabInsight" class="research-insight"></div>
+              </article>
+            </div>
+            <article class="research-study-card same-date-study">
+              <div class="panel-heading compact"><div><h3>同日期差異</h3><p>只有兩邊都有紀錄的日期才會列入，正值代表實盤優於回測。</p></div></div>
+              <div class="table-wrap research-table-wrap">
+                <table>
+                  <thead><tr><th>日期</th><th>實盤筆數</th><th>實盤 R</th><th>回測筆數</th><th>回測 R</th><th>實盤 − 回測</th></tr></thead>
+                  <tbody id="researchDateRows"></tbody>
+                </table>
+              </div>
+            </article>
+            <section class="panel research-monte-carlo-suite">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">RISK DISTRIBUTION LAB</p>
+                  <h2>實盤／回測 Monte Carlo</h2>
+                  <p>使用上方選擇的回測斷點，與目前實盤斷點進行相同條件的尾端風險模擬。</p>
+                </div>
+              </div>
+              <select id="researchBreakpointInput" class="visually-hidden" aria-hidden="true" tabindex="-1">
+                <option value="">不比較回測</option>
+              </select>
+              <div class="monte-carlo-layout">
+                <section class="monte-carlo-panel live-panel">
+                  <div class="mc-panel-head">
+                    <div><h3>實盤 Monte Carlo</h3><p>使用目前交易紀錄篩選後的 R 分布。</p></div>
+                    <strong id="monteCarloFormula"></strong>
+                  </div>
+                  <div id="monteCarloMetrics" class="simulation-metrics monte-carlo-metrics"></div>
+                  <div class="simulation-chart-wrap monte-carlo-wrap">
+                    <div class="chart-legend monte-carlo-legend"><span><i></i>實盤區間</span></div>
+                    <canvas id="monteCarloChart" aria-label="實盤 Monte Carlo 資金曲線區間"></canvas>
+                  </div>
+                  <div id="monteCarloStress" class="monte-carlo-stress"></div>
+                </section>
+                <section class="monte-carlo-panel research-panel">
+                  <div class="mc-panel-head">
+                    <div><h3>回測 Monte Carlo</h3><p>使用目前研究室選擇的回測斷點 R 分布。</p></div>
+                    <strong id="researchMonteCarloFormula"></strong>
+                  </div>
+                  <div id="researchMonteCarloMetrics" class="simulation-metrics monte-carlo-metrics"></div>
+                  <div class="simulation-chart-wrap monte-carlo-wrap">
+                    <div class="chart-legend monte-carlo-legend"><span><i></i>回測區間</span></div>
+                    <canvas id="researchMonteCarloChart" aria-label="回測 Monte Carlo 資金曲線區間"></canvas>
+                  </div>
+                  <div id="researchMonteCarloStress" class="monte-carlo-stress"></div>
+                </section>
+                <section class="monte-carlo-panel compare-panel">
+                  <div class="mc-panel-head"><div><h3>實盤 vs 回測比較</h3><p>看實盤是否比回測的尾端風險更差。</p></div></div>
+                  <div id="monteCarloCompare" class="research-compare"></div>
+                </section>
+              </div>
+              <p class="simulation-note">此結果是隨機情境，不是獲利保證；實際交易還會受到滑價、手續費、連續虧損與執行差異影響。</p>
+            </section>
           </div>
         </section>
       </section>
@@ -567,59 +663,6 @@
             <div class="chart-legend"><span><i></i>帳戶報酬率</span><strong id="simulationFormula"></strong></div>
             <canvas id="simulationChart" aria-label="模擬交易資金曲線"></canvas>
           </div>
-          <div class="monte-carlo-layout">
-            <section class="monte-carlo-panel live-panel">
-              <div class="mc-panel-head">
-                <div>
-                  <h3>實盤 Monte Carlo</h3>
-                  <p>使用目前交易紀錄篩選後的 R 分布。</p>
-                </div>
-                <strong id="monteCarloFormula"></strong>
-              </div>
-              <div id="monteCarloMetrics" class="simulation-metrics monte-carlo-metrics"></div>
-              <div class="simulation-chart-wrap monte-carlo-wrap">
-                <div class="chart-legend monte-carlo-legend">
-                  <span><i></i>實盤區間</span>
-                </div>
-                <canvas id="monteCarloChart" aria-label="實盤 Monte Carlo 資金曲線區間"></canvas>
-              </div>
-              <div id="monteCarloStress" class="monte-carlo-stress"></div>
-            </section>
-
-            <section class="monte-carlo-panel research-panel">
-              <div class="mc-panel-head">
-                <div>
-                  <h3>回測 Monte Carlo</h3>
-                  <p>選擇研究系統斷點，用該斷點 R 分布模擬。</p>
-                </div>
-                <label class="research-batch-picker">回測斷點
-                  <select id="researchBreakpointInput">
-                    <option value="">不比較回測</option>
-                  </select>
-                </label>
-                <strong id="researchMonteCarloFormula"></strong>
-              </div>
-              <div id="researchMonteCarloMetrics" class="simulation-metrics monte-carlo-metrics"></div>
-              <div class="simulation-chart-wrap monte-carlo-wrap">
-                <div class="chart-legend monte-carlo-legend">
-                  <span><i></i>回測區間</span>
-                </div>
-                <canvas id="researchMonteCarloChart" aria-label="回測 Monte Carlo 資金曲線區間"></canvas>
-              </div>
-              <div id="researchMonteCarloStress" class="monte-carlo-stress"></div>
-            </section>
-
-            <section class="monte-carlo-panel compare-panel">
-              <div class="mc-panel-head">
-                <div>
-                  <h3>實盤 vs 回測比較</h3>
-                  <p>看實盤是否比回測的尾端風險更差。</p>
-                </div>
-              </div>
-              <div id="monteCarloCompare" class="research-compare"></div>
-            </section>
-          </div>
-          <p class="simulation-note">此結果是隨機情境，不是獲利保證；實際交易還會受到滑價、手續費、連續虧損與執行差異影響。</p>
         </section>
       </section>
     </main>
@@ -742,7 +785,7 @@
           <div>
             <p class="eyebrow">MT4 JOURNAL BRIDGE</p>
             <h2>貼上 EA 交易記錄</h2>
-            <p>在記事本全選複製，貼到下方即可。系統會依帳號與 Ticket 自動略過重複交易。</p>
+            <p>在記事本全選複製，貼到下方即可。同帳號、商品、方向、開倉時間與開倉價會合併成一筆，重複 Ticket 會略過。</p>
           </div>
           <button class="icon-button" value="cancel" type="button" id="closeMt4ImportDialog" aria-label="關閉">×</button>
         </div>
@@ -801,6 +844,6 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
-    <script src="app.js?v=20260819-3"></script>
+    <script src="app.js?v=20260820-2"></script>
   </body>
 </html>

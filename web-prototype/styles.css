@@ -3809,3 +3809,162 @@ td:nth-child(12) {
     transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) rotate(var(--rotation)) scale(1);
   }
 }
+
+.research-lab-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.research-lab-heading {
+  align-items: end;
+}
+
+.research-lab-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.research-lab-controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 210px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.research-lab-controls select {
+  min-height: 42px;
+}
+
+.research-lab-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.research-metric-card,
+.research-study-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%);
+}
+
+.research-metric-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  padding: 16px;
+}
+
+.research-metric-card > span,
+.research-metric-card > em {
+  grid-column: 1 / -1;
+}
+
+.research-metric-card > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.research-metric-card div {
+  display: grid;
+  gap: 2px;
+}
+
+.research-metric-card strong {
+  font-size: clamp(1.2rem, 2vw, 1.75rem);
+}
+
+.research-metric-card small,
+.research-metric-card em {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.research-lab-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(290px, 0.8fr);
+  gap: 16px;
+}
+
+.research-study-card {
+  overflow: hidden;
+}
+
+.research-study-card .panel-heading.compact {
+  padding: 16px 18px 8px;
+}
+
+.research-table-wrap {
+  border: 0;
+  border-radius: 0;
+}
+
+.research-insight {
+  display: grid;
+  gap: 10px;
+  padding: 8px 18px 18px;
+}
+
+.research-verdict,
+.research-focus {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.research-verdict.positive {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.research-verdict.negative {
+  border-color: color-mix(in srgb, var(--loss) 55%, var(--line));
+}
+
+.research-verdict span,
+.research-focus span,
+.research-verdict p,
+.research-focus p {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.research-verdict strong,
+.research-focus strong {
+  font-size: 1.12rem;
+}
+
+.same-date-study {
+  margin-top: 16px;
+}
+
+.research-monte-carlo-suite {
+  margin-top: 16px;
+}
+
+@media (max-width: 1000px) {
+  .research-lab-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .research-lab-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .research-lab-controls,
+  .research-lab-controls label {
+    width: 100%;
+  }
+
+  .research-lab-metrics {
+    grid-template-columns: 1fr;
+  }
+}

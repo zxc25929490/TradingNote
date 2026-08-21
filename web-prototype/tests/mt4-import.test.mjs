@@ -49,6 +49,12 @@ const functionNames = [
   "mt4PositiveNumber",
   "captureQualityLabel",
   "normalizeMt4JournalRows",
+  "isMt4Trade",
+  "mt4PositionGroupKey",
+  "mt4TradeLegs",
+  "mt4WeightedValue",
+  "consolidateMt4Position",
+  "consolidateMt4Trades",
 ];
 
 const sandbox = {
@@ -128,6 +134,39 @@ assert.equal(trades[0].mfeR, 2.4);
 assert.equal(trades[0].maeR, -0.4);
 assert.equal(trades[0].exitEfficiencyPct, 67.58);
 assert.equal(sandbox.tradeIdentityFingerprint(trades[0]), sandbox.tradeIdentityFingerprint(trades[1]));
+
+const partialExitValues = {
+  ...values,
+  ticket: "987656",
+  lots: "0.25",
+  close_time: "2026-08-18 10:35:00",
+  exit_price: "23200.5",
+  initial_risk_money: "125.00",
+  gross_profit: "250.00",
+  commission: "-1.75",
+  swap: "-0.50",
+  net_profit: "247.75",
+  net_r: "1.9820",
+};
+const partialJournal = `${headers.join("\t")}\n${row}\n${headers.map((header) => partialExitValues[header] ?? "").join("\t")}\n`;
+const partialTrades = sandbox.normalizeMt4JournalRows(sandbox.parseMt4Journal(partialJournal));
+const [consolidated] = sandbox.consolidateMt4Trades(partialTrades);
+assert.equal(consolidated.partialExitCount, 2);
+assert.deepEqual(Array.from(consolidated.partialExitTickets), ["987654", "987656"]);
+assert.equal(consolidated.lots, 0.75);
+assert.equal(consolidated.profit, 653.25);
+assert.equal(consolidated.initialRiskMoney, 375);
+assert.equal(consolidated.r, 1.742);
+assert.equal(consolidated.closeTime, "2026-08-18 10:35:00");
+assert.match(consolidated.review, /分批出場已合併：2 段/);
+assert.equal(
+  sandbox.consolidateMt4Trades([
+    { ...partialTrades[0], batchId: "live-a" },
+    { ...partialTrades[1], batchId: "live-b" },
+  ]).length,
+  2,
+  "same position in different breakpoints must remain separate",
+);
 
 const missingRiskValues = {
   ...values,
