@@ -5,6 +5,7 @@ const LIVE_BATCH_KEY = "tradingnote.liveBatches";
 const LIVE_ACTIVE_BATCH_KEY = "tradingnote.activeLiveBatch";
 const ALL_LIVE_BATCH_ID = "live-all";
 const ACCOUNT_RULES_KEY = "tradingnote.accountRules";
+const STRATEGY_VERSIONS_KEY = "tradingnote.strategyVersions.v1";
 const THEME_KEY = "tradingnote.theme";
 const RESEARCH_TRADE_KEY = "trading-research.trades.v1";
 const RESEARCH_RULE_KEY = "trading-research.rules.v1";
@@ -37,6 +38,7 @@ let trades = mergeTrades();
 let currentDetailId = null;
 let toastTimer = null;
 let accountRules = loadAccountRules();
+let strategyVersions = loadStrategyVersions();
 let selectedPeriodMonth = monthKey(new Date());
 let selectedPeriodWeekStart = null;
 let reviewsExpanded = false;
@@ -62,6 +64,7 @@ const els = {
   maxDd: document.querySelector("#maxDd"),
   lossStreak: document.querySelector("#lossStreak"),
   periodComparisonCards: document.querySelector("#periodComparisonCards"),
+  homeComparisonCards: document.querySelector("#homeComparisonCards"),
   filterSummary: document.querySelector("#filterSummary"),
   resetFilters: document.querySelector("#resetFiltersButton"),
   profitFactor: document.querySelector("#profitFactor"),
@@ -164,12 +167,30 @@ const els = {
   monteCarloCompare: document.querySelector("#monteCarloCompare"),
   researchLabBreakpoint: document.querySelector("#researchLabBreakpoint"),
   researchLabMarket: document.querySelector("#researchLabMarket"),
+  researchLabStrategy: document.querySelector("#researchLabStrategy"),
   researchLabEmpty: document.querySelector("#researchLabEmpty"),
   researchLabContent: document.querySelector("#researchLabContent"),
   researchLabMetrics: document.querySelector("#researchLabMetrics"),
   researchMarketRows: document.querySelector("#researchMarketRows"),
   researchDateRows: document.querySelector("#researchDateRows"),
   researchLabInsight: document.querySelector("#researchLabInsight"),
+  researchAttribution: document.querySelector("#researchAttribution"),
+  researchStrategyComparison: document.querySelector("#researchStrategyComparison"),
+  strategyVersionGrid: document.querySelector("#strategyVersionGrid"),
+  strategyVersionEmpty: document.querySelector("#strategyVersionEmpty"),
+  addStrategyVersion: document.querySelector("#addStrategyVersionButton"),
+  strategyVersionDialog: document.querySelector("#strategyVersionDialog"),
+  strategyVersionForm: document.querySelector("#strategyVersionForm"),
+  strategyVersionDialogTitle: document.querySelector("#strategyVersionDialogTitle"),
+  closeStrategyVersionDialog: document.querySelector("#closeStrategyVersionDialog"),
+  cancelStrategyVersion: document.querySelector("#cancelStrategyVersion"),
+  liveReviewMetrics: document.querySelector("#liveReviewMetrics"),
+  liveReviewClassFilter: document.querySelector("#liveReviewClassFilter"),
+  liveReviewStrategyFilter: document.querySelector("#liveReviewStrategyFilter"),
+  liveReviewSearch: document.querySelector("#liveReviewSearch"),
+  liveReviewRows: document.querySelector("#liveReviewRows"),
+  liveReviewEmpty: document.querySelector("#liveReviewEmpty"),
+  addMissedTrade: document.querySelector("#addMissedTradeButton"),
   checklist: document.querySelector("#checklistItems"),
   checklistScore: document.querySelector("#checklistScore"),
   tradeGate: document.querySelector("#tradeGate"),
@@ -232,9 +253,10 @@ const pageTitles = {
   dashboard: "交易績效儀表板",
   objectives: "挑戰目標與風險",
   analytics: "深度數據分析",
-  review: "交易複盤中心",
+  review: "行為與紀律分析",
   period: "週/月績效分析",
   trades: "交易紀錄",
+  strategy: "策略版本庫",
   "research-lab": "回測 vs 實盤研究室",
   checklist: "交易前檢查表",
   calculator: "風控手數計算",
@@ -342,6 +364,60 @@ function loadAccountRules() {
   } catch {
     return defaults;
   }
+}
+
+function loadStrategyVersions() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(STRATEGY_VERSIONS_KEY) || "[]");
+    return Array.isArray(stored) ? stored.map((strategy) => ({
+      ...strategy,
+      id: String(strategy.id || crypto.randomUUID()),
+      name: String(strategy.name || "未命名策略"),
+      version: String(strategy.version || "v1.0"),
+      status: strategy.status || "Draft",
+      locked: Boolean(strategy.locked),
+    })) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStrategyVersions() {
+  localStorage.setItem(STRATEGY_VERSIONS_KEY, JSON.stringify(strategyVersions));
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
+  })[character]);
+}
+
+function strategyVersionLabel(id) {
+  if (!id) return "未綁定策略";
+  const strategy = strategyVersions.find((item) => String(item.id) === String(id));
+  return strategy ? `${strategy.name} ${strategy.version}` : "已刪除的策略版本";
+}
+
+function reviewClassLabel(value) {
+  return ({
+    correct_execution: "符合策略且執行正確",
+    execution_error: "符合策略但執行錯誤",
+    rule_violation: "不符合策略卻進場",
+    missed_trade: "符合策略但漏單",
+  })[value] || "待復盤";
+}
+
+const ATTRIBUTION_FIELDS = [
+  ["missedTradeR", "漏單"],
+  ["earlyExitR", "提早出場"],
+  ["extraTradeR", "額外亂做"],
+  ["lateEntryR", "太晚進場"],
+  ["slippageR", "滑價／成本"],
+  ["marketDriftR", "市場狀態差異"],
+];
+
+function tradeAttributionTotal(trade) {
+  return ATTRIBUTION_FIELDS.reduce((sum, [field]) => sum + Math.max(0, Number(trade[field]) || 0), 0);
 }
 
 function saveLocalTrades() {
@@ -960,6 +1036,154 @@ function researchMetricCard(label, liveValue, backtestValue, formatter, better =
   </article>`;
 }
 
+function populateStrategySelects() {
+  const options = strategyVersions
+    .slice()
+    .sort((a, b) => String(b.effectiveFrom || b.createdAt || "").localeCompare(String(a.effectiveFrom || a.createdAt || "")))
+    .map((strategy) => `<option value="${escapeHtml(strategy.id)}">${escapeHtml(strategyVersionLabel(strategy.id))}${strategy.locked ? " · 已鎖定" : ""}</option>`)
+    .join("");
+  const tradeSelect = els.tradeForm?.elements.strategyVersionId;
+  if (tradeSelect) {
+    const previous = tradeSelect.value;
+    tradeSelect.innerHTML = `<option value="">未綁定策略</option>${options}`;
+    if ([...tradeSelect.options].some((option) => option.value === previous)) tradeSelect.value = previous;
+  }
+  if (els.researchLabStrategy) {
+    const previous = els.researchLabStrategy.value || "all";
+    els.researchLabStrategy.innerHTML = `<option value="all">全部版本</option><option value="unassigned">未綁定策略</option>${options}`;
+    els.researchLabStrategy.value = [...els.researchLabStrategy.options].some((option) => option.value === previous) ? previous : "all";
+  }
+}
+
+function renderStrategyVersions() {
+  if (!els.strategyVersionGrid) return;
+  els.strategyVersionEmpty.hidden = strategyVersions.length > 0;
+  els.strategyVersionGrid.hidden = strategyVersions.length === 0;
+  els.strategyVersionGrid.innerHTML = strategyVersions.map((strategy) => {
+    const linkedLive = localTrades.filter((trade) => String(trade.strategyVersionId || "") === String(strategy.id)).length;
+    const research = storedArray(LEGACY_RESEARCH_TRADE_KEY).filter((trade) => String(trade.strategyVersionId || "") === String(strategy.id)).length;
+    return `<article class="strategy-version-card ${strategy.locked ? "locked" : ""}" data-strategy-id="${escapeHtml(strategy.id)}">
+      <div class="strategy-card-top"><span class="strategy-status">${escapeHtml(strategy.status)}</span><span>${strategy.locked ? "🔒 已鎖定" : "可編輯"}</span></div>
+      <h3>${escapeHtml(strategy.name)} <em>${escapeHtml(strategy.version)}</em></h3>
+      <p>${escapeHtml(strategy.scope || "尚未設定適用市場與時段")}</p>
+      <dl><div><dt>生效期間</dt><dd>${escapeHtml(strategy.effectiveFrom || "未設定")} → ${escapeHtml(strategy.effectiveTo || "持續中")}</dd></div><div><dt>每筆風險</dt><dd>${strategy.riskR === "" || strategy.riskR == null ? "未設定" : `${Number(strategy.riskR)}R`}</dd></div><div><dt>關聯資料</dt><dd>實盤 ${linkedLive} · 回測 ${research}</dd></div></dl>
+      <details><summary>查看凍結規則</summary><div class="strategy-rules"><b>進場</b><p>${escapeHtml(strategy.entryRules || "—")}</p><b>出場</b><p>${escapeHtml(strategy.exitRules || "—")}</p><b>No Trade</b><p>${escapeHtml(strategy.noTradeRules || "—")}</p></div></details>
+      <div class="strategy-card-actions">
+        <button class="ghost-button" type="button" data-strategy-action="duplicate">複製新版</button>
+        ${strategy.locked ? "" : `<button class="ghost-button" type="button" data-strategy-action="edit">編輯</button><button class="ghost-button" type="button" data-strategy-action="lock">鎖定</button><button class="ghost-button danger-button" type="button" data-strategy-action="delete">刪除</button>`}
+      </div>
+    </article>`;
+  }).join("");
+  populateStrategySelects();
+}
+
+function populateLiveReviewControls() {
+  if (!els.liveReviewStrategyFilter) return;
+  const previous = els.liveReviewStrategyFilter.value || "all";
+  const options = strategyVersions.map((strategy) => `<option value="${escapeHtml(strategy.id)}">${escapeHtml(strategyVersionLabel(strategy.id))}</option>`).join("");
+  els.liveReviewStrategyFilter.innerHTML = `<option value="all">全部版本</option><option value="unassigned">未綁定策略</option>${options}`;
+  els.liveReviewStrategyFilter.value = [...els.liveReviewStrategyFilter.options].some((option) => option.value === previous) ? previous : "all";
+}
+
+function liveReviewItems() {
+  const classFilter = els.liveReviewClassFilter?.value || "all";
+  const strategyFilter = els.liveReviewStrategyFilter?.value || "all";
+  const query = String(els.liveReviewSearch?.value || "").trim().toLowerCase();
+  return tradesForActiveView().filter((trade) => {
+    const reviewClass = trade.reviewClass || "pending";
+    const classMatch = classFilter === "all" || reviewClass === classFilter;
+    const strategyMatch = strategyFilter === "all"
+      || (strategyFilter === "unassigned" ? !trade.strategyVersionId : String(trade.strategyVersionId || "") === strategyFilter);
+    const searchText = [trade.date, trade.time, trade.pair, trade.setup, trade.review, trade.lesson, strategyVersionLabel(trade.strategyVersionId)].join(" ").toLowerCase();
+    return classMatch && strategyMatch && (!query || searchText.includes(query));
+  });
+}
+
+function renderLiveReview() {
+  if (!els.liveReviewRows) return;
+  populateLiveReviewControls();
+  const all = tradesForActiveView();
+  const reviewed = all.filter((trade) => Boolean(trade.reviewClass));
+  const pending = all.length - reviewed.length;
+  const correct = reviewed.filter((trade) => trade.reviewClass === "correct_execution").length;
+  const strategyAligned = reviewed.filter((trade) => ["correct_execution", "execution_error", "missed_trade"].includes(trade.reviewClass)).length;
+  const attributedR = all.reduce((sum, trade) => sum + tradeAttributionTotal(trade), 0);
+  els.liveReviewMetrics.innerHTML = [
+    ["待復盤", pending, `${all.length} 筆總紀錄`, pending ? "warning" : "positive"],
+    ["已完成復盤", reviewed.length, `${(all.length ? reviewed.length / all.length * 100 : 0).toFixed(1)}% 完成率`, ""],
+    ["執行正確", reviewed.length ? `${(correct / reviewed.length * 100).toFixed(1)}%` : "—", `${correct} 筆分類正確`, "positive"],
+    ["符合策略機會", reviewed.length ? `${(strategyAligned / reviewed.length * 100).toFixed(1)}%` : "—", "包含執行錯誤與漏單", ""],
+    ["已歸因損失", attributedR ? `-${attributedR.toFixed(2)}R` : "—", "六種落差原因合計", attributedR ? "negative" : ""],
+  ].map(([label, value, note, tone]) => `<article class="review-metric ${tone}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join("");
+
+  const items = sortByDate(liveReviewItems()).reverse();
+  els.liveReviewEmpty.hidden = items.length > 0;
+  document.querySelector(".live-review-table-wrap").hidden = items.length === 0;
+  els.liveReviewRows.innerHTML = items.map((trade) => {
+    const missed = trade.recordType === "missed_opportunity" || trade.reviewClass === "missed_trade";
+    const result = missed ? "漏單" : trade.r == null ? "R 未記錄" : tradeRLabel(trade);
+    const reviewClass = trade.reviewClass || "pending";
+    return `<tr data-review-id="${escapeHtml(trade.id)}">
+      <td><strong>${escapeHtml(trade.date || "-")}</strong><small>${escapeHtml(trade.time || "")}</small></td>
+      <td><strong>${escapeHtml(trade.pair || "-")}</strong><small>${escapeHtml(trade.setup || trade.checklist || "未填 Setup")}</small></td>
+      <td>${escapeHtml(strategyVersionLabel(trade.strategyVersionId))}</td>
+      <td class="${trade.r > 0 ? "profit-pos" : trade.r < 0 ? "profit-neg" : ""}">${result}</td>
+      <td><span class="review-class-chip ${reviewClass}">${reviewClassLabel(trade.reviewClass)}</span></td>
+      <td class="${tradeAttributionTotal(trade) ? "profit-neg" : ""}">${tradeAttributionTotal(trade) ? `-${tradeAttributionTotal(trade).toFixed(2)}R` : "—"}</td>
+      <td><button class="ghost-button review-edit-button" type="button" data-review-action="edit">${trade.reviewClass ? "編輯復盤" : "開始復盤"}</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function openStrategyVersionForm(strategy = null, duplicate = false) {
+  const form = els.strategyVersionForm;
+  form.reset();
+  const source = strategy ? { ...strategy } : null;
+  form.elements.id.value = duplicate || !source ? "" : source.id;
+  els.strategyVersionDialogTitle.textContent = duplicate ? "複製成新策略版本" : source ? "編輯策略版本" : "新增策略版本";
+  if (source) {
+    ["name", "version", "status", "riskR", "effectiveFrom", "effectiveTo", "scope", "entryRules", "exitRules", "noTradeRules", "notes"].forEach((name) => {
+      form.elements[name].value = source[name] ?? "";
+    });
+    if (duplicate) {
+      form.elements.version.value = `${source.version}-next`;
+      form.elements.status.value = "Draft";
+      form.elements.effectiveFrom.value = isoDate(new Date());
+      form.elements.effectiveTo.value = "";
+    }
+  } else {
+    form.elements.version.value = `v${strategyVersions.length + 1}.0`;
+    form.elements.effectiveFrom.value = isoDate(new Date());
+  }
+  els.strategyVersionDialog.showModal();
+}
+
+function handleStrategyAction(event) {
+  const button = event.target.closest("[data-strategy-action]");
+  const card = event.target.closest("[data-strategy-id]");
+  if (!button || !card) return;
+  const strategy = strategyVersions.find((item) => String(item.id) === String(card.dataset.strategyId));
+  if (!strategy) return;
+  const action = button.dataset.strategyAction;
+  if (action === "edit") openStrategyVersionForm(strategy);
+  if (action === "duplicate") openStrategyVersionForm(strategy, true);
+  if (action === "lock" && window.confirm(`鎖定「${strategyVersionLabel(strategy.id)}」後不能再編輯，只能複製新版。確定嗎？`)) {
+    strategy.locked = true;
+    strategy.lockedAt = new Date().toISOString();
+    saveStrategyVersions();
+    renderStrategyVersions();
+    showToast("策略版本已鎖定。之後的規則變更請複製成新版。");
+  }
+  if (action === "delete") {
+    const linked = [...localTrades, ...storedArray(LEGACY_RESEARCH_TRADE_KEY)].some((trade) => String(trade.strategyVersionId || "") === String(strategy.id));
+    if (linked) return showToast("這個版本已有關聯紀錄，請保留或先改綁其他版本。", "error");
+    if (!window.confirm(`確定刪除「${strategyVersionLabel(strategy.id)}」？`)) return;
+    strategyVersions = strategyVersions.filter((item) => item.id !== strategy.id);
+    saveStrategyVersions();
+    renderStrategyVersions();
+  }
+}
+
 function populateResearchLabControls() {
   if (!els.researchLabBreakpoint || !els.researchLabMarket) return;
   const { activeBatch, batches } = readResearchBreakpoints();
@@ -980,6 +1204,7 @@ function populateResearchLabControls() {
   ])].filter(Boolean).sort();
   els.researchLabMarket.innerHTML = [`<option value="all">全部商品</option>`, ...markets.map((market) => `<option value="${market}">${market}</option>`)].join("");
   els.researchLabMarket.value = markets.includes(previousMarket) ? previousMarket : "all";
+  populateStrategySelects();
 }
 
 function renderResearchLab() {
@@ -991,8 +1216,11 @@ function renderResearchLab() {
   if (!selected) return;
   const market = els.researchLabMarket.value;
   const matchesMarket = (trade) => market === "all" || researchTradeMarket(trade) === market;
-  const live = sortByDate(tradesForActiveView().filter(matchesMarket));
-  const backtest = sortByDate(selected.trades.filter(matchesMarket));
+  const strategyId = els.researchLabStrategy?.value || "all";
+  const matchesStrategy = (trade) => strategyId === "all"
+    || (strategyId === "unassigned" ? !trade.strategyVersionId : String(trade.strategyVersionId || "") === strategyId);
+  const live = sortByDate(tradesForActiveView().filter(matchesMarket).filter(matchesStrategy));
+  const backtest = sortByDate(selected.trades.filter(matchesMarket).filter(matchesStrategy));
   const liveStats = researchSummary(live);
   const backtestStats = researchSummary(backtest);
   els.researchLabMetrics.innerHTML = [
@@ -1039,6 +1267,47 @@ function renderResearchLab() {
     <div class="research-verdict ${expectancyGap >= 0 ? "positive" : "negative"}"><span>整體執行落差</span><strong>${signed(expectancyGap, "R / trade")}</strong><p>${expectancyGap >= 0 ? "實盤目前守住或超過回測期望值。" : "實盤期望值低於回測，優先檢查進場、出場與漏單。"}</p></div>
     <div class="research-focus"><span>優先研究商品</span><strong>${weakest?.name || "樣本不足"}</strong><p>${weakest ? `實盤比回測低 ${Math.abs(weakest.gap).toFixed(2)}R / trade。` : "至少需要一個兩邊都有紀錄的商品。"}</p></div>
     <div class="research-focus"><span>同日期配對</span><strong>${pairedDates.length} 天</strong><p>用相同市場環境檢查策略與實際執行差異。</p></div>`;
+
+  const attribution = ATTRIBUTION_FIELDS.map(([field, label]) => ({
+    field,
+    label,
+    value: live.reduce((sum, trade) => sum + Math.max(0, Number(trade[field]) || 0), 0),
+  }));
+  const attributionTotal = attribution.reduce((sum, item) => sum + item.value, 0);
+  const attributionMax = Math.max(...attribution.map((item) => item.value), 0.01);
+  els.researchAttribution.innerHTML = attributionTotal
+    ? `<div class="attribution-total"><span>已歸因執行損失</span><strong>-${attributionTotal.toFixed(2)}R</strong></div>${attribution.map((item) => `<div class="attribution-row"><span>${item.label}</span><i><b style="width:${item.value / attributionMax * 100}%"></b></i><strong>${item.value ? `-${item.value.toFixed(2)}R` : "—"}</strong></div>`).join("")}`
+    : `<div class="empty-state compact-empty">尚未在實盤復盤填寫 R 落差原因。</div>`;
+
+  const versionIds = [...new Set([...live, ...backtest].map((trade) => trade.strategyVersionId || "unassigned"))];
+  els.researchStrategyComparison.innerHTML = versionIds.length
+    ? versionIds.map((id) => {
+      const liveVersion = researchSummary(live.filter((trade) => String(trade.strategyVersionId || "unassigned") === String(id)));
+      const backtestVersion = researchSummary(backtest.filter((trade) => String(trade.strategyVersionId || "unassigned") === String(id)));
+      const gap = liveVersion.avgR - backtestVersion.avgR;
+      return `<div class="strategy-compare-row"><div><strong>${escapeHtml(id === "unassigned" ? "未綁定策略" : strategyVersionLabel(id))}</strong><small>實盤 ${liveVersion.count} 筆 · 回測 ${backtestVersion.count} 筆</small></div><span>${signed(liveVersion.avgR, "R")}</span><span>${signed(backtestVersion.avgR, "R")}</span><b class="${gap >= 0 ? "profit-pos" : "profit-neg"}">${signed(gap, "R")}</b></div>`;
+    }).join("")
+    : `<div class="empty-state compact-empty">目前篩選條件沒有策略版本資料。</div>`;
+}
+
+function renderHomeComparisons() {
+  if (!els.homeComparisonCards) return;
+  const live = tradesForActiveView();
+  const research = readResearchBreakpoints();
+  const selected = research.batches.find((batch) => String(batch.id) === String(research.activeBatch)) || research.batches[0];
+  const backtest = selected?.trades || [];
+  const liveStats = researchSummary(live);
+  const backtestStats = researchSummary(backtest);
+  const expectancyGap = liveStats.avgR - backtestStats.avgR;
+  const reviewed = live.filter((trade) => trade.reviewClass).length;
+  const reviewRate = live.length ? reviewed / live.length * 100 : 0;
+  const attributedR = live.reduce((sum, trade) => sum + tradeAttributionTotal(trade), 0);
+  const liveDates = new Set(live.map((trade) => normalizeDateValue(trade.date)).filter(Boolean));
+  const pairedDays = new Set(backtest.map((trade) => normalizeDateValue(trade.date)).filter((date) => liveDates.has(date))).size;
+  els.homeComparisonCards.innerHTML = `
+    <a href="../analysis-system/index.html"><span>三層差異診斷</span><strong class="${expectancyGap >= 0 ? "profit-pos" : "profit-neg"}">${backtestStats.count ? signed(expectancyGap, "R / trade") : "尚無回測"}</strong><small>回測 → 復盤 → 實盤，定位績效流失層級</small><em>進入分析系統 →</em></a>
+    <a href="../review-system/index.html"><span>實盤復盤完成率</span><strong>${reviewRate.toFixed(1)}%</strong><small>${reviewed} / ${live.length} 筆 · 已歸因 ${attributedR ? `-${attributedR.toFixed(2)}R` : "—"}</small><em>進入復盤系統 →</em></a>
+    <a href="../research-system/index.html"><span>歷史回測樣本</span><strong>${backtestStats.count} 筆</strong><small>${escapeHtml(selected?.name || "尚未建立斷點")} · 同日期 ${pairedDays} 天</small><em>進入回測系統 →</em></a>`;
 }
 
 function inRange(trade, start, end) {
@@ -2101,14 +2370,15 @@ function renderRows(items) {
     .reverse()
     .slice(0, 100)
     .map((trade) => {
-      const profitClass = trade.profit >= 0 ? "profit-pos" : "profit-neg";
+      const isMissed = trade.recordType === "missed_opportunity" || trade.reviewClass === "missed_trade";
+      const profitClass = trade.profit == null ? "" : trade.profit >= 0 ? "profit-pos" : "profit-neg";
       const mainRow = `
         <tr data-id="${trade.id}" tabindex="0">
           <td data-label="${labels[0]}"><strong>${trade.date || "-"}</strong><small>${trade.time || ""}</small></td>
           <td data-label="${labels[1]}">${trade.id}</td>
           <td data-label="${labels[2]}"><strong>${trade.pair}</strong></td>
-          <td data-label="${labels[3]}"><span class="pill ${trade.outcome}">${outcomeLabels[trade.outcome] || trade.outcome.toUpperCase()}</span></td>
-          <td data-label="${labels[4]}" class="${profitClass}">${money(trade.profit)}</td>
+          <td data-label="${labels[3]}"><span class="pill ${isMissed ? "be" : trade.outcome}">${isMissed ? "漏單" : outcomeLabels[trade.outcome] || String(trade.outcome || "-").toUpperCase()}</span></td>
+          <td data-label="${labels[4]}" class="${profitClass}">${trade.profit == null ? "—" : money(trade.profit)}</td>
           <td data-label="${labels[5]}">${tradeRLabel(trade)}</td>
           <td data-label="${labels[6]}">${trade.lots ?? "-"}</td>
           <td data-label="${labels[7]}">${trade.slPips ?? "-"}</td>
@@ -2117,7 +2387,7 @@ function renderRows(items) {
           <td data-label="${labels[10]}">${trade.takeProfit ?? "-"}</td>
           <td data-label="${labels[11]}"><span class="mamba-chip">${mambaDecisionLabel(trade.mambaDecision)}</span><small>${mambaAgreementLabel(trade)}</small></td>
           <td data-label="${labels[12]}" class="${mambaRClass(trade.mambaR)}">${mambaRLabel(trade.mambaR)}</td>
-          <td data-label="${labels[13]}">${trade.setup || trade.checklist || "-"}</td>
+          <td data-label="${labels[13]}">${trade.setup || trade.checklist || "-"}<small>${escapeHtml(strategyVersionLabel(trade.strategyVersionId))}</small></td>
           <td data-label="${labels[14]}">${trade.origin === "local" ? (trade.partialExitCount > 1 ? `MT4 分批出場 · ${trade.partialExitCount} 段` : "手動新增") : `第 ${trade.row} 列`}</td>
         </tr>`;
       if (!reviewsExpanded) return mainRow;
@@ -2125,7 +2395,7 @@ function renderRows(items) {
         <tr class="review-row">
           <td colspan="15">
             <span>Review</span>
-            <p>${tradeReviewText(trade)}</p>
+            <p><b>${reviewClassLabel(trade.reviewClass)}</b> · ${tradeReviewText(trade)}${tradeAttributionTotal(trade) ? ` · 已歸因 -${tradeAttributionTotal(trade).toFixed(2)}R` : ""}</p>
           </td>
         </tr>`;
     })
@@ -2555,7 +2825,7 @@ function openImagePreview(src, label = "交易截圖") {
 
 function openTradeDetail(trade) {
   currentDetailId = trade.id;
-  const profitClass = trade.profit >= 0 ? "profit-pos" : "profit-neg";
+  const profitClass = trade.profit == null ? "" : trade.profit >= 0 ? "profit-pos" : "profit-neg";
   const metric = (value, suffix = "", digits = 2) => Number.isFinite(Number(value))
     ? `${Number(value).toFixed(digits)}${suffix}`
     : "-";
@@ -2589,9 +2859,9 @@ function openTradeDetail(trade) {
     : "";
   els.detail.innerHTML = `
     <p class="eyebrow">${trade.origin === "local" ? "Local trade" : `${trade.source} · row ${trade.row}`}</p>
-    <h2>${trade.pair} · ${trade.outcome.toUpperCase()}</h2>
+    <h2>${trade.pair} · ${trade.recordType === "missed_opportunity" ? "漏單" : String(trade.outcome || "-").toUpperCase()}</h2>
     <div class="detail-stats">
-      <div><span>P/L</span><strong class="${profitClass}">${money(trade.profit)}</strong></div>
+      <div><span>P/L</span><strong class="${profitClass}">${trade.profit == null ? "—" : money(trade.profit)}</strong></div>
       <div><span>R</span><strong>${tradeRLabel(trade)}</strong></div>
       <div><span>Lots</span><strong>${trade.lots ?? "-"}</strong></div>
       <div><span>SL pips</span><strong>${trade.slPips ?? "-"}</strong></div>
@@ -2607,6 +2877,10 @@ function openTradeDetail(trade) {
       <dt>Exit</dt><dd>${trade.exitPrice ?? "-"}</dd>
       <dt>Mamba</dt><dd>${mambaDecisionLabel(trade.mambaDecision)} · ${mambaAgreementLabel(trade)}</dd>
       <dt>Mamba R</dt><dd>${mambaRLabel(trade.mambaR)}</dd>
+      <dt>策略版本</dt><dd>${escapeHtml(strategyVersionLabel(trade.strategyVersionId))}</dd>
+      <dt>復盤分類</dt><dd>${reviewClassLabel(trade.reviewClass)}</dd>
+      <dt>紀錄類型</dt><dd>${trade.recordType === "missed_opportunity" ? "符合策略但漏單" : "實際交易"}</dd>
+      <dt>已歸因 R 落差</dt><dd>${tradeAttributionTotal(trade) ? `-${tradeAttributionTotal(trade).toFixed(2)}R` : "尚未歸因"}</dd>
       <dt>Setup</dt><dd>${trade.setup || trade.checklist || "-"}</dd>
       <dt>Review</dt><dd>${trade.review || trade.lesson || "尚未填寫賽後檢討。"}</dd>
     </dl>
@@ -2631,8 +2905,8 @@ function closeTradeDetail() {
 
 function createTradeFromForm(form) {
   const data = new FormData(form);
-  const profit = Number(data.get("profit"));
-  const r = Number(data.get("r"));
+  const profit = data.get("profit") === "" ? null : Number(data.get("profit"));
+  const r = data.get("r") === "" ? null : Number(data.get("r"));
   const numericOrNull = (name) => data.get(name) === "" ? null : Number(data.get(name));
   const exitPrice = numericOrNull("exitPrice");
   return {
@@ -2643,6 +2917,9 @@ function createTradeFromForm(form) {
     pair: String(data.get("pair") || "").trim().toUpperCase(),
     direction: data.get("direction"),
     outcome: data.get("outcome"),
+    recordType: data.get("recordType") || "trade",
+    strategyVersionId: String(data.get("strategyVersionId") || ""),
+    reviewClass: String(data.get("reviewClass") || ""),
     profit,
     r,
     lots: data.get("lots") === "" ? null : Number(data.get("lots")),
@@ -2657,6 +2934,7 @@ function createTradeFromForm(form) {
     image: currentTradeImage || "",
     setup: String(data.get("setup") || "").trim(),
     review: String(data.get("review") || "").trim(),
+    ...Object.fromEntries(ATTRIBUTION_FIELDS.map(([field]) => [field, numericOrNull(field)])),
     source: "Manual Entry",
   };
 }
@@ -2672,6 +2950,9 @@ function resetTradeForm() {
   els.tradeForm.elements.pair.value = "NAS100";
   els.tradeForm.elements.mambaDecision.value = "";
   els.tradeForm.elements.mambaR.value = "";
+  els.tradeForm.elements.recordType.value = "trade";
+  els.tradeForm.elements.reviewClass.value = "";
+  populateStrategySelects();
   els.tradeImageInput.value = "";
   updateTradeImagePreview("");
   delete els.tradeForm.elements.r.dataset.autoCalculated;
@@ -2769,7 +3050,8 @@ function editTrade(trade) {
     const recordedExit = String(editable.takeProfit || "").split(/[、,;/]/)[0]?.trim();
     editable.exitPrice = recordedExit && Number.isFinite(Number(recordedExit)) ? Number(recordedExit) : "";
   }
-  const fields = ["localId", "batchId", "year", "date", "time", "pair", "direction", "outcome", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips", "mambaDecision", "mambaR", "setup", "review"];
+  populateStrategySelects();
+  const fields = ["localId", "batchId", "year", "date", "time", "pair", "direction", "outcome", "recordType", "strategyVersionId", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips", "mambaDecision", "mambaR", "setup", "reviewClass", "review", ...ATTRIBUTION_FIELDS.map(([field]) => field)];
   for (const field of fields) {
     const input = els.tradeForm.elements[field];
     if (input) input.value = editable[field] ?? "";
@@ -2828,6 +3110,8 @@ function render() {
   renderReview(items);
   renderPairBars(items);
   renderRows(items);
+  renderStrategyVersions();
+  renderHomeComparisons();
   populateResearchLabControls();
   renderResearchLab();
   els.tradeEmpty.hidden = items.length !== 0;
@@ -2842,7 +3126,7 @@ function setPage(pageName) {
   if (window.location.hash !== `#${nextPage}`) {
     history.replaceState(null, "", `#${nextPage}`);
   }
-  if (nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "research-lab") render();
+  if (nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "strategy" || nextPage === "research-lab") render();
   if (nextPage === "research-lab") window.requestAnimationFrame(() => renderMonteCarloSimulation(monteCarloResult));
   if (nextPage === "calculator") renderReturnSimulation();
 }
@@ -3074,7 +3358,7 @@ function exportFullBackup() {
   const visibleSnapshot = uniqueTrades(trades.map(backupTradeRecord));
   const backup = {
     app: "TradingNoteAll",
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     suggestedFolder: "backups",
     live: {
@@ -3084,6 +3368,7 @@ function exportFullBackup() {
       visibleTrades: visibleSnapshot,
       deletedTrades: Array.from(deletedTrades),
       accountRules,
+      strategyVersions,
     },
     research: {
       trades: Array.isArray(researchTrades) ? researchTrades : null,
@@ -3111,6 +3396,7 @@ function restoreUnifiedBackup(payload, mode = "merge") {
   let liveAdded = 0;
   let researchAdded = 0;
   let rulesAdded = 0;
+  let strategiesAdded = 0;
 
   if (mode === "replace") {
     localTrades = incomingTrades.map(prepareBackupTrade);
@@ -3118,6 +3404,7 @@ function restoreUnifiedBackup(payload, mode = "merge") {
       ? new Set(importedTrades.map(baseTradeKey))
       : new Set(Array.isArray(livePayload.deletedTrades) ? livePayload.deletedTrades : []);
     if (livePayload.accountRules) accountRules = { ...accountRules, ...livePayload.accountRules };
+    strategyVersions = Array.isArray(livePayload.strategyVersions) ? livePayload.strategyVersions : [];
     if (Array.isArray(livePayload.liveBatches)) liveBatches = livePayload.liveBatches;
     if (livePayload.activeLiveBatch) activeLiveBatch = livePayload.activeLiveBatch;
     if (Array.isArray(researchPayload.trades)) localStorage.setItem(RESEARCH_TRADE_KEY, JSON.stringify(researchPayload.trades));
@@ -3138,6 +3425,11 @@ function restoreUnifiedBackup(payload, mode = "merge") {
     localTrades.push(...incomingUnique);
     liveAdded = incomingUnique.length;
     if (livePayload.accountRules) accountRules = { ...livePayload.accountRules, ...accountRules };
+    if (Array.isArray(livePayload.strategyVersions)) {
+      const result = mergeMissingRecords(strategyVersions, livePayload.strategyVersions, (item) => `${String(item.name || "").trim().toLowerCase()}::${String(item.version || "").trim().toLowerCase()}`);
+      strategyVersions = result.merged;
+      strategiesAdded = result.added;
+    }
     if (Array.isArray(livePayload.liveBatches)) {
       const result = mergeMissingRecords(liveBatches, livePayload.liveBatches, batchFingerprint);
       liveBatches = result.merged;
@@ -3173,6 +3465,7 @@ function restoreUnifiedBackup(payload, mode = "merge") {
   }
 
   saveAccountRules();
+  saveStrategyVersions();
   populateAccountRulesForm();
   saveLocalTrades();
   if (activeLiveBatch !== ALL_LIVE_BATCH_ID && !liveBatches.some((batch) => batch.id === activeLiveBatch)) {
@@ -3182,7 +3475,7 @@ function restoreUnifiedBackup(payload, mode = "merge") {
   refreshAfterDataChange();
   showToast(mode === "replace"
     ? `強制覆蓋完成：目前實盤 ${trades.length} 筆。`
-    : `智慧合併完成：新增實盤 ${liveAdded} 筆、回測 ${researchAdded} 筆、規則 ${rulesAdded} 條；重複資料已略過。`);
+    : `智慧合併完成：新增實盤 ${liveAdded} 筆、回測 ${researchAdded} 筆、策略版本 ${strategiesAdded} 個、規則 ${rulesAdded} 條；重複資料已略過。`);
 }
 
 async function importBackupFile(file, mode = "merge") {
@@ -3840,6 +4133,66 @@ els.accountRulesForm.addEventListener("submit", (event) => {
   showToast(`${accountRules.name} 的帳戶規則已更新。`);
 });
 
+els.addStrategyVersion?.addEventListener("click", () => openStrategyVersionForm());
+els.closeStrategyVersionDialog?.addEventListener("click", () => els.strategyVersionDialog.close());
+els.cancelStrategyVersion?.addEventListener("click", () => els.strategyVersionDialog.close());
+els.strategyVersionGrid?.addEventListener("click", handleStrategyAction);
+els.strategyVersionForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const id = String(data.get("id") || "");
+  const existing = strategyVersions.find((strategy) => String(strategy.id) === id);
+  if (existing?.locked) {
+    showToast("已鎖定的策略不能直接修改，請複製成新版。", "error");
+    return;
+  }
+  const values = {
+    name: String(data.get("name") || "").trim(),
+    version: String(data.get("version") || "").trim(),
+    status: String(data.get("status") || "Draft"),
+    riskR: data.get("riskR") === "" ? null : Number(data.get("riskR")),
+    effectiveFrom: String(data.get("effectiveFrom") || ""),
+    effectiveTo: String(data.get("effectiveTo") || ""),
+    scope: String(data.get("scope") || "").trim(),
+    entryRules: String(data.get("entryRules") || "").trim(),
+    exitRules: String(data.get("exitRules") || "").trim(),
+    noTradeRules: String(data.get("noTradeRules") || "").trim(),
+    notes: String(data.get("notes") || "").trim(),
+    updatedAt: new Date().toISOString(),
+  };
+  const duplicate = strategyVersions.some((strategy) => strategy.id !== id && String(strategy.name || "").toLowerCase() === values.name.toLowerCase() && String(strategy.version || "").toLowerCase() === values.version.toLowerCase());
+  if (duplicate) {
+    showToast("同名同版本已存在，請改用新的版本號。", "error");
+    return;
+  }
+  if (existing) Object.assign(existing, values);
+  else strategyVersions.unshift({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), locked: false, ...values });
+  saveStrategyVersions();
+  els.strategyVersionDialog.close();
+  renderStrategyVersions();
+  renderResearchLab();
+  showToast(existing ? "策略版本已更新。" : "策略版本已建立。完成驗證後可鎖定版本。");
+});
+
+els.addMissedTrade?.addEventListener("click", () => {
+  if (!requireWritableLiveBatch()) return;
+  resetTradeForm();
+  els.tradeForm.elements.recordType.value = "missed_opportunity";
+  els.tradeForm.elements.reviewClass.value = "missed_trade";
+  els.dialogTitle.textContent = "記錄符合策略但漏單";
+  els.dialogSubtitle.textContent = "不需要填損益或 R；記下當時應做的策略版本、Setup 與錯過原因。";
+  els.tradeDialog.showModal();
+});
+[els.liveReviewClassFilter, els.liveReviewStrategyFilter].forEach((control) => control?.addEventListener("change", renderLiveReview));
+els.liveReviewSearch?.addEventListener("input", renderLiveReview);
+els.liveReviewRows?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-review-action='edit']");
+  const row = event.target.closest("[data-review-id]");
+  if (!button || !row) return;
+  const trade = tradesForActiveView().find((item) => String(item.id) === String(row.dataset.reviewId));
+  if (trade) editTrade(trade);
+});
+
 els.newTrade.addEventListener("click", () => {
   if (!requireWritableLiveBatch()) return;
   resetTradeForm();
@@ -3872,12 +4225,14 @@ els.tradeForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!requireWritableLiveBatch()) return;
   updateTradeDerivedFields();
-  if (els.tradeForm.elements.r.value === "") {
-    showToast("請先填入損益、手數與止損點數，才能計算 R 倍數。", "error");
-    return;
-  }
   const trade = createTradeFromForm(els.tradeForm);
-  if (trade.profit > 0 && trade.exitPrice == null) {
+  if (trade.recordType === "missed_opportunity") {
+    trade.reviewClass = "missed_trade";
+    trade.profit = null;
+    trade.r = null;
+    trade.outcome = "be";
+  }
+  if (trade.recordType === "trade" && trade.profit > 0 && trade.exitPrice == null) {
     showToast("獲利交易請填入實際出場價格；虧損或 BE 可以留空。", "error");
     els.tradeForm.elements.exitPrice.focus();
     return;
@@ -3892,7 +4247,7 @@ els.tradeForm.addEventListener("submit", (event) => {
     trade.stopLoss != null &&
     (trade.direction === "Long" ? trade.stopLoss >= trade.entry : trade.stopLoss <= trade.entry);
   if ((directionMismatch || profitableExitMismatch) && !window.confirm("Entry、SL 或實際出場價的方向與 Long／Short 不一致，仍要儲存嗎？")) return;
-  const signMismatch =
+  const signMismatch = trade.profit != null &&
     (trade.outcome === "win" && trade.profit < 0) ||
     (trade.outcome === "loss" && trade.profit > 0) ||
     (trade.outcome === "be" && Math.abs(trade.profit) > 0.01);
@@ -3909,7 +4264,7 @@ els.tradeForm.addEventListener("submit", (event) => {
   showToast(existingIndex >= 0 ? "交易已更新。" : "交易已新增。");
 });
 
-["date", "time", "pair", "direction", "outcome", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips"].forEach((name) => {
+["date", "time", "pair", "direction", "outcome", "recordType", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips"].forEach((name) => {
   els.tradeForm.elements[name].addEventListener("input", updateTradeDerivedFields);
 });
 
@@ -4120,6 +4475,7 @@ els.researchLabBreakpoint?.addEventListener("change", () => {
   runMonteCarloSimulation();
 });
 els.researchLabMarket?.addEventListener("change", renderResearchLab);
+els.researchLabStrategy?.addEventListener("change", renderResearchLab);
 
 els.calendarHeatmap.addEventListener("click", (event) => {
   const cell = event.target.closest("[data-date]");

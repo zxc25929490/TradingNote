@@ -15,6 +15,100 @@
   --focus: 0 0 0 3px rgba(15, 159, 140, 0.2);
 }
 
+/* Strategy versioning and execution-gap research */
+.system-switcher { display: grid; gap: 6px; margin: 14px 0; padding: 13px 0; border-block: 1px solid var(--line); }
+.system-switcher a { display: grid; grid-template-columns: 42px 1fr; align-items: center; min-height: 40px; padding: 7px 10px; border: 1px solid transparent; border-radius: 9px; color: var(--muted); text-decoration: none; }
+.system-switcher a span { color: var(--accent); font-size: 10px; letter-spacing: .08em; }
+.system-switcher a b { font-size: 13px; font-weight: 700; }
+.system-switcher a:hover, .system-switcher a.active { color: var(--ink); background: color-mix(in srgb, var(--accent) 9%, transparent); border-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+.home-compare-panel { margin: 18px 0; }
+.home-comparison-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.home-comparison-cards a { display: grid; gap: 8px; min-height: 150px; padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: color-mix(in srgb, var(--surface-2) 72%, transparent); color: var(--ink); text-decoration: none; transition: transform .2s ease, border-color .2s ease; }
+.home-comparison-cards a:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 48%, var(--line)); }
+.home-comparison-cards span, .home-comparison-cards small { color: var(--muted); }
+.home-comparison-cards strong { font-size: 1.5rem; }
+.home-comparison-cards em { align-self: end; color: var(--accent); font-size: .8rem; font-style: normal; }
+@media (max-width: 980px) {
+  .system-switcher { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .system-switcher a { grid-template-columns: auto 1fr; }
+}
+.live-review-panel { min-height: 560px; }
+.live-review-heading { align-items: flex-end; gap: 20px; }
+.live-review-metrics { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 12px; margin: 22px 0 18px; }
+.review-metric { display: grid; gap: 7px; min-height: 112px; padding: 16px; border: 1px solid var(--line); border-radius: 13px; background: color-mix(in srgb, var(--surface) 88%, transparent); }
+.review-metric span, .review-metric small { color: var(--muted); }
+.review-metric strong { font-size: 1.45rem; }
+.review-metric.positive strong { color: var(--accent); }
+.review-metric.warning strong { color: var(--accent-2); }
+.review-metric.negative strong { color: var(--loss); }
+.live-review-toolbar { display: grid; grid-template-columns: minmax(210px,.8fr) minmax(210px,.8fr) minmax(260px,1.4fr); gap: 12px; margin-bottom: 16px; }
+.live-review-toolbar label { display: grid; gap: 7px; color: var(--muted); }
+.live-review-table td { vertical-align: middle; }
+.live-review-table td small { display: block; margin-top: 5px; color: var(--muted); }
+.review-class-chip { display: inline-flex; max-width: 210px; padding: 6px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: .78rem; line-height: 1.25; }
+.review-class-chip.correct_execution { color: var(--win); background: color-mix(in srgb, var(--win) 12%, transparent); }
+.review-class-chip.execution_error, .review-class-chip.missed_trade { color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 12%, transparent); }
+.review-class-chip.rule_violation { color: var(--loss); background: color-mix(in srgb, var(--loss) 12%, transparent); }
+.review-edit-button { min-width: 92px; padding: 7px 10px; }
+
+.strategy-version-panel { min-height: 520px; }
+.strategy-heading { align-items: flex-end; gap: 24px; }
+.strategy-version-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 22px; }
+.strategy-version-card { padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: color-mix(in srgb, var(--surface) 88%, transparent); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.strategy-version-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: 0 16px 36px rgba(0,0,0,.16); }
+.strategy-version-card.locked { background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface)); }
+.strategy-card-top, .strategy-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.strategy-card-top { color: var(--muted); font-size: .78rem; }
+.strategy-status { color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 999px; padding: 4px 9px; }
+.strategy-version-card h3 { margin: 18px 0 6px; font-size: 1.15rem; }
+.strategy-version-card h3 em { color: var(--accent); font-style: normal; font-size: .8rem; margin-left: 6px; }
+.strategy-version-card > p { min-height: 38px; color: var(--muted); }
+.strategy-version-card dl { display: grid; gap: 9px; margin: 18px 0; }
+.strategy-version-card dl div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.strategy-version-card dt { color: var(--muted); }
+.strategy-version-card dd { margin: 0; text-align: right; }
+.strategy-version-card details { margin: 14px 0 18px; }
+.strategy-version-card summary { cursor: pointer; color: var(--accent); }
+.strategy-rules { margin-top: 12px; padding: 14px; background: color-mix(in srgb, var(--bg) 55%, transparent); border-radius: 10px; }
+.strategy-rules p { margin: 4px 0 12px; white-space: pre-wrap; color: var(--muted); }
+.strategy-card-actions { justify-content: flex-end; }
+.strategy-card-actions .ghost-button { min-height: 36px; padding: 7px 11px; }
+.strategy-modal { width: min(860px, calc(100vw - 28px)); }
+.gap-attribution-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
+.gap-attribution-fields legend { color: var(--muted); padding: 0 8px; }
+.gap-attribution-fields label { min-width: 0; }
+.attribution-grid { margin-top: 16px; }
+.attribution-list, .strategy-comparison { display: grid; gap: 12px; }
+.attribution-total { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.attribution-total span { color: var(--muted); }
+.attribution-total strong { color: var(--loss); font-size: 1.35rem; }
+.attribution-row { display: grid; grid-template-columns: 92px minmax(80px,1fr) 72px; align-items: center; gap: 10px; }
+.attribution-row i { height: 7px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--line) 75%, transparent); }
+.attribution-row i b { display: block; height: 100%; background: linear-gradient(90deg, #f2a63b, #ff647c); border-radius: inherit; }
+.attribution-row strong { text-align: right; color: var(--loss); }
+.strategy-compare-row { display: grid; grid-template-columns: minmax(150px,1.5fr) repeat(3,minmax(62px,.5fr)); gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.strategy-compare-row div { display: grid; gap: 3px; }
+.strategy-compare-row small { color: var(--muted); }
+.compact-empty { min-height: 130px; }
+
+@media (max-width: 760px) {
+  .home-comparison-cards { grid-template-columns: 1fr; }
+  .system-switcher a { grid-template-columns: 1fr; text-align: center; }
+  .live-review-heading { align-items: stretch; }
+  .live-review-metrics { grid-template-columns: 1fr 1fr; }
+  .live-review-toolbar { grid-template-columns: 1fr; }
+  .strategy-heading { align-items: stretch; }
+  .strategy-version-grid { grid-template-columns: 1fr; }
+  .gap-attribution-fields { grid-template-columns: 1fr 1fr; }
+  .strategy-compare-row { grid-template-columns: 1fr repeat(3, 64px); font-size: .8rem; }
+}
+
+@media (max-width: 480px) {
+  .live-review-metrics { grid-template-columns: 1fr; }
+  .gap-attribution-fields { grid-template-columns: 1fr; }
+  .strategy-compare-row { grid-template-columns: 1fr; }
+}
+
 body.dark {
   color-scheme: dark;
   --bg: #111417;
@@ -146,6 +240,14 @@ nav {
   margin-top: 34px;
 }
 
+.nav-section-title {
+  margin: 13px 12px 3px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
 nav a {
   position: relative;
   display: flex;
@@ -155,6 +257,10 @@ nav a {
   border-radius: 8px;
   color: #c9d1d7;
   text-decoration: none;
+  font-family: Inter, "Segoe UI", "Noto Sans TC", system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 nav a.active,

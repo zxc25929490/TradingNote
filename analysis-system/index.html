@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script>try{if(sessionStorage.getItem('tradingnote.system-switching')==='1')document.documentElement.classList.add('system-transition-pending')}catch(_){}</script>
+  <title>TradingNote · 三層差異分析</title>
+  <link rel="icon" href="../web-prototype/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=20260822-1">
+  <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><b>AX</b><span><strong>Gap Analysis</strong><small>Edge Diagnosis</small></span></div>
+    <div class="system-switcher" aria-label="切換研究系統">
+      <a href="../web-prototype/index.html"><span>LIVE</span><b>實盤中樞</b></a>
+      <a href="../research-system/index.html"><span>BT</span><b>歷史回測</b></a>
+      <a href="../review-system/index.html"><span>RV</span><b>實盤復盤</b></a>
+      <a class="active" href="index.html"><span>AX</span><b>差異分析</b></a>
+    </div>
+    <nav aria-label="分析頁面">
+      <button class="active" data-view="diagnosis"><span>⌁</span>三層診斷</button>
+      <button data-view="execution"><span>⇣</span>執行落差</button>
+      <button data-view="strategy"><span>◇</span>策略與 Edge</button>
+    </nav>
+    <div class="cycle"><i></i><span><b>定位順序</b><small>策略 → 判讀 → 執行</small></span></div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div><p>BACKTEST × REVIEW × LIVE</p><h1 id="pageTitle">三層績效診斷</h1></div>
+      <button id="refreshButton" type="button">↻ 重新讀取資料</button>
+    </header>
+
+    <section class="filter-panel" aria-label="分析條件">
+      <label>實盤斷點<select id="liveBatchSelect"></select></label>
+      <label>回測斷點<select id="backtestBatchSelect"></select></label>
+      <label>商品<select id="marketSelect"><option value="all">全部商品</option></select></label>
+      <label>策略版本<select id="strategySelect"><option value="all">全部版本</option></select></label>
+      <label class="tolerance">一致容許值 <b id="toleranceValue">0.20R</b><input id="toleranceInput" type="range" min="0.05" max="0.6" step="0.05" value="0.2"></label>
+    </section>
+
+    <section id="diagnosis" class="page active">
+      <article id="diagnosisHero" class="diagnosis-hero"></article>
+
+      <section class="performance-chain" aria-label="三層績效關係">
+        <article class="layer-card backtest"><small>01 · 策略理論值</small><h2>Backtest</h2><strong id="backtestTotal">—</strong><span id="backtestMeta">尚無資料</span></article>
+        <div class="chain-arrow"><i></i><span>策略定義／回測品質</span></div>
+        <article class="layer-card review"><small>02 · 規則應有結果</small><h2>Review / Replay</h2><strong id="reviewTotal">—</strong><span id="reviewMeta">尚無資料</span></article>
+        <div class="chain-arrow"><i></i><span>人的執行落差</span></div>
+        <article class="layer-card live"><small>03 · 真正執行結果</small><h2>Live</h2><strong id="liveTotal">—</strong><span id="liveMeta">尚無資料</span></article>
+      </section>
+
+      <div id="gapMetrics" class="gap-metrics"></div>
+
+      <div class="grid two">
+        <article class="panel chart-panel">
+          <div class="panel-head"><div><h3>三層累積 R</h3><p>依各自交易順序標準化，觀察績效曲線是否逐層流失。</p></div><div class="legend"><span class="bt">回測</span><span class="rv">復盤</span><span class="lv">實盤</span></div></div>
+          <div id="tripleCurve" class="triple-curve"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div><h3>關係檢查</h3><p>先定位哪一層有問題，再決定要改策略還是改執行。</p></div></div>
+          <div id="relationshipChecks" class="relationship-checks"></div>
+        </article>
+      </div>
+
+      <article class="panel coverage-panel">
+        <div class="panel-head"><div><h3>資料可信度</h3><p>診斷會區分「已有足夠證據」與「目前只能觀察」。</p></div></div>
+        <div id="coverageChecks" class="coverage-checks"></div>
+      </article>
+    </section>
+
+    <section id="execution" class="page">
+      <article class="section-hero"><small>EXECUTION GAP</small><h2>復盤應有結果與實盤之間，R 消失在哪裡？</h2><p>這一頁只看「人」：漏單、額外交易、進出場與情緒干預，不先懷疑策略。</p></article>
+      <div class="grid two execution-grid">
+        <article class="panel">
+          <div class="panel-head"><div><h3>R 落差歸因</h3><p>來自實盤復盤已填寫的六種原因。</p></div></div>
+          <div id="attributionBoard" class="attribution-board"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div><h3>優先修正</h3><p>依損失 R 排序，只先處理影響最大的執行問題。</p></div></div>
+          <div id="executionActions" class="action-list"></div>
+        </article>
+      </div>
+      <article class="panel">
+        <div class="panel-head"><div><h3>每日實盤 vs 復盤</h3><p>復盤 R = 實盤 R + 當日已歸因的少掉 R。</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>日期</th><th>實盤筆數</th><th>實盤 R</th><th>復盤應有 R</th><th>Execution Gap</th><th>狀態</th></tr></thead><tbody id="executionRows"></tbody></table></div>
+      </article>
+    </section>
+
+    <section id="strategy" class="page">
+      <article class="section-hero"><small>STRATEGY / REGIME</small><h2>執行正確後，策略 Edge 還能被複製嗎？</h2><p>復盤接近實盤、但兩者持續低於回測時，才進一步查回測偏誤或市場環境。</p></article>
+      <div id="edgeVerdict" class="edge-verdict"></div>
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-head"><div><h3>商品層級差異</h3><p>找出落差集中在哪個市場。</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>商品</th><th>回測 Avg R</th><th>復盤 Avg R</th><th>實盤 Avg R</th><th>判讀</th></tr></thead><tbody id="marketRows"></tbody></table></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div><h3>策略版本差異</h3><p>避免把不同規則版本混成一個策略。</p></div></div>
+          <div id="strategyRows" class="strategy-rows"></div>
+        </article>
+      </div>
+      <article class="panel method-panel">
+        <div class="panel-head"><div><h3>四種診斷邏輯</h3><p>系統會依目前容許值與樣本可信度自動分類。</p></div></div>
+        <div class="method-grid">
+          <div><b>① Execution Gap</b><span>復盤 ≠ 實盤</span><p>先查漏單、亂做、進出場與情緒干預。</p></div>
+          <div><b>② Backtest Quality Gap</b><span>復盤 ≈ 實盤，但復盤 ≠ 回測</span><p>檢查事後偏誤、規則主觀與未來資訊。</p></div>
+          <div><b>③ Edge Replicated</b><span>三者彼此接近</span><p>策略、判讀與執行基本一致。</p></div>
+          <div><b>④ Strategy / Regime Watch</b><span>復盤 ≈ 實盤，且長期低於回測</span><p>樣本足夠後才懷疑 Edge 衰退或市場轉變。</p></div>
+        </div>
+      </article>
+    </section>
+  </main>
+  <div id="toast" class="toast" hidden></div>
+  <script src="../web-prototype/data/trades.js"></script>
+  <script src="app.js?v=20260822-1"></script>
+  <script src="../shared/system-transition.js?v=20260821-2"></script>
+</body>
+</html>

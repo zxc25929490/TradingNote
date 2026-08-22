@@ -3,9 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>try{if(sessionStorage.getItem('tradingnote.system-switching')==='1')document.documentElement.classList.add('system-transition-pending')}catch(_){}</script>
     <title>TradingNote Analytics</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260820-1" />
+    <link rel="stylesheet" href="styles.css?v=20260821-2" />
+    <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2" />
   </head>
   <body>
     <aside class="sidebar">
@@ -16,17 +18,22 @@
           <span>Performance OS</span>
         </div>
       </div>
+      <div class="system-switcher" aria-label="切換研究系統">
+        <a class="active" href="index.html"><span>LIVE</span><b>實盤中樞</b></a>
+        <a href="../research-system/index.html"><span>BT</span><b>歷史回測</b></a>
+        <a href="../review-system/index.html"><span>RV</span><b>實盤復盤</b></a>
+        <a href="../analysis-system/index.html"><span>AX</span><b>差異分析</b></a>
+      </div>
       <nav aria-label="主要導覽">
+        <span class="nav-section-title">實盤管理</span>
         <a class="active" href="#dashboard" data-page-link="dashboard"><span aria-hidden="true">⌂</span>績效總覽</a>
         <a href="#objectives" data-page-link="objectives"><span aria-hidden="true">◉</span>挑戰目標</a>
         <a href="#analytics" data-page-link="analytics"><span aria-hidden="true">⌁</span>深度分析</a>
-        <a href="#review" data-page-link="review"><span aria-hidden="true">◎</span>交易複盤</a>
         <a href="#period" data-page-link="period"><span aria-hidden="true">▦</span>週月績效</a>
         <a href="#trades" data-page-link="trades"><span aria-hidden="true">≡</span>交易紀錄</a>
-        <a href="#research-lab" data-page-link="research-lab"><span aria-hidden="true">⇄</span>回測實盤研究</a>
+        <span class="nav-section-title">實盤工具</span>
         <a href="#checklist" data-page-link="checklist"><span aria-hidden="true">✓</span>交易檢查</a>
         <a href="#calculator" data-page-link="calculator"><span aria-hidden="true">％</span>風控計算</a>
-        <a href="../research-system/index.html"><span aria-hidden="true">R</span>回測研究系統</a>
       </nav>
     </aside>
 
@@ -158,6 +165,13 @@
         </section>
 
         <section id="periodComparisonCards" class="period-compare-grid" aria-label="期間績效比較"></section>
+
+        <section class="panel home-compare-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">CROSS-SYSTEM SNAPSHOT</p><h2>實盤與各系統比較</h2><p>主頁只看最重要的落差；需要逐筆研究時再進入獨立系統。</p></div>
+          </div>
+          <div id="homeComparisonCards" class="home-comparison-cards"></div>
+        </section>
 
         <section class="insight-grid" aria-label="Advanced metrics">
           <article class="insight">
@@ -504,6 +518,24 @@
         </section>
       </section>
 
+      <section id="strategy" class="page" data-page="strategy">
+        <section class="panel strategy-version-panel">
+          <div class="panel-heading strategy-heading">
+            <div>
+              <p class="eyebrow">STRATEGY VERSION CONTROL</p>
+              <h2>策略版本庫</h2>
+              <p>先固定規則，再把回測與實盤綁到同一版本。已鎖定版本只能複製，避免事後改規則。</p>
+            </div>
+            <button id="addStrategyVersionButton" class="primary-button" type="button">＋ 新增策略版本</button>
+          </div>
+          <div id="strategyVersionGrid" class="strategy-version-grid"></div>
+          <div id="strategyVersionEmpty" class="empty-state page-empty" hidden>
+            <strong>尚未建立策略版本</strong>
+            <span>建立第一版後，回測與實盤紀錄就能清楚區隔規則。</span>
+          </div>
+        </section>
+      </section>
+
       <section id="research-lab" class="page" data-page="research-lab">
         <section class="panel research-lab-panel">
           <div class="panel-heading research-lab-heading">
@@ -518,6 +550,9 @@
               </label>
               <label>商品
                 <select id="researchLabMarket"><option value="all">全部商品</option></select>
+              </label>
+              <label>策略版本
+                <select id="researchLabStrategy"><option value="all">全部版本</option></select>
               </label>
             </div>
           </div>
@@ -551,6 +586,16 @@
                 </table>
               </div>
             </article>
+            <div class="research-lab-grid attribution-grid">
+              <article class="research-study-card">
+                <div class="panel-heading compact"><div><h3>R 落差歸因</h3><p>把漏單、提早出場、額外亂做與進場品質造成的損失拆開。</p></div></div>
+                <div id="researchAttribution" class="attribution-list"></div>
+              </article>
+              <article class="research-study-card">
+                <div class="panel-heading compact"><div><h3>策略版本比較</h3><p>確認績效差異來自策略版本，還是實際執行。</p></div></div>
+                <div id="researchStrategyComparison" class="strategy-comparison"></div>
+              </article>
+            </div>
             <section class="panel research-monte-carlo-suite">
               <div class="panel-heading">
                 <div>
@@ -703,10 +748,19 @@
               <option value="be">BE</option>
             </select>
           </label>
-          <label>損益 <input name="profit" type="number" step="0.01" min="-10000000" max="10000000" required /></label>
+          <label>紀錄類型
+            <select name="recordType">
+              <option value="trade">實際交易</option>
+              <option value="missed_opportunity">符合策略但漏單</option>
+            </select>
+          </label>
+          <label>策略版本
+            <select name="strategyVersionId"><option value="">未綁定策略</option></select>
+          </label>
+          <label>損益（選填） <input name="profit" type="number" step="0.01" min="-10000000" max="10000000" /></label>
           <label>R 倍數
-            <input name="r" type="number" step="any" min="-100" max="100" required />
-            <small class="form-hint" id="rFormulaHint">自動計算：損益 ÷（手數 × 止損點數）</small>
+            <input name="r" type="number" step="any" min="-100" max="100" />
+            <small class="form-hint" id="rFormulaHint">可手動輸入；沒有交易或風險資料可留空。</small>
           </label>
           <label>手數 <input name="lots" type="number" step="0.01" min="0" max="100000" /></label>
           <label>入場價格 Entry <input name="entry" type="number" step="any" /></label>
@@ -732,6 +786,24 @@
             <small class="form-hint">如果 Mamba 沒做，這欄可留空。</small>
           </label>
           <label class="full">Setup <input name="setup" type="text" placeholder="AOI rejection, breakout, pullback..." /></label>
+          <label class="full">復盤分類
+            <select name="reviewClass">
+              <option value="">待復盤</option>
+              <option value="correct_execution">符合策略且執行正確</option>
+              <option value="execution_error">符合策略但執行錯誤</option>
+              <option value="rule_violation">不符合策略卻進場</option>
+              <option value="missed_trade">符合策略但漏單</option>
+            </select>
+          </label>
+          <fieldset class="full gap-attribution-fields">
+            <legend>實盤少掉的 R（全部選填，填正數）</legend>
+            <label>漏單 <input name="missedTradeR" type="number" step="0.01" min="0" max="100" /></label>
+            <label>提早出場 <input name="earlyExitR" type="number" step="0.01" min="0" max="100" /></label>
+            <label>額外亂做 <input name="extraTradeR" type="number" step="0.01" min="0" max="100" /></label>
+            <label>太晚進場 <input name="lateEntryR" type="number" step="0.01" min="0" max="100" /></label>
+            <label>滑價／成本 <input name="slippageR" type="number" step="0.01" min="0" max="100" /></label>
+            <label>市場狀態差異 <input name="marketDriftR" type="number" step="0.01" min="0" max="100" /></label>
+          </fieldset>
           <label class="full">Review <textarea name="review" rows="4" placeholder="進場理由、情緒、錯誤、下次要注意什麼"></textarea></label>
           <div class="full trade-image-field">
             <span>交易截圖（選填，會一起進入一鍵備份）</span>
@@ -748,6 +820,30 @@
           <button type="button" class="ghost-button danger-button" id="clearLocalTrades">清除本機資料</button>
           <button type="submit" class="primary-button" id="saveTradeButton">儲存交易</button>
         </div>
+      </form>
+    </dialog>
+
+    <dialog id="strategyVersionDialog" class="modal strategy-modal">
+      <form id="strategyVersionForm" method="dialog">
+        <input name="id" type="hidden" />
+        <div class="modal-heading">
+          <div><p class="eyebrow">STRATEGY DNA</p><h2 id="strategyVersionDialogTitle">新增策略版本</h2><p>把當下規則完整凍結，之後才能公平比較。</p></div>
+          <button id="closeStrategyVersionDialog" class="icon-button" type="button">×</button>
+        </div>
+        <div class="form-grid">
+          <label>策略名稱 <input name="name" type="text" maxlength="60" required placeholder="例如：Mamba 支撐壓力" /></label>
+          <label>版本 <input name="version" type="text" maxlength="20" required placeholder="v1.0" /></label>
+          <label>狀態 <select name="status"><option value="Draft">Draft</option><option value="Testing">Testing</option><option value="Verified">Verified</option><option value="Retired">Retired</option></select></label>
+          <label>每筆風險 R <input name="riskR" type="number" step="0.01" min="0" max="10" /></label>
+          <label>生效日 <input name="effectiveFrom" type="date" /></label>
+          <label>停止日 <input name="effectiveTo" type="date" /></label>
+          <label class="full">適用市場／時段 <input name="scope" type="text" placeholder="NAS100、DJ30 · New York" /></label>
+          <label class="full">進場條件 <textarea name="entryRules" rows="3" placeholder="什麼結構與確認條件才可以進場"></textarea></label>
+          <label class="full">SL／TP 與出場規則 <textarea name="exitRules" rows="3" placeholder="SL 放哪裡、如何分批、何時 BE、TP 條件"></textarea></label>
+          <label class="full">禁止交易條件 <textarea name="noTradeRules" rows="3" placeholder="新聞、時段、高週期衝突、RR 不足等"></textarea></label>
+          <label class="full">備註 <textarea name="notes" rows="2"></textarea></label>
+        </div>
+        <div class="modal-actions"><button id="cancelStrategyVersion" class="ghost-button" type="button">取消</button><button class="primary-button" type="submit">儲存版本</button></div>
       </form>
     </dialog>
 
@@ -844,6 +940,7 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
-    <script src="app.js?v=20260820-2"></script>
+    <script src="app.js?v=20260821-3"></script>
+    <script src="../shared/system-transition.js?v=20260821-2"></script>
   </body>
 </html>

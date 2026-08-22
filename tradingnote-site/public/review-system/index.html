@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script>try{if(sessionStorage.getItem('tradingnote.system-switching')==='1')document.documentElement.classList.add('system-transition-pending')}catch(_){}</script>
+  <title>TradingNote · 實盤復盤系統</title>
+  <link rel="icon" href="../web-prototype/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=20260821-1">
+  <link rel="stylesheet" href="typography.css?v=20260821-1">
+  <link rel="stylesheet" href="analysis-switcher.css?v=20260822-1">
+  <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><b>RV</b><span><strong>Trade Review</strong><small>Execution Intelligence</small></span></div>
+    <div class="system-switcher" aria-label="切換研究系統">
+      <a href="../web-prototype/index.html"><span>LIVE</span><b>實盤中樞</b></a>
+      <a href="../research-system/index.html"><span>BT</span><b>歷史回測</b></a>
+      <a class="active" href="index.html"><span>RV</span><b>實盤復盤</b></a>
+      <a href="../analysis-system/index.html"><span>AX</span><b>差異分析</b></a>
+    </div>
+    <nav>
+      <button class="active" data-view="queue"><span>◫</span>復盤工作台</button>
+      <button data-view="patterns"><span>⌁</span>執行落差</button>
+      <button data-view="lessons"><span>✓</span>復盤結論</button>
+    </nav>
+    <div class="cycle"><i></i><span><b>復盤流程</b><small>分類 → 歸因 → 改進</small></span></div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div><p>LIVE EXECUTION REVIEW</p><h1 id="pageTitle">實盤復盤工作台</h1></div>
+      <div class="actions">
+        <label class="batch-picker"><small>實盤斷點</small><select id="batchSelect"></select></label>
+        <button id="addMissedTrade" class="primary">＋ 記錄漏單</button>
+      </div>
+    </header>
+
+    <section id="queue" class="page active">
+      <div class="hero">
+        <div><small>REVIEW QUEUE</small><h2>我有沒有真的做到策略？</h2><p>只處理實際執行，不在這裡改寫回測結果或策略 Edge。</p></div>
+        <strong id="pendingHero">0<small>筆待復盤</small></strong>
+      </div>
+      <div id="metrics" class="metrics"></div>
+      <div class="toolbar">
+        <label>復盤分類<select id="classFilter"><option value="all">全部紀錄</option><option value="pending">待復盤</option><option value="correct_execution">符合策略且執行正確</option><option value="execution_error">符合策略但執行錯誤</option><option value="rule_violation">不符合策略卻進場</option><option value="missed_trade">符合策略但漏單</option></select></label>
+        <label>策略版本<select id="strategyFilter"><option value="all">全部版本</option></select></label>
+        <label>商品<select id="marketFilter"><option value="all">全部商品</option></select></label>
+        <label class="search">搜尋<input id="searchInput" type="search" placeholder="日期、商品、Setup 或筆記"></label>
+      </div>
+      <div class="table-wrap" id="reviewTableWrap">
+        <table><thead><tr><th>日期</th><th>商品／Setup</th><th>策略版本</th><th>結果</th><th>復盤分類</th><th>R 落差</th><th></th></tr></thead><tbody id="reviewRows"></tbody></table>
+      </div>
+      <div id="emptyState" class="empty" hidden><b>這個篩選沒有紀錄</b><span>切換分類，或新增一筆符合策略但漏掉的機會。</span></div>
+    </section>
+
+    <section id="patterns" class="page">
+      <div class="hero compact"><div><small>EXECUTION GAP</small><h2>實盤少掉的 R 在哪裡？</h2><p>把策略有 Edge、但執行沒有拿到的部分拆開。</p></div></div>
+      <div id="attributionSummary" class="attribution-board"></div>
+      <div class="grid-two">
+        <article class="panel"><div class="panel-head"><h3>四類復盤分布</h3><p>辨識主要問題是紀律、執行，還是漏單。</p></div><div id="classDistribution" class="distribution"></div></article>
+        <article class="panel"><div class="panel-head"><h3>策略版本執行品質</h3><p>同一套策略在實盤中的落實程度。</p></div><div id="strategyQuality" class="strategy-quality"></div></article>
+      </div>
+    </section>
+
+    <section id="lessons" class="page">
+      <div class="hero compact"><div><small>REVIEW OUTPUT</small><h2>把復盤變成下一次行動</h2><p>集中查看最近的 Review 與尚未解決的執行問題。</p></div></div>
+      <div id="lessonCards" class="lesson-cards"></div>
+      <div class="system-bridge">
+        <a href="../analysis-system/index.html"><span>前往差異分析</span><b>診斷回測、復盤與實盤 →</b></a>
+        <a href="../research-system/index.html"><span>前往歷史回測</span><b>驗證策略 Edge →</b></a>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="reviewDialog">
+    <form id="reviewForm">
+      <input name="recordKey" type="hidden">
+      <input name="origin" type="hidden">
+      <div class="dialog-head"><div><small>EXECUTION REVIEW</small><h2 id="dialogTitle">編輯實盤復盤</h2><p id="tradeSummary"></p></div><button id="closeDialog" type="button">×</button></div>
+      <div class="form-grid">
+        <label>日期<input name="date" type="date" required></label>
+        <label>時間<input name="time" type="time"></label>
+        <label>商品<input name="pair" type="text" required></label>
+        <label>方向<select name="direction"><option>Long</option><option>Short</option></select></label>
+        <label>紀錄類型<select name="recordType"><option value="trade">實際交易</option><option value="missed_opportunity">符合策略但漏單</option></select></label>
+        <label>策略版本<select name="strategyVersionId"><option value="">未綁定策略</option></select></label>
+        <label class="full">Setup<input name="setup" type="text" placeholder="當時符合哪個模型或條件"></label>
+        <label class="full">復盤分類<select name="reviewClass" required><option value="">請選擇</option><option value="correct_execution">符合策略且執行正確</option><option value="execution_error">符合策略但執行錯誤</option><option value="rule_violation">不符合策略卻進場</option><option value="missed_trade">符合策略但漏單</option></select></label>
+        <fieldset class="full"><legend>少掉的 R（選填，填正數）</legend><label>漏單<input name="missedTradeR" type="number" step=".01" min="0"></label><label>提早出場<input name="earlyExitR" type="number" step=".01" min="0"></label><label>額外亂做<input name="extraTradeR" type="number" step=".01" min="0"></label><label>太晚進場<input name="lateEntryR" type="number" step=".01" min="0"></label><label>滑價／成本<input name="slippageR" type="number" step=".01" min="0"></label><label>市場狀態差異<input name="marketDriftR" type="number" step=".01" min="0"></label></fieldset>
+        <label class="full">復盤筆記<textarea name="review" rows="5" placeholder="當下看到什麼、錯在哪裡、下次如何執行"></textarea></label>
+        <figure id="tradeImage" class="trade-image" hidden><img alt="交易截圖"><figcaption>原交易截圖</figcaption></figure>
+      </div>
+      <footer><button id="cancelDialog" type="button">取消</button><button class="primary" type="submit">儲存復盤</button></footer>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" hidden></div>
+  <script src="../web-prototype/data/trades.js"></script>
+  <script src="app.js?v=20260821-1"></script>
+  <script src="../shared/system-transition.js?v=20260821-2"></script>
+</body>
+</html>
