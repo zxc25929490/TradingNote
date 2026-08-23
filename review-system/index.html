@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="styles.css?v=20260821-1">
   <link rel="stylesheet" href="typography.css?v=20260821-1">
   <link rel="stylesheet" href="analysis-switcher.css?v=20260822-1">
+  <link rel="stylesheet" href="review-form.css?v=20260823-1">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
 </head>
 <body>
@@ -79,17 +80,19 @@
       <input name="recordKey" type="hidden">
       <input name="origin" type="hidden">
       <div class="dialog-head"><div><small>EXECUTION REVIEW</small><h2 id="dialogTitle">編輯實盤復盤</h2><p id="tradeSummary"></p></div><button id="closeDialog" type="button">×</button></div>
+      <section id="tradeContext" class="review-context" hidden></section>
       <div class="form-grid">
-        <label>日期<input name="date" type="date" required></label>
-        <label>時間<input name="time" type="time"></label>
-        <label>商品<input name="pair" type="text" required></label>
-        <label>方向<select name="direction"><option>Long</option><option>Short</option></select></label>
-        <label>紀錄類型<select name="recordType"><option value="trade">實際交易</option><option value="missed_opportunity">符合策略但漏單</option></select></label>
-        <label>策略版本<select name="strategyVersionId"><option value="">未綁定策略</option></select></label>
-        <label class="full">Setup<input name="setup" type="text" placeholder="當時符合哪個模型或條件"></label>
+        <label class="opportunity-only">日期<input name="date" type="date" required></label>
+        <label class="opportunity-only">時間<input name="time" type="time"></label>
+        <label class="opportunity-only">商品<input name="pair" type="text" required></label>
+        <label class="opportunity-only">方向<select name="direction"><option>Long</option><option>Short</option></select></label>
+        <label class="opportunity-only">紀錄類型<select name="recordType"><option value="missed_opportunity">符合策略但漏單</option></select></label>
+        <label class="opportunity-only">策略版本<select name="strategyVersionId"><option value="">未綁定策略</option></select></label>
+        <label class="full opportunity-only">Setup<input name="setup" type="text" placeholder="當時符合哪個模型或條件"></label>
         <label class="full">復盤分類<select name="reviewClass" required><option value="">請選擇</option><option value="correct_execution">符合策略且執行正確</option><option value="execution_error">符合策略但執行錯誤</option><option value="rule_violation">不符合策略卻進場</option><option value="missed_trade">符合策略但漏單</option></select></label>
         <fieldset class="full"><legend>少掉的 R（選填，填正數）</legend><label>漏單<input name="missedTradeR" type="number" step=".01" min="0"></label><label>提早出場<input name="earlyExitR" type="number" step=".01" min="0"></label><label>額外亂做<input name="extraTradeR" type="number" step=".01" min="0"></label><label>太晚進場<input name="lateEntryR" type="number" step=".01" min="0"></label><label>滑價／成本<input name="slippageR" type="number" step=".01" min="0"></label><label>市場狀態差異<input name="marketDriftR" type="number" step=".01" min="0"></label></fieldset>
-        <label class="full">復盤筆記<textarea name="review" rows="5" placeholder="當下看到什麼、錯在哪裡、下次如何執行"></textarea></label>
+        <label class="full">這次發生什麼錯誤？<textarea name="review" rows="4" placeholder="當時怎麼判斷、哪個環節偏離規則、造成什麼結果"></textarea></label>
+        <label class="full">如何改善／下次行動<textarea name="improvement" rows="4" placeholder="下次遇到相同情境時，要等待什麼、停止什麼、具體怎麼做"></textarea></label>
         <figure id="tradeImage" class="trade-image" hidden><img alt="交易截圖"><figcaption>原交易截圖</figcaption></figure>
       </div>
       <footer><button id="cancelDialog" type="button">取消</button><button class="primary" type="submit">儲存復盤</button></footer>

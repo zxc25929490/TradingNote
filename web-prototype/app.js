@@ -1317,7 +1317,7 @@ function inRange(trade, start, end) {
 }
 
 function tradeText(trade) {
-  return `${trade.lesson || ""} ${trade.review || ""} ${trade.setup || ""} ${trade.checklist || ""}`.toLowerCase();
+  return `${trade.lesson || ""} ${trade.review || ""} ${trade.improvement || ""} ${trade.setup || ""} ${trade.checklist || ""}`.toLowerCase();
 }
 
 function classifyMistakes(trade) {
@@ -2356,7 +2356,8 @@ function renderReview(items) {
 }
 
 function tradeReviewText(trade) {
-  return trade.review || trade.lesson || "尚未填寫賽後檢討。";
+  const review = trade.review || trade.lesson || "尚未填寫賽後檢討。";
+  return trade.improvement ? `${review} · 下次行動：${trade.improvement}` : review;
 }
 
 function renderRows(items) {
@@ -2883,6 +2884,7 @@ function openTradeDetail(trade) {
       <dt>已歸因 R 落差</dt><dd>${tradeAttributionTotal(trade) ? `-${tradeAttributionTotal(trade).toFixed(2)}R` : "尚未歸因"}</dd>
       <dt>Setup</dt><dd>${trade.setup || trade.checklist || "-"}</dd>
       <dt>Review</dt><dd>${trade.review || trade.lesson || "尚未填寫賽後檢討。"}</dd>
+      <dt>下次改善</dt><dd>${trade.improvement || "尚未填寫改善行動。"}</dd>
     </dl>
     ${mt4Metrics}
     ${imageBlock}
@@ -3051,7 +3053,7 @@ function editTrade(trade) {
     editable.exitPrice = recordedExit && Number.isFinite(Number(recordedExit)) ? Number(recordedExit) : "";
   }
   populateStrategySelects();
-  const fields = ["localId", "batchId", "year", "date", "time", "pair", "direction", "outcome", "recordType", "strategyVersionId", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips", "mambaDecision", "mambaR", "setup", "reviewClass", "review", ...ATTRIBUTION_FIELDS.map(([field]) => field)];
+  const fields = ["localId", "batchId", "year", "date", "time", "pair", "direction", "outcome", "recordType", "strategyVersionId", "profit", "r", "lots", "entry", "stopLoss", "exitPrice", "slPips", "mambaDecision", "mambaR", "setup", "reviewClass", "review", "improvement", ...ATTRIBUTION_FIELDS.map(([field]) => field)];
   for (const field of fields) {
     const input = els.tradeForm.elements[field];
     if (input) input.value = editable[field] ?? "";
@@ -3138,7 +3140,7 @@ function csvEscape(value) {
 
 function exportFilteredCsv() {
   const items = filteredTrades();
-  const headers = ["id", "breakpointId", "breakpointName", "externalId", "account", "ticket", "magicNumber", "date", "time", "closeTime", "year", "pair", "direction", "outcome", "profit", "r", "grossProfit", "commission", "swap", "lots", "slPips", "entry", "stopLoss", "takeProfit", "exitPrice", "initialRiskMoney", "grossR", "mfeR", "maeR", "exitEfficiencyPct", "entrySpreadPoints", "exitSpreadPoints", "maxSpreadPoints", "spreadCostEstimate", "exitReason", "exitSlippagePoints", "regime", "volatility", "htfAlignment", "session", "captureQuality", "mambaDecision", "mambaR", "setup", "checklist", "source", "row", "lesson", "review"];
+  const headers = ["id", "breakpointId", "breakpointName", "externalId", "account", "ticket", "magicNumber", "date", "time", "closeTime", "year", "pair", "direction", "outcome", "profit", "r", "grossProfit", "commission", "swap", "lots", "slPips", "entry", "stopLoss", "takeProfit", "exitPrice", "initialRiskMoney", "grossR", "mfeR", "maeR", "exitEfficiencyPct", "entrySpreadPoints", "exitSpreadPoints", "maxSpreadPoints", "spreadCostEstimate", "exitReason", "exitSlippagePoints", "regime", "volatility", "htfAlignment", "session", "captureQuality", "mambaDecision", "mambaR", "setup", "checklist", "source", "row", "lesson", "review", "improvement"];
   const rows = [
     headers.join(","),
     ...items.map((trade) => headers.map((key) => csvEscape(

@@ -7,6 +7,8 @@
   <title>TradingNote · 三層差異分析</title>
   <link rel="icon" href="../web-prototype/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css?v=20260822-1">
+  <link rel="stylesheet" href="workflow-guide.css?v=20260823-1">
+  <link rel="stylesheet" href="monte-carlo.css?v=20260822-1">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
 </head>
 <body>
@@ -22,6 +24,7 @@
       <button class="active" data-view="diagnosis"><span>⌁</span>三層診斷</button>
       <button data-view="execution"><span>⇣</span>執行落差</button>
       <button data-view="strategy"><span>◇</span>策略與 Edge</button>
+      <button data-view="montecarlo"><span>％</span>Monte Carlo</button>
     </nav>
     <div class="cycle"><i></i><span><b>定位順序</b><small>策略 → 判讀 → 執行</small></span></div>
   </aside>
@@ -68,6 +71,11 @@
         <div class="panel-head"><div><h3>資料可信度</h3><p>診斷會區分「已有足夠證據」與「目前只能觀察」。</p></div></div>
         <div id="coverageChecks" class="coverage-checks"></div>
       </article>
+
+      <article class="panel same-date-panel">
+        <div class="panel-head"><div><h3>同日期三層績效</h3><p>只列出回測與實盤都有紀錄的日期，用相同市場環境檢查差異。</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>日期</th><th>回測筆數</th><th>回測 R</th><th>復盤應有 R</th><th>實盤 R</th><th>實盤 − 回測</th></tr></thead><tbody id="sameDateRows"></tbody></table></div>
+      </article>
     </section>
 
     <section id="execution" class="page">
@@ -90,6 +98,33 @@
 
     <section id="strategy" class="page">
       <article class="section-hero"><small>STRATEGY / REGIME</small><h2>執行正確後，策略 Edge 還能被複製嗎？</h2><p>復盤接近實盤、但兩者持續低於回測時，才進一步查回測偏誤或市場環境。</p></article>
+      <article class="panel workflow-guide">
+        <div class="panel-head"><div><h3>五層研究流程與用途</h3><p>先分清楚每個系統在回答什麼問題；點擊卡片可直接前往對應工作區。</p></div><span class="guide-badge">策略 → 驗證 → 執行 → 稽核 → 重建</span></div>
+        <div class="workflow-path" aria-label="TradingNote 研究流程">
+          <a class="workflow-card definition" href="../research-system/index.html#strategies">
+            <small>01 · STRATEGY</small><b>策略定義</b><p>固定進場、出場、風險與 No Trade 條件，建立不可任意改寫的版本。</p><strong>前往策略版本 <span>→</span></strong>
+          </a>
+          <a class="workflow-card backtest" href="../research-system/index.html#journal">
+            <small>02 · BACKTEST</small><b>歷史回測</b><p>只按照固定規則走歷史行情，驗證策略是否具有可重複的 Edge。</p><strong>前往回測紀錄 <span>→</span></strong>
+          </a>
+          <a class="workflow-card live" href="../web-prototype/index.html#trades">
+            <small>03 · LIVE</small><b>實盤執行</b><p>策略訊號加上當下判斷、真實執行，以及滑價與交易成本後的結果。</p><strong>前往實盤紀錄 <span>→</span></strong>
+          </a>
+          <a class="workflow-card review" href="../review-system/index.html#queue">
+            <small>04 · TRADE REVIEW</small><b>交易復盤</b><p>連結原始實盤訂單，稽核是否照策略執行，記錄錯誤、R 落差與改善。</p><strong>前往復盤工作台 <span>→</span></strong>
+          </a>
+          <a class="workflow-card replay" href="../review-system/index.html#queue">
+            <small>05 · MARKET REPLAY</small><b>行情重建</b><p>用當時可見資訊重走行情，找出漏單，估算完全照規則應有的結果。</p><strong>前往記錄漏單 <span>→</span></strong>
+          </a>
+        </div>
+        <div class="concept-grid">
+          <div><span>回測 Backtest</span><b>策略的歷史理論值</b><p>回答「策略有沒有 Edge？」</p></div>
+          <div><span>實盤 Live</span><b>策略 × 人 × 真實摩擦</b><p>回答「我在市場中真正做到了多少？」</p></div>
+          <div><span>復盤 Review</span><b>實盤完成後的執行稽核</b><p>回答「問題出在策略，還是我的執行？」</p></div>
+          <div><span>Replay</span><b>當時規則應有結果的重建</b><p>用來計算漏單與反事實績效；它不等於交易復盤。</p></div>
+        </div>
+        <div class="decision-sequence"><b>實盤與回測差很多時：</b><span>① 稽核兩邊設定</span><i>→</i><span>② 固定正確策略版本</span><i>→</i><span>③ 重新回測</span><i>→</i><span>④ 依新基準復盤實盤</span></div>
+      </article>
       <div id="edgeVerdict" class="edge-verdict"></div>
       <div class="grid two">
         <article class="panel">
@@ -110,6 +145,25 @@
           <div><b>④ Strategy / Regime Watch</b><span>復盤 ≈ 實盤，且長期低於回測</span><p>樣本足夠後才懷疑 Edge 衰退或市場轉變。</p></div>
         </div>
       </article>
+    </section>
+
+    <section id="montecarlo" class="page">
+      <article class="section-hero"><small>RISK DISTRIBUTION LAB</small><h2>三層 Monte Carlo 尾端風險</h2><p>用相同的資金、風險與交易次數，分別重抽樣回測、復盤與實盤 R 分布，確認實盤風險是否超出策略理論範圍。</p></article>
+      <form id="monteCarloForm" class="mc-controls">
+        <label>起始資金<input id="mcBalance" type="number" min="1" step="any" value="100000" required></label>
+        <label>每筆風險 %<input id="mcRisk" type="number" min="0.01" max="20" step="0.1" value="1" required></label>
+        <label>每輪交易數<input id="mcTrades" type="number" min="10" max="1000" step="10" value="100" required></label>
+        <label>模擬次數<input id="mcRuns" type="number" min="100" max="5000" step="100" value="1000" required></label>
+        <button type="submit">重新模擬</button>
+      </form>
+      <div class="mc-sample-note" id="mcSampleNote"></div>
+      <div class="mc-layout">
+        <article class="panel mc-panel live"><div class="panel-head"><div><h3>實盤 Monte Carlo</h3><p>真正做到的 R 分布。</p></div><strong id="mcLiveFormula"></strong></div><div id="mcLiveMetrics" class="mc-metrics"></div><div class="mc-chart"><canvas id="mcLiveChart" aria-label="實盤 Monte Carlo 區間"></canvas></div><div id="mcLiveStress" class="mc-stress"></div></article>
+        <article class="panel mc-panel review"><div class="panel-head"><div><h3>復盤 Monte Carlo</h3><p>按照規則應有的 R 分布。</p></div><strong id="mcReviewFormula"></strong></div><div id="mcReviewMetrics" class="mc-metrics"></div><div class="mc-chart"><canvas id="mcReviewChart" aria-label="復盤 Monte Carlo 區間"></canvas></div><div id="mcReviewStress" class="mc-stress"></div></article>
+        <article class="panel mc-panel backtest"><div class="panel-head"><div><h3>回測 Monte Carlo</h3><p>策略理論 R 分布。</p></div><strong id="mcBacktestFormula"></strong></div><div id="mcBacktestMetrics" class="mc-metrics"></div><div class="mc-chart"><canvas id="mcBacktestChart" aria-label="回測 Monte Carlo 區間"></canvas></div><div id="mcBacktestStress" class="mc-stress"></div></article>
+      </div>
+      <article class="panel mc-compare-panel"><div class="panel-head"><div><h3>三層尾端風險比較</h3><p>實盤若持續比復盤與回測差，才視為需要處理的風險偏離。</p></div></div><div id="mcComparison" class="mc-comparison"></div></article>
+      <p class="mc-disclaimer">Monte Carlo 是依現有 R 樣本重抽順序的壓力測試，不是獲利保證；每層至少需要 5 筆非 0R 資料。</p>
     </section>
   </main>
   <div id="toast" class="toast" hidden></div>

@@ -42,5 +42,13 @@ assert.equal(sandbox.gapTotal({ missedTradeR: 1.2, earlyExitR: ".5", extraTradeR
 assert.match(html, /href="\.\.\/web-prototype\/index\.html"/);
 assert.match(html, /href="\.\.\/research-system\/index\.html"/);
 assert.match(html, /id="reviewForm"/);
+assert.match(source, /openReviewView/);
+assert.match(source, /hashchange/);
+assert.match(html, /id="tradeContext"/);
+assert.match(html, /class="opportunity-only"/);
+assert.match(html, /name="improvement"/);
+assert.match(source, /form\.dataset\.mode=isOpportunity\?'opportunity':'trade-review'/);
+assert.match(source, /values=isOpportunity\?/);
+assert.match(source, /原始實盤資料保持不變/);
 
 console.log("Standalone review system tests passed");
