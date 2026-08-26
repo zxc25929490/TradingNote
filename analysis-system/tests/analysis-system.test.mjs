@@ -11,7 +11,7 @@ const siblingPages = [
   new URL("../../review-system/index.html", import.meta.url),
 ].map(url => fs.readFileSync(url, "utf8"));
 
-assert.match(html, /BACKTEST × REVIEW × LIVE/);
+assert.match(html, /BACKTEST × LIVE × REVIEW/);
 assert.match(html, /三層診斷/);
 assert.match(html, /執行落差/);
 assert.match(html, /策略與 Edge/);

@@ -31,7 +31,7 @@
 
   <main>
     <header class="topbar">
-      <div><p>BACKTEST × REVIEW × LIVE</p><h1 id="pageTitle">三層績效診斷</h1></div>
+      <div><p>BACKTEST × LIVE × REVIEW</p><h1 id="pageTitle">三層績效診斷</h1></div>
       <button id="refreshButton" type="button">↻ 重新讀取資料</button>
     </header>
 
@@ -48,17 +48,17 @@
 
       <section class="performance-chain" aria-label="三層績效關係">
         <article class="layer-card backtest"><small>01 · 策略理論值</small><h2>Backtest</h2><strong id="backtestTotal">—</strong><span id="backtestMeta">尚無資料</span></article>
-        <div class="chain-arrow"><i></i><span>策略定義／回測品質</span></div>
-        <article class="layer-card review"><small>02 · 規則應有結果</small><h2>Review / Replay</h2><strong id="reviewTotal">—</strong><span id="reviewMeta">尚無資料</span></article>
-        <div class="chain-arrow"><i></i><span>人的執行落差</span></div>
-        <article class="layer-card live"><small>03 · 真正執行結果</small><h2>Live</h2><strong id="liveTotal">—</strong><span id="liveMeta">尚無資料</span></article>
+        <div class="chain-arrow"><i></i><span>策略落地／真實執行</span></div>
+        <article class="layer-card live"><small>02 · 真正執行結果</small><h2>Live</h2><strong id="liveTotal">—</strong><span id="liveMeta">尚無資料</span></article>
+        <div class="chain-arrow"><i></i><span>檢查落差／找出原因</span></div>
+        <article class="layer-card review"><small>03 · 復盤修正結果</small><h2>Review / Replay</h2><strong id="reviewTotal">—</strong><span id="reviewMeta">尚無資料</span></article>
       </section>
 
       <div id="gapMetrics" class="gap-metrics"></div>
 
       <div class="grid two">
         <article class="panel chart-panel">
-          <div class="panel-head"><div><h3>三層累積 R</h3><p>依各自交易順序標準化，觀察績效曲線是否逐層流失。</p></div><div class="legend"><span class="bt">回測</span><span class="rv">復盤</span><span class="lv">實盤</span></div></div>
+          <div class="panel-head"><div><h3>三層累積 R</h3><p>依回測 → 實盤 → 復盤流程，觀察策略落地與錯誤修正。</p></div><div class="legend"><span class="bt">回測</span><span class="lv">實盤</span><span class="rv">復盤</span></div></div>
           <div id="tripleCurve" class="triple-curve"></div>
         </article>
         <article class="panel">
@@ -74,7 +74,7 @@
 
       <article class="panel same-date-panel">
         <div class="panel-head"><div><h3>同日期三層績效</h3><p>只列出回測與實盤都有紀錄的日期，用相同市場環境檢查差異。</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>日期</th><th>回測筆數</th><th>回測 R</th><th>復盤應有 R</th><th>實盤 R</th><th>實盤 − 回測</th></tr></thead><tbody id="sameDateRows"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>日期</th><th>回測筆數</th><th>回測 R</th><th>實盤 R</th><th>復盤修正 R</th><th>實盤 − 回測</th></tr></thead><tbody id="sameDateRows"></tbody></table></div>
       </article>
     </section>
 
@@ -129,7 +129,7 @@
       <div class="grid two">
         <article class="panel">
           <div class="panel-head"><div><h3>商品層級差異</h3><p>找出落差集中在哪個市場。</p></div></div>
-          <div class="table-wrap"><table><thead><tr><th>商品</th><th>回測 Avg R</th><th>復盤 Avg R</th><th>實盤 Avg R</th><th>判讀</th></tr></thead><tbody id="marketRows"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>商品</th><th>回測 Avg R</th><th>實盤 Avg R</th><th>復盤 Avg R</th><th>判讀</th></tr></thead><tbody id="marketRows"></tbody></table></div>
         </article>
         <article class="panel">
           <div class="panel-head"><div><h3>策略版本差異</h3><p>避免把不同規則版本混成一個策略。</p></div></div>
@@ -158,9 +158,9 @@
       </form>
       <div class="mc-sample-note" id="mcSampleNote"></div>
       <div class="mc-layout">
-        <article class="panel mc-panel live"><div class="panel-head"><div><h3>實盤 Monte Carlo</h3><p>真正做到的 R 分布。</p></div><strong id="mcLiveFormula"></strong></div><div id="mcLiveMetrics" class="mc-metrics"></div><div class="mc-chart"><canvas id="mcLiveChart" aria-label="實盤 Monte Carlo 區間"></canvas></div><div id="mcLiveStress" class="mc-stress"></div></article>
-        <article class="panel mc-panel review"><div class="panel-head"><div><h3>復盤 Monte Carlo</h3><p>按照規則應有的 R 分布。</p></div><strong id="mcReviewFormula"></strong></div><div id="mcReviewMetrics" class="mc-metrics"></div><div class="mc-chart"><canvas id="mcReviewChart" aria-label="復盤 Monte Carlo 區間"></canvas></div><div id="mcReviewStress" class="mc-stress"></div></article>
         <article class="panel mc-panel backtest"><div class="panel-head"><div><h3>回測 Monte Carlo</h3><p>策略理論 R 分布。</p></div><strong id="mcBacktestFormula"></strong></div><div id="mcBacktestMetrics" class="mc-metrics"></div><div class="mc-chart"><canvas id="mcBacktestChart" aria-label="回測 Monte Carlo 區間"></canvas></div><div id="mcBacktestStress" class="mc-stress"></div></article>
+        <article class="panel mc-panel live"><div class="panel-head"><div><h3>實盤 Monte Carlo</h3><p>真正做到的 R 分布。</p></div><strong id="mcLiveFormula"></strong></div><div id="mcLiveMetrics" class="mc-metrics"></div><div class="mc-chart"><canvas id="mcLiveChart" aria-label="實盤 Monte Carlo 區間"></canvas></div><div id="mcLiveStress" class="mc-stress"></div></article>
+        <article class="panel mc-panel review"><div class="panel-head"><div><h3>復盤 Monte Carlo</h3><p>檢查錯誤並修正後的 R 分布。</p></div><strong id="mcReviewFormula"></strong></div><div id="mcReviewMetrics" class="mc-metrics"></div><div class="mc-chart"><canvas id="mcReviewChart" aria-label="復盤 Monte Carlo 區間"></canvas></div><div id="mcReviewStress" class="mc-stress"></div></article>
       </div>
       <article class="panel mc-compare-panel"><div class="panel-head"><div><h3>三層尾端風險比較</h3><p>實盤若持續比復盤與回測差，才視為需要處理的風險偏離。</p></div></div><div id="mcComparison" class="mc-comparison"></div></article>
       <p class="mc-disclaimer">Monte Carlo 是依現有 R 樣本重抽順序的壓力測試，不是獲利保證；每層至少需要 5 筆非 0R 資料。</p>
@@ -168,7 +168,7 @@
   </main>
   <div id="toast" class="toast" hidden></div>
   <script src="../web-prototype/data/trades.js"></script>
-  <script src="app.js?v=20260826-live-vs-backtest"></script>
+  <script src="app.js?v=20260826-backtest-live-review"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
 </body>
 </html>
