@@ -45,6 +45,7 @@ let reviewsExpanded = false;
 let currentTradeImage = "";
 let monteCarloResult = null;
 let moveTradeCandidates = new Map();
+let editingTradeContext = null;
 
 const els = {
   year: document.querySelector("#yearFilter"),
@@ -616,18 +617,34 @@ function enrichTradeFields(trade) {
   const entry = Number.isFinite(Number(trade.entry)) && Number(trade.entry) > 0 ? Number(trade.entry) : null;
   const stopLoss = Number.isFinite(Number(trade.stopLoss)) && Number(trade.stopLoss) > 0 ? Number(trade.stopLoss) : null;
   const takeProfit = Number.isFinite(Number(trade.takeProfit)) && Number(trade.takeProfit) > 0 ? Number(trade.takeProfit) : null;
-  const initialRiskMoney = Number.isFinite(Number(trade.initialRiskMoney)) && Number(trade.initialRiskMoney) > 0
+  const recordedInitialRiskMoney = Number.isFinite(Number(trade.initialRiskMoney)) && Number(trade.initialRiskMoney) > 0
     ? Number(trade.initialRiskMoney)
     : null;
   const isEaTrade = Boolean(trade.externalId || trade.source === "TradingNote MT4 EA");
-  const riskUnavailable = Boolean(trade.riskUnavailable || (isEaTrade && (!stopLoss || !initialRiskMoney)));
+  const pair = String(trade.pair || "").trim().toUpperCase();
+  const fallbackSlPips = /^(NAS100|US100)(?:\.|$)/.test(pair)
+    ? 25
+    : /^(US30|DJ30)(?:\.|$)/.test(pair)
+      ? 30
+      : null;
+  const lots = Number.isFinite(Number(trade.lots)) && Number(trade.lots) > 0 ? Number(trade.lots) : null;
+  const needsFallbackRisk = Boolean(trade.riskUnavailable || trade.r == null || !Number.isFinite(Number(trade.r)));
+  const canUseFallbackRisk = Boolean(fallbackSlPips && lots && (isEaTrade || needsFallbackRisk));
+  const initialRiskMoney = canUseFallbackRisk ? lots * fallbackSlPips : recordedInitialRiskMoney;
+  const riskUnavailable = Boolean(!canUseFallbackRisk && (trade.riskUnavailable || (isEaTrade && (!stopLoss || !initialRiskMoney))));
   const derivedSlPips =
     entry && stopLoss && entry !== stopLoss
       ? Math.abs(entry - stopLoss)
       : null;
   const slPips = Number.isFinite(Number(trade.slPips)) && Number(trade.slPips) > 0
     ? Number(trade.slPips)
-    : derivedSlPips;
+    : canUseFallbackRisk
+      ? fallbackSlPips
+      : derivedSlPips;
+  const fallbackR = canUseFallbackRisk && Number.isFinite(Number(trade.profit))
+    ? Number(trade.profit) / initialRiskMoney
+    : null;
+  const isSmallLossBe = Number.isFinite(Number(trade.profit)) && Number(trade.profit) >= -50 && Number(trade.profit) <= 0;
   const derivedLots =
     slPips && Number(trade.r) !== 0 && Number.isFinite(Number(trade.profit)) && Number.isFinite(Number(trade.r))
       ? Math.abs(Number(trade.profit) / (Number(trade.r) * slPips))
@@ -639,7 +656,8 @@ function enrichTradeFields(trade) {
     stopLoss,
     takeProfit,
     initialRiskMoney,
-    r: riskUnavailable ? null : trade.r,
+    outcome: isSmallLossBe ? "be" : trade.outcome,
+    r: isSmallLossBe ? 0 : riskUnavailable ? null : fallbackR ?? trade.r,
     grossR: riskUnavailable ? null : trade.grossR,
     mfeR: riskUnavailable ? null : trade.mfeR,
     maeR: riskUnavailable ? null : trade.maeR,
@@ -649,8 +667,8 @@ function enrichTradeFields(trade) {
       ? "missing_initial_sl"
       : trade.captureQuality,
     slPips: riskUnavailable || slPips == null ? null : Number(slPips.toFixed(4)),
-    lots: Number.isFinite(Number(trade.lots)) && Number(trade.lots) > 0
-      ? Number(trade.lots)
+    lots: lots != null
+      ? lots
       : derivedLots == null
         ? null
         : Number(derivedLots.toFixed(4)),
@@ -1443,14 +1461,14 @@ function computeStats(items) {
     equity += tradeR;
     peak = Math.max(peak, equity);
     maxDd = Math.min(maxDd, equity - peak);
-    currentLoss = tradeR < 0 ? currentLoss + 1 : 0;
+    currentLoss = trade.outcome === "loss" ? currentLoss + 1 : 0;
     worstLoss = Math.max(worstLoss, currentLoss);
     currentWin = tradeR > 0 ? currentWin + 1 : 0;
     bestWin = Math.max(bestWin, currentWin);
   }
 
-  const wins = items.filter((trade) => trade.profit > 0);
-  const losses = items.filter((trade) => trade.profit < 0);
+  const wins = items.filter((trade) => trade.outcome === "win");
+  const losses = items.filter((trade) => trade.outcome === "loss");
   const rWins = rItems.filter((trade) => Number(trade.r) > 0);
   const rLosses = rItems.filter((trade) => Number(trade.r) < 0);
   const decided = wins.length + losses.length;
@@ -2942,6 +2960,7 @@ function createTradeFromForm(form) {
 }
 
 function resetTradeForm() {
+  editingTradeContext = null;
   els.tradeForm.reset();
   els.tradeForm.elements.localId.value = "";
   els.tradeForm.elements.baseKey.value = "";
@@ -3001,7 +3020,7 @@ function updateTradeDerivedFields() {
   if (date) form.year.value = Number(date.slice(0, 4));
   if (profitText !== "") {
     const profit = Number(profitText);
-    form.outcome.value = profit > 0 ? "win" : profit < 0 ? "loss" : "be";
+    form.outcome.value = profit > 0 ? "win" : profit >= -50 ? "be" : "loss";
   }
 
   const profit = Number(profitText);
@@ -3047,6 +3066,7 @@ function updateTradeDerivedFields() {
 }
 
 function editTrade(trade) {
+  editingTradeContext = trade;
   const editable = trade.origin === "local" ? { ...trade } : { ...trade, localId: crypto.randomUUID(), source: "Edited Import" };
   if (editable.exitPrice == null && Number(editable.profit) > 0) {
     const recordedExit = String(editable.takeProfit || "").split(/[、,;/]/)[0]?.trim();
@@ -3674,7 +3694,7 @@ function consolidateMt4Position(positions) {
   for (const position of positions) {
     for (const leg of mt4TradeLegs(position)) {
       const key = `${leg.account || "unknown"}:${leg.ticket || leg.externalId || leg.localId}`;
-      if (!legsByTicket.has(key)) legsByTicket.set(key, { ...leg, partialExits: undefined });
+      if (!legsByTicket.has(key)) legsByTicket.set(key, { ...enrichTradeFields(leg), partialExits: undefined });
     }
   }
   const legs = [...legsByTicket.values()];
@@ -3682,6 +3702,7 @@ function consolidateMt4Position(positions) {
   const sum = (field) => legs.reduce((total, leg) => total + (Number.isFinite(Number(leg[field])) ? Number(leg[field]) : 0), 0);
   const lots = sum("lots");
   const profit = sum("profit");
+  const isSmallLossBe = profit >= -50 && profit <= 0;
   const riskUnavailable = legs.some((leg) => leg.riskUnavailable || !Number.isFinite(Number(leg.initialRiskMoney)) || Number(leg.initialRiskMoney) <= 0);
   const initialRiskMoney = riskUnavailable ? null : sum("initialRiskMoney");
   const tickets = legs.map((leg) => String(leg.ticket || "")).filter(Boolean);
@@ -3703,7 +3724,7 @@ function consolidateMt4Position(positions) {
     commission: Number(sum("commission").toFixed(2)),
     swap: Number(sum("swap").toFixed(2)),
     initialRiskMoney,
-    r: riskUnavailable ? null : Number((profit / initialRiskMoney).toFixed(6)),
+    r: isSmallLossBe ? 0 : riskUnavailable ? null : Number((profit / initialRiskMoney).toFixed(6)),
     grossR: riskUnavailable ? null : Number((sum("grossProfit") / initialRiskMoney).toFixed(6)),
     entry: mt4WeightedValue(legs, "entry"),
     exitPrice: mt4WeightedValue(legs, "exitPrice"),
@@ -3711,7 +3732,7 @@ function consolidateMt4Position(positions) {
     exitSpreadPoints: mt4WeightedValue(legs, "exitSpreadPoints"),
     maxSpreadPoints: Math.max(...legs.map((leg) => Number(leg.maxSpreadPoints)).filter(Number.isFinite), 0),
     spreadCostEstimate: Number(sum("spreadCostEstimate").toFixed(2)),
-    outcome: profit > 0 ? "win" : profit < 0 ? "loss" : "be",
+    outcome: isSmallLossBe ? "be" : profit > 0 ? "win" : "loss",
     riskUnavailable,
     captureQuality: riskUnavailable ? "missing_initial_sl" : legs.every((leg) => !leg.captureQuality || leg.captureQuality === "complete") ? "complete" : "partial_capture",
     exitReason: legs.length > 1 ? "partial_exit" : base?.exitReason,
@@ -4252,10 +4273,26 @@ els.tradeForm.addEventListener("submit", (event) => {
   const signMismatch = trade.profit != null &&
     (trade.outcome === "win" && trade.profit < 0) ||
     (trade.outcome === "loss" && trade.profit > 0) ||
-    (trade.outcome === "be" && Math.abs(trade.profit) > 0.01);
+    (trade.outcome === "be" && (trade.profit > 0.01 || trade.profit < -50));
   if (signMismatch && !window.confirm("交易結果與損益正負不一致，仍要儲存嗎？")) return;
   const replacedBaseKey = els.tradeForm.elements.baseKey.value;
   if (replacedBaseKey) deletedTrades.add(replacedBaseKey);
+  if (editingTradeContext && isMt4Trade(editingTradeContext)) {
+    const editedLegs = mt4TradeLegs(editingTradeContext);
+    editedLegs.map((leg) => leg.baseKey).filter(Boolean).forEach((key) => deletedTrades.add(key));
+    const editedLocalIds = new Set(editedLegs.map((leg) => String(leg.localId || "")).filter(Boolean));
+    const editedExternalIds = new Set(editedLegs.map((leg) => String(leg.externalId || "")).filter(Boolean));
+    localTrades = localTrades.filter((item) =>
+      !editedLocalIds.has(String(item.localId || "")) &&
+      !editedExternalIds.has(String(item.externalId || ""))
+    );
+    trade.localId = crypto.randomUUID();
+    trade.source = "Edited EA Import";
+  }
+  if (trade.profit != null && trade.profit >= -50 && trade.profit <= 0) {
+    trade.outcome = "be";
+    trade.r = 0;
+  }
   const existingIndex = localTrades.findIndex((item) => item.localId === trade.localId);
   if (existingIndex >= 0) localTrades[existingIndex] = { ...localTrades[existingIndex], ...trade };
   else localTrades.push(trade);

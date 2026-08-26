@@ -12,12 +12,18 @@ const dateOf=trade=>{const raw=String(trade.date||'').trim();const match=raw.mat
 const baseKey=trade=>`${trade.source||'TradingNote'}::${trade.row||trade.id||''}::${trade.date||''}`;
 const identity=trade=>trade.externalId||[dateOf(trade),trade.time||'',marketOf(trade),trade.profit??'',trade.entry??''].join('::');
 const gapOf=trade=>ATTR.reduce((sum,[field])=>sum+Math.max(0,Number(trade[field])||0),0);
+function normalizeLiveTrade(trade){
+  const pair=marketOf(trade),lots=Number(trade.lots),profit=Number(trade.profit),isEa=Boolean(trade.externalId||trade.source==='TradingNote MT4 EA');
+  const fallbackPips=/^(NAS100|US100)(?:\.|$)/.test(pair)?25:/^(US30|DJ30)(?:\.|$)/.test(pair)?30:null;
+  const smallLossBe=Number.isFinite(profit)&&profit>=-50&&profit<=0;
+  return{...trade,outcome:smallLossBe?'be':trade.outcome,r:smallLossBe?0:isEa&&fallbackPips&&lots>0&&Number.isFinite(profit)?profit/(lots*fallbackPips):trade.r,slPips:isEa&&fallbackPips&&lots>0?fallbackPips:trade.slPips};
+}
 let liveTrades=[],liveBatches=[],backtestTrades=[],backtestBatches=[],strategies=[],activeLive='live-default',activeBacktest='',tolerance=.2,monteCarloResults=null;
 
 function refreshData(){
-  const local=readArray(KEYS.trades).map((trade,index)=>({...trade,id:trade.id??100000+index,origin:'local',batchId:trade.batchId||'live-default'}));
+  const local=readArray(KEYS.trades).map((trade,index)=>normalizeLiveTrade({...trade,id:trade.id??100000+index,origin:'local',batchId:trade.batchId||'live-default'}));
   const deleted=new Set(readArray(KEYS.deleted));
-  const imported=(window.TRADES||[]).filter(trade=>!deleted.has(baseKey(trade))).map((trade,index)=>({...trade,id:trade.id??index+1,origin:'imported',batchId:trade.batchId||'live-default'}));
+  const imported=(window.TRADES||[]).filter(trade=>!deleted.has(baseKey(trade))).map((trade,index)=>normalizeLiveTrade({...trade,id:trade.id??index+1,origin:'imported',batchId:trade.batchId||'live-default'}));
   const map=new Map();[...imported,...local].forEach(trade=>map.set(identity(trade),trade));liveTrades=[...map.values()];
   liveBatches=readArray(KEYS.batches);if(!liveBatches.length)liveBatches=[{id:'live-default',name:'主要紀錄'}];
   backtestTrades=readArray(KEYS.backtests);backtestBatches=readArray(KEYS.backtestBatches);strategies=readArray(KEYS.strategies);
@@ -45,7 +51,7 @@ function pairedDates(live,backtest){const dates=new Set(live.map(dateOf).filter(
 
 function diagnose(data){
   const live=stats(data.live),review=stats(data.review),backtest=stats(data.backtest),reviewed=reviewRate(data.live),paired=pairedDates(data.live,data.backtest);
-  const executionGap=review.avg-live.avg,strategyGap=backtest.avg-review.avg,executionAligned=Math.abs(executionGap)<=tolerance,strategyAligned=Math.abs(strategyGap)<=tolerance;
+  const executionGap=review.avg-live.avg,strategyGap=backtest.avg-review.avg,directGap=live.avg-backtest.avg,executionAligned=Math.abs(executionGap)<=tolerance,strategyAligned=Math.abs(strategyGap)<=tolerance,directAligned=Math.abs(directGap)<=tolerance;
   const enough=live.count>=20&&backtest.count>=20&&reviewed>=60;
   const trends={live:trend(data.live),review:trend(data.review),backtest:trend(data.backtest)};
   const allDeclining=Object.values(trends).every(item=>item.ready&&item.delta< -tolerance);
@@ -55,7 +61,7 @@ function diagnose(data){
   else if(strategyAligned)scenario={number:'3',key:'replicated',label:'③ EDGE REPLICATED',title:'三層績效目前基本一致',description:'策略理論值、當下規則判讀與真正執行都落在容許範圍內，實盤正在複製回測 Edge。',tone:'good'};
   else if(strategyGap>tolerance&&enough)scenario={number:'4',key:'regime',label:'④ STRATEGY / REGIME WATCH',title:'執行接近復盤，但長期低於回測',description:'執行不是主要問題。檢查策略適用環境、波動結構與 Edge 是否衰退；不要只因單月差異就改規則。',tone:'warn'};
   else scenario={number:'2',key:'quality',label:'② BACKTEST QUALITY GAP',title:'實盤執行接近復盤，但與回測判讀不同',description:'優先檢查 Hindsight Bias、支撐壓力主觀性、規則版本與回測是否使用未來資訊。',tone:'warn'};
-  return{live,review,backtest,reviewed,paired,executionGap,strategyGap,executionAligned,strategyAligned,enough,trends,allDeclining,scenario};
+  return{live,review,backtest,reviewed,paired,executionGap,strategyGap,directGap,executionAligned,strategyAligned,directAligned,enough,trends,allDeclining,scenario};
 }
 
 function populateControls(){
@@ -83,7 +89,7 @@ function renderCurve(result){
 }
 function check(label,note,ok,warning=false){const tone=ok?'good':warning?'warn':'bad';return`<article class="${tone}"><i>${ok?'✓':warning?'!':'×'}</i><div><b>${label}</b><small>${note}</small></div><strong>${ok?'一致':warning?'觀察':'有落差'}</strong></article>`}
 function renderRelationships(result){
-  $('#relationshipChecks').innerHTML=[check('復盤 vs 實盤',`相差 ${Math.abs(result.executionGap).toFixed(2)}R／筆；用來看人的執行。`,result.executionAligned),check('回測 vs 復盤',`相差 ${Math.abs(result.strategyGap).toFixed(2)}R／筆；用來看策略定義與回測品質。`,result.strategyAligned),check('三者後段趨勢',result.allDeclining?'三層樣本後段都同步下降，需觀察市場環境。':'尚未出現三層同步惡化的完整證據。',!result.allDeclining,!result.enough)].join('');
+  $('#relationshipChecks').innerHTML=[check('實盤 vs 回測',`相差 ${Math.abs(result.directGap).toFixed(2)}R／筆；直接檢查實盤是否複製回測 Edge。`,result.directAligned),check('復盤 vs 實盤',`相差 ${Math.abs(result.executionGap).toFixed(2)}R／筆；用來看人的執行。`,result.executionAligned),check('回測 vs 復盤',`相差 ${Math.abs(result.strategyGap).toFixed(2)}R／筆；用來看策略定義與回測品質。`,result.strategyAligned),check('三者後段趨勢',result.allDeclining?'三層樣本後段都同步下降，需觀察市場環境。':'尚未出現三層同步惡化的完整證據。',!result.allDeclining,!result.enough)].join('');
   const data=selectedData();$('#coverageChecks').innerHTML=[`<div><b>${result.live.count} 筆實盤 R</b><span>${result.live.count>=20?'已達基本診斷門檻':'建議至少累積 20 筆'}</span></div>`,`<div><b>${result.backtest.count} 筆回測 R</b><span>${result.backtest.count>=20?'已達基本診斷門檻':'建議至少累積 20 筆'}</span></div>`,`<div><b>${result.reviewed.toFixed(1)}% 已復盤</b><span>${result.reviewed>=60?'足以觀察執行分布':'完成率過低會低估 Execution Gap'}</span></div>`,`<div><b>${result.paired} 個同日期</b><span>${result.paired?'可分離市場日差異':'目前只能比較整體分布'}</span></div>`].join('');
 }
 
