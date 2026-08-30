@@ -1,10 +1,10 @@
 #property strict
-#property version   "1.00"
+#property version   "3.00"
 #property description "Records MT4 closed trades for TradingNote local import."
 
-input string JournalFileName = "TradingNote_MT4_Journal.tsv";
-input string StateFileName = "TradingNote_MT4_OpenState.tsv";
-input string ExportedTicketsFileName = "TradingNote_MT4_ExportedTickets.txt";
+input string JournalFileName = "TradingNote_MT4_Journal_v3.tsv";
+input string StateFileName = "TradingNote_MT4_OpenState_v3.tsv";
+input string ExportedTicketsFileName = "TradingNote_MT4_ExportedTickets_v3.txt";
 input int TimerSeconds = 1;
 input int MagicNumberFilter = -1; // -1 = all manual and EA trades
 input ENUM_TIMEFRAMES AnalysisTimeframe = PERIOD_H1;
@@ -29,6 +29,46 @@ struct TradeTracker
    double initialRiskMoney;
    double bestExitPrice;
    double worstExitPrice;
+   datetime trackingStartedAt;
+   datetime lastObservedAt;
+   datetime mfeTime;
+   datetime maeTime;
+   int trackingDelaySeconds;
+   int monitoringGapSeconds;
+   int monitoredSeconds;
+   int favorableSeconds;
+   int adverseSeconds;
+   int sampleCount;
+   int first05RSeconds;
+   int first10RSeconds;
+   int first15RSeconds;
+   int first20RSeconds;
+   int first25RSeconds;
+   int first30RSeconds;
+   int firstMinus05RSeconds;
+   int firstMinus10RSeconds;
+   double lastStop;
+   double lastTakeProfit;
+   int stopChangeCount;
+   int takeProfitChangeCount;
+   datetime firstStopChangeTime;
+   datetime breakEvenTime;
+   double plannedRR;
+   double maxLockedR;
+   double maxRiskR;
+   double maxGivebackR;
+   int slTightenCount;
+   int slWidenCount;
+   double entryAtrPoints;
+   double entryAdx;
+   double entryEmaGapPoints;
+   double entryPreviousDayPositionPct;
+   double balanceAtEntry;
+   double equityAtEntry;
+   double freeMarginAtEntry;
+   double riskPctEquity;
+   int openTradesAtEntry;
+   int sameSymbolTradesAtEntry;
    double entrySpreadPoints;
    double maxSpreadPoints;
    string regime;
@@ -63,6 +103,67 @@ string DateText(datetime value)
 string TimeText(datetime value)
 {
    return TimeToString(value, TIME_SECONDS);
+}
+
+string DateTimeText(datetime value)
+{
+   if(value <= 0) return "";
+   return DateText(value) + " " + TimeText(value);
+}
+
+string AppendQualityToken(string current, string token)
+{
+   if(token == "") return current;
+   if(current == "") return token;
+   if(StringFind("+" + current + "+", "+" + token + "+") >= 0) return current;
+   return current + "+" + token;
+}
+
+double TrackerMfeR(TradeTracker &tracker)
+{
+   if(tracker.initialRiskPrice <= 0) return EMPTY_VALUE;
+   double distance = tracker.type == OP_BUY
+      ? MathMax(0, tracker.bestExitPrice - tracker.openPrice)
+      : MathMax(0, tracker.openPrice - tracker.bestExitPrice);
+   return distance / tracker.initialRiskPrice;
+}
+
+double TrackerMaeR(TradeTracker &tracker)
+{
+   if(tracker.initialRiskPrice <= 0) return EMPTY_VALUE;
+   double distance = tracker.type == OP_BUY
+      ? MathMax(0, tracker.openPrice - tracker.worstExitPrice)
+      : MathMax(0, tracker.worstExitPrice - tracker.openPrice);
+   return -distance / tracker.initialRiskPrice;
+}
+
+double StopLevelR(TradeTracker &tracker, double stopPrice)
+{
+   if(tracker.initialRiskPrice <= 0 || stopPrice <= 0) return EMPTY_VALUE;
+   return tracker.type == OP_BUY
+      ? (stopPrice - tracker.openPrice) / tracker.initialRiskPrice
+      : (tracker.openPrice - stopPrice) / tracker.initialRiskPrice;
+}
+
+int CountMarketOrders(string symbolFilter)
+{
+   int count = 0;
+   int selectedTicket = OrderTicket();
+   for(int position = OrdersTotal() - 1; position >= 0; position--)
+   {
+      if(!OrderSelect(position, SELECT_BY_POS, MODE_TRADES)) continue;
+      if(OrderType() != OP_BUY && OrderType() != OP_SELL) continue;
+      if(symbolFilter != "" && OrderSymbol() != symbolFilter) continue;
+      count++;
+   }
+   if(selectedTicket > 0) OrderSelect(selectedTicket, SELECT_BY_TICKET);
+   return count;
+}
+
+void RecordMilestone(int &field, double currentR, double targetR, datetime observedAt, datetime openTime)
+{
+   if(field > 0 || currentR == EMPTY_VALUE || currentR < targetR) return;
+   field = (int)MathMax(1, observedAt - openTime);
 }
 
 string NumberText(double value, int digits)
@@ -241,6 +342,58 @@ void AddSelectedOrder()
    if(quote <= 0) quote = tracker.openPrice;
    tracker.bestExitPrice = quote;
    tracker.worstExitPrice = quote;
+   tracker.trackingStartedAt = TimeCurrent();
+   tracker.lastObservedAt = tracker.trackingStartedAt;
+   tracker.mfeTime = tracker.trackingStartedAt;
+   tracker.maeTime = tracker.trackingStartedAt;
+   tracker.trackingDelaySeconds = (int)MathMax(0, tracker.trackingStartedAt - tracker.openTime);
+   tracker.monitoringGapSeconds = 0;
+   tracker.monitoredSeconds = 0;
+   tracker.favorableSeconds = 0;
+   tracker.adverseSeconds = 0;
+   tracker.sampleCount = 0;
+   tracker.first05RSeconds = 0;
+   tracker.first10RSeconds = 0;
+   tracker.first15RSeconds = 0;
+   tracker.first20RSeconds = 0;
+   tracker.first25RSeconds = 0;
+   tracker.first30RSeconds = 0;
+   tracker.firstMinus05RSeconds = 0;
+   tracker.firstMinus10RSeconds = 0;
+   tracker.lastStop = tracker.initialStop;
+   tracker.lastTakeProfit = tracker.takeProfit;
+   tracker.stopChangeCount = 0;
+   tracker.takeProfitChangeCount = 0;
+   tracker.firstStopChangeTime = 0;
+   tracker.breakEvenTime = 0;
+   tracker.plannedRR = tracker.initialRiskPrice > 0 && tracker.takeProfit > 0
+      ? MathAbs(tracker.takeProfit - tracker.openPrice) / tracker.initialRiskPrice
+      : EMPTY_VALUE;
+   double initialStopR = StopLevelR(tracker, tracker.initialStop);
+   tracker.maxLockedR = initialStopR == EMPTY_VALUE ? 0 : initialStopR;
+   tracker.maxRiskR = initialStopR == EMPTY_VALUE ? 0 : MathMax(0, -initialStopR);
+   tracker.maxGivebackR = 0;
+   tracker.slTightenCount = 0;
+   tracker.slWidenCount = 0;
+   int entryShift = AnalysisShift(tracker.symbol, tracker.openTime);
+   tracker.entryAtrPoints = iATR(tracker.symbol, AnalysisTimeframe, AtrPeriod, entryShift) / PointSize(tracker.symbol);
+   tracker.entryAdx = iADX(tracker.symbol, AnalysisTimeframe, AdxPeriod, PRICE_CLOSE, MODE_MAIN, entryShift);
+   double entryFastEma = iMA(tracker.symbol, AnalysisTimeframe, FastEmaPeriod, 0, MODE_EMA, PRICE_CLOSE, entryShift);
+   double entrySlowEma = iMA(tracker.symbol, AnalysisTimeframe, SlowEmaPeriod, 0, MODE_EMA, PRICE_CLOSE, entryShift);
+   tracker.entryEmaGapPoints = (entryFastEma - entrySlowEma) / PointSize(tracker.symbol);
+   int entryDayShift = iBarShift(tracker.symbol, PERIOD_D1, tracker.openTime, false);
+   int previousDayShift = entryDayShift >= 0 ? entryDayShift + 1 : 1;
+   double previousDayHigh = iHigh(tracker.symbol, PERIOD_D1, previousDayShift);
+   double previousDayLow = iLow(tracker.symbol, PERIOD_D1, previousDayShift);
+   tracker.entryPreviousDayPositionPct = previousDayHigh > previousDayLow
+      ? (tracker.openPrice - previousDayLow) / (previousDayHigh - previousDayLow) * 100.0
+      : EMPTY_VALUE;
+   tracker.balanceAtEntry = AccountBalance();
+   tracker.equityAtEntry = AccountEquity();
+   tracker.freeMarginAtEntry = AccountFreeMargin();
+   tracker.riskPctEquity = tracker.equityAtEntry > 0 && tracker.initialRiskMoney > 0
+      ? tracker.initialRiskMoney / tracker.equityAtEntry * 100.0
+      : EMPTY_VALUE;
    tracker.entrySpreadPoints = CurrentSpreadPoints(tracker.symbol);
    tracker.maxSpreadPoints = tracker.entrySpreadPoints;
    tracker.regime = DetectRegime(tracker.symbol, tracker.openTime);
@@ -249,8 +402,9 @@ void AddSelectedOrder()
    tracker.session = DetectSession(tracker.openTime);
    tracker.brokerUtcOffset = BrokerUtcOffsetHours();
    tracker.orderComment = CleanText(OrderComment());
-   int detectionDelay = (int)MathMax(0, TimeCurrent() - tracker.openTime);
-   tracker.captureQuality = detectionDelay <= MathMax(5, TimerSeconds * 2) ? "complete" : "attached_mid_trade";
+   tracker.captureQuality = tracker.trackingDelaySeconds <= MathMax(5, TimerSeconds * 2) ? "complete" : "attached_mid_trade";
+   tracker.openTradesAtEntry = CountMarketOrders("");
+   tracker.sameSymbolTradesAtEntry = CountMarketOrders(tracker.symbol);
 
    int count = ArraySize(trackers);
    ArrayResize(trackers, count + 1);
@@ -260,25 +414,134 @@ void AddSelectedOrder()
 
 void UpdateTracker(int index)
 {
+   datetime observedAt = TimeCurrent();
+   double point = PointSize(trackers[index].symbol);
+   double currentStop = OrderStopLoss();
+   double currentTakeProfit = OrderTakeProfit();
    if(trackers[index].initialStop <= 0 && OrderStopLoss() > 0)
    {
-      trackers[index].initialStop = OrderStopLoss();
+      trackers[index].initialStop = currentStop;
       trackers[index].initialRiskPrice = MathAbs(trackers[index].openPrice - trackers[index].initialStop);
       trackers[index].initialRiskMoney = MoneyForDistance(trackers[index].symbol, trackers[index].lots, trackers[index].initialRiskPrice);
+      trackers[index].plannedRR = trackers[index].initialRiskPrice > 0 && currentTakeProfit > 0
+         ? MathAbs(currentTakeProfit - trackers[index].openPrice) / trackers[index].initialRiskPrice
+         : EMPTY_VALUE;
+      trackers[index].riskPctEquity = trackers[index].equityAtEntry > 0 && trackers[index].initialRiskMoney > 0
+         ? trackers[index].initialRiskMoney / trackers[index].equityAtEntry * 100.0
+         : EMPTY_VALUE;
+      double initialStopR = StopLevelR(trackers[index], currentStop);
+      trackers[index].maxLockedR = initialStopR == EMPTY_VALUE ? 0 : initialStopR;
+      trackers[index].maxRiskR = initialStopR == EMPTY_VALUE ? 0 : MathMax(0, -initialStopR);
+      trackers[index].lastStop = currentStop;
    }
-   if(trackers[index].takeProfit <= 0 && OrderTakeProfit() > 0) trackers[index].takeProfit = OrderTakeProfit();
+   else if(MathAbs(currentStop - trackers[index].lastStop) > point * 0.5)
+   {
+      double oldStopR = StopLevelR(trackers[index], trackers[index].lastStop);
+      double newStopR = StopLevelR(trackers[index], currentStop);
+      trackers[index].stopChangeCount++;
+      if(trackers[index].firstStopChangeTime <= 0) trackers[index].firstStopChangeTime = observedAt;
+      if(currentStop <= 0)
+      {
+         trackers[index].slWidenCount++;
+         trackers[index].captureQuality = AppendQualityToken(trackers[index].captureQuality, "sl_removed");
+      }
+      else
+      {
+         if(newStopR != EMPTY_VALUE)
+         {
+            if(oldStopR == EMPTY_VALUE || newStopR > oldStopR) trackers[index].slTightenCount++;
+            else if(newStopR < oldStopR) trackers[index].slWidenCount++;
+            trackers[index].maxLockedR = MathMax(trackers[index].maxLockedR, newStopR);
+            trackers[index].maxRiskR = MathMax(trackers[index].maxRiskR, MathMax(0, -newStopR));
+         }
+      }
+      trackers[index].lastStop = currentStop;
+   }
+   if(trackers[index].takeProfit <= 0 && currentTakeProfit > 0)
+   {
+      trackers[index].takeProfit = currentTakeProfit;
+      trackers[index].lastTakeProfit = currentTakeProfit;
+      if(trackers[index].initialRiskPrice > 0)
+         trackers[index].plannedRR = MathAbs(currentTakeProfit - trackers[index].openPrice) / trackers[index].initialRiskPrice;
+   }
+   else if(MathAbs(currentTakeProfit - trackers[index].lastTakeProfit) > point * 0.5)
+   {
+      trackers[index].takeProfitChangeCount++;
+      trackers[index].lastTakeProfit = currentTakeProfit;
+   }
+   if(trackers[index].breakEvenTime <= 0 && currentStop > 0)
+   {
+      bool atBreakEven = (trackers[index].type == OP_BUY && currentStop >= trackers[index].openPrice)
+         || (trackers[index].type == OP_SELL && currentStop <= trackers[index].openPrice);
+      if(atBreakEven) trackers[index].breakEvenTime = observedAt;
+   }
    double quote = ExitQuote(trackers[index].symbol, trackers[index].type);
    if(quote <= 0) return;
+   int elapsed = (int)MathMax(0, observedAt - trackers[index].lastObservedAt);
+   if(elapsed > 0)
+   {
+      int allowedGap = MathMax(5, TimerSeconds * 3);
+      if(elapsed <= allowedGap)
+      {
+         trackers[index].monitoredSeconds += elapsed;
+         bool favorableNow = (trackers[index].type == OP_BUY && quote >= trackers[index].openPrice)
+            || (trackers[index].type == OP_SELL && quote <= trackers[index].openPrice);
+         if(favorableNow) trackers[index].favorableSeconds += elapsed;
+         else trackers[index].adverseSeconds += elapsed;
+      }
+      else
+      {
+         trackers[index].monitoringGapSeconds += elapsed;
+         trackers[index].captureQuality = AppendQualityToken(trackers[index].captureQuality, "monitoring_gap");
+      }
+   }
+   trackers[index].lastObservedAt = observedAt;
+   trackers[index].sampleCount++;
    if(trackers[index].type == OP_BUY)
    {
-      trackers[index].bestExitPrice = MathMax(trackers[index].bestExitPrice, quote);
-      trackers[index].worstExitPrice = MathMin(trackers[index].worstExitPrice, quote);
+      if(quote > trackers[index].bestExitPrice)
+      {
+         trackers[index].bestExitPrice = quote;
+         trackers[index].mfeTime = observedAt;
+      }
+      if(quote < trackers[index].worstExitPrice)
+      {
+         trackers[index].worstExitPrice = quote;
+         trackers[index].maeTime = observedAt;
+      }
    }
    else
    {
-      trackers[index].bestExitPrice = MathMin(trackers[index].bestExitPrice, quote);
-      trackers[index].worstExitPrice = MathMax(trackers[index].worstExitPrice, quote);
+      if(quote < trackers[index].bestExitPrice)
+      {
+         trackers[index].bestExitPrice = quote;
+         trackers[index].mfeTime = observedAt;
+      }
+      if(quote > trackers[index].worstExitPrice)
+      {
+         trackers[index].worstExitPrice = quote;
+         trackers[index].maeTime = observedAt;
+      }
    }
+   double currentMfeR = TrackerMfeR(trackers[index]);
+   double currentMaeR = TrackerMaeR(trackers[index]);
+   if(trackers[index].initialRiskPrice > 0 && currentMfeR != EMPTY_VALUE)
+   {
+      double currentPositionR = trackers[index].type == OP_BUY
+         ? (quote - trackers[index].openPrice) / trackers[index].initialRiskPrice
+         : (trackers[index].openPrice - quote) / trackers[index].initialRiskPrice;
+      trackers[index].maxGivebackR = MathMax(trackers[index].maxGivebackR, MathMax(0, currentMfeR - currentPositionR));
+   }
+   RecordMilestone(trackers[index].first05RSeconds, currentMfeR, 0.5, observedAt, trackers[index].openTime);
+   RecordMilestone(trackers[index].first10RSeconds, currentMfeR, 1.0, observedAt, trackers[index].openTime);
+   RecordMilestone(trackers[index].first15RSeconds, currentMfeR, 1.5, observedAt, trackers[index].openTime);
+   RecordMilestone(trackers[index].first20RSeconds, currentMfeR, 2.0, observedAt, trackers[index].openTime);
+   RecordMilestone(trackers[index].first25RSeconds, currentMfeR, 2.5, observedAt, trackers[index].openTime);
+   RecordMilestone(trackers[index].first30RSeconds, currentMfeR, 3.0, observedAt, trackers[index].openTime);
+   if(trackers[index].firstMinus05RSeconds <= 0 && currentMaeR != EMPTY_VALUE && currentMaeR <= -0.5)
+      trackers[index].firstMinus05RSeconds = (int)MathMax(1, observedAt - trackers[index].openTime);
+   if(trackers[index].firstMinus10RSeconds <= 0 && currentMaeR != EMPTY_VALUE && currentMaeR <= -1.0)
+      trackers[index].firstMinus10RSeconds = (int)MathMax(1, observedAt - trackers[index].openTime);
    trackers[index].maxSpreadPoints = MathMax(trackers[index].maxSpreadPoints, CurrentSpreadPoints(trackers[index].symbol));
 }
 
@@ -303,7 +566,7 @@ bool AppendJournalLine(string line)
    }
    if(FileSize(handle) == 0)
    {
-      string header = "record_version\tsource\taccount\tticket\tmagic\tdate\ttime\tclose_time\tsymbol\tdirection\tlots\tentry\tstop_loss\ttake_profit\texit_price\tinitial_risk_points\tinitial_risk_money\tgross_profit\tcommission\tswap\tnet_profit\tgross_r\tnet_r\tmfe_price\tmfe_r\tmae_price\tmae_r\texit_efficiency_pct\tentry_spread_points\texit_spread_points\tmax_spread_points\tspread_cost_estimate\texit_reason\texit_slippage_points\tregime\tvolatility\thtf_alignment\tsession\tbroker_utc_offset\tcomment\tcapture_quality";
+      string header = "record_version\tsource\taccount\tticket\tmagic\tdate\ttime\tclose_time\tsymbol\tdirection\tlots\tentry\tstop_loss\ttake_profit\texit_price\tinitial_risk_points\tinitial_risk_money\tgross_profit\tcommission\tswap\tnet_profit\tgross_r\tnet_r\tmfe_price\tmfe_r\tmae_price\tmae_r\texit_efficiency_pct\tentry_spread_points\texit_spread_points\tmax_spread_points\tspread_cost_estimate\texit_reason\texit_slippage_points\tregime\tvolatility\thtf_alignment\tsession\tbroker_utc_offset\tcomment\tcapture_quality\ttracking_started_at\ttracking_delay_seconds\tmonitored_seconds\tmonitoring_gap_seconds\tmonitoring_coverage_pct\tsample_count\tholding_seconds\tmfe_time\tmfe_seconds\tmae_time\tmae_seconds\tfirst_0_5r_seconds\tfirst_1r_seconds\tfirst_1_5r_seconds\tfirst_2r_seconds\tfirst_2_5r_seconds\tfirst_3r_seconds\tfirst_minus_0_5r_seconds\tfirst_minus_1r_seconds\tfinal_stop_loss\tfinal_take_profit\tstop_change_count\tfirst_stop_change_time\tbreakeven_time\ttake_profit_change_count\tfavorable_seconds\tadverse_seconds\tfavorable_time_pct\tplanned_rr\tmax_locked_r\tmax_risk_r\tmax_giveback_r\tsl_tighten_count\tsl_widen_count\tentry_atr_points\tentry_adx\tentry_ema_gap_points\tentry_previous_day_position_pct\tbalance_at_entry\tequity_at_entry\tfree_margin_at_entry\trisk_pct_equity\topen_trades_at_entry\tsame_symbol_trades_at_entry";
       FileWriteString(handle, header + "\r\n");
    }
    FileSeek(handle, 0, SEEK_END);
@@ -348,6 +611,11 @@ bool ExportClosedTracker(int index)
    double exitSlippage = target > 0
       ? (closePrice - target) * (tracker.type == OP_BUY ? 1.0 : -1.0) / PointSize(tracker.symbol)
       : EMPTY_VALUE;
+   int holdingSeconds = (int)MathMax(0, OrderCloseTime() - tracker.openTime);
+   int mfeSeconds = tracker.mfeTime > 0 ? (int)MathMax(0, tracker.mfeTime - tracker.openTime) : 0;
+   int maeSeconds = tracker.maeTime > 0 ? (int)MathMax(0, tracker.maeTime - tracker.openTime) : 0;
+   double monitoringCoverage = holdingSeconds > 0 ? MathMin(100.0, (double)tracker.monitoredSeconds / holdingSeconds * 100.0) : EMPTY_VALUE;
+   double favorableTimePct = tracker.monitoredSeconds > 0 ? (double)tracker.favorableSeconds / tracker.monitoredSeconds * 100.0 : EMPTY_VALUE;
    string exportQuality = tracker.captureQuality;
    if(tracker.initialStop <= 0 || tracker.initialRiskMoney <= 0)
    {
@@ -357,8 +625,8 @@ bool ExportClosedTracker(int index)
    }
 
    string values[];
-   ArrayResize(values, 41);
-   values[0] = "1";
+   ArrayResize(values, 85);
+   values[0] = "2";
    values[1] = "TradingNote MT4 EA";
    values[2] = IntegerToString(AccountNumber());
    values[3] = IntegerToString(ticket);
@@ -399,6 +667,50 @@ bool ExportClosedTracker(int index)
    values[38] = NumberText(tracker.brokerUtcOffset, 1);
    values[39] = CleanText(tracker.orderComment);
    values[40] = exportQuality;
+   values[41] = DateTimeText(tracker.trackingStartedAt);
+   values[42] = IntegerToString(tracker.trackingDelaySeconds);
+   values[43] = IntegerToString(tracker.monitoredSeconds);
+   values[44] = IntegerToString(tracker.monitoringGapSeconds);
+   values[45] = NumberText(monitoringCoverage, 2);
+   values[46] = IntegerToString(tracker.sampleCount);
+   values[47] = IntegerToString(holdingSeconds);
+   values[48] = DateTimeText(tracker.mfeTime);
+   values[49] = IntegerToString(mfeSeconds);
+   values[50] = DateTimeText(tracker.maeTime);
+   values[51] = IntegerToString(maeSeconds);
+   values[52] = tracker.first05RSeconds > 0 ? IntegerToString(tracker.first05RSeconds) : "";
+   values[53] = tracker.first10RSeconds > 0 ? IntegerToString(tracker.first10RSeconds) : "";
+   values[54] = tracker.first15RSeconds > 0 ? IntegerToString(tracker.first15RSeconds) : "";
+   values[55] = tracker.first20RSeconds > 0 ? IntegerToString(tracker.first20RSeconds) : "";
+   values[56] = tracker.first25RSeconds > 0 ? IntegerToString(tracker.first25RSeconds) : "";
+   values[57] = tracker.first30RSeconds > 0 ? IntegerToString(tracker.first30RSeconds) : "";
+   values[58] = tracker.firstMinus05RSeconds > 0 ? IntegerToString(tracker.firstMinus05RSeconds) : "";
+   values[59] = tracker.firstMinus10RSeconds > 0 ? IntegerToString(tracker.firstMinus10RSeconds) : "";
+   values[60] = finalStop > 0 ? NumberText(finalStop, (int)MarketInfo(tracker.symbol, MODE_DIGITS)) : "";
+   values[61] = finalTakeProfit > 0 ? NumberText(finalTakeProfit, (int)MarketInfo(tracker.symbol, MODE_DIGITS)) : "";
+   values[62] = IntegerToString(tracker.stopChangeCount);
+   values[63] = DateTimeText(tracker.firstStopChangeTime);
+   values[64] = DateTimeText(tracker.breakEvenTime);
+   values[65] = IntegerToString(tracker.takeProfitChangeCount);
+   values[66] = IntegerToString(tracker.favorableSeconds);
+   values[67] = IntegerToString(tracker.adverseSeconds);
+   values[68] = NumberText(favorableTimePct, 2);
+   values[69] = NumberText(tracker.plannedRR, 4);
+   values[70] = NumberText(tracker.maxLockedR, 4);
+   values[71] = NumberText(tracker.maxRiskR, 4);
+   values[72] = NumberText(tracker.maxGivebackR, 4);
+   values[73] = IntegerToString(tracker.slTightenCount);
+   values[74] = IntegerToString(tracker.slWidenCount);
+   values[75] = NumberText(tracker.entryAtrPoints, 2);
+   values[76] = NumberText(tracker.entryAdx, 2);
+   values[77] = NumberText(tracker.entryEmaGapPoints, 2);
+   values[78] = NumberText(tracker.entryPreviousDayPositionPct, 2);
+   values[79] = NumberText(tracker.balanceAtEntry, 2);
+   values[80] = NumberText(tracker.equityAtEntry, 2);
+   values[81] = NumberText(tracker.freeMarginAtEntry, 2);
+   values[82] = NumberText(tracker.riskPctEquity, 4);
+   values[83] = IntegerToString(tracker.openTradesAtEntry);
+   values[84] = IntegerToString(tracker.sameSymbolTradesAtEntry);
 
    string line = values[0];
    for(int i = 1; i < ArraySize(values); i++) line += "\t" + values[i];
@@ -423,11 +735,11 @@ void SaveTrackers()
       Print("TradingNote: cannot save open-state file. Error ", GetLastError());
       return;
    }
-   FileWrite(handle, "ticket", "symbol", "type", "lots", "open_time", "open_price", "initial_stop", "take_profit", "risk_price", "risk_money", "best_exit", "worst_exit", "entry_spread", "max_spread", "regime", "volatility", "htf", "session", "utc_offset", "comment", "quality");
+   FileWrite(handle, "ticket", "symbol", "type", "lots", "open_time", "open_price", "initial_stop", "take_profit", "risk_price", "risk_money", "best_exit", "worst_exit", "tracking_started", "last_observed", "mfe_time", "mae_time", "tracking_delay", "monitoring_gap", "monitored_seconds", "favorable_seconds", "adverse_seconds", "sample_count", "first_05r", "first_10r", "first_15r", "first_20r", "first_25r", "first_30r", "first_minus_05r", "first_minus_10r", "last_stop", "last_take_profit", "stop_change_count", "take_profit_change_count", "first_stop_change_time", "breakeven_time", "entry_spread", "max_spread", "regime", "volatility", "htf", "session", "utc_offset", "comment", "quality", "planned_rr", "max_locked_r", "max_risk_r", "max_giveback_r", "sl_tighten_count", "sl_widen_count", "entry_atr_points", "entry_adx", "entry_ema_gap_points", "entry_previous_day_position_pct", "balance_at_entry", "equity_at_entry", "free_margin_at_entry", "risk_pct_equity", "open_trades_at_entry", "same_symbol_trades_at_entry");
    for(int i = 0; i < ArraySize(trackers); i++)
    {
       TradeTracker tracker = trackers[i];
-      FileWrite(handle, tracker.ticket, tracker.symbol, tracker.type, tracker.lots, (long)tracker.openTime, tracker.openPrice, tracker.initialStop, tracker.takeProfit, tracker.initialRiskPrice, tracker.initialRiskMoney, tracker.bestExitPrice, tracker.worstExitPrice, tracker.entrySpreadPoints, tracker.maxSpreadPoints, tracker.regime, tracker.volatility, tracker.htfAlignment, tracker.session, tracker.brokerUtcOffset, CleanText(tracker.orderComment), tracker.captureQuality);
+      FileWrite(handle, tracker.ticket, tracker.symbol, tracker.type, tracker.lots, (long)tracker.openTime, tracker.openPrice, tracker.initialStop, tracker.takeProfit, tracker.initialRiskPrice, tracker.initialRiskMoney, tracker.bestExitPrice, tracker.worstExitPrice, (long)tracker.trackingStartedAt, (long)tracker.lastObservedAt, (long)tracker.mfeTime, (long)tracker.maeTime, tracker.trackingDelaySeconds, tracker.monitoringGapSeconds, tracker.monitoredSeconds, tracker.favorableSeconds, tracker.adverseSeconds, tracker.sampleCount, tracker.first05RSeconds, tracker.first10RSeconds, tracker.first15RSeconds, tracker.first20RSeconds, tracker.first25RSeconds, tracker.first30RSeconds, tracker.firstMinus05RSeconds, tracker.firstMinus10RSeconds, tracker.lastStop, tracker.lastTakeProfit, tracker.stopChangeCount, tracker.takeProfitChangeCount, (long)tracker.firstStopChangeTime, (long)tracker.breakEvenTime, tracker.entrySpreadPoints, tracker.maxSpreadPoints, tracker.regime, tracker.volatility, tracker.htfAlignment, tracker.session, tracker.brokerUtcOffset, CleanText(tracker.orderComment), tracker.captureQuality, tracker.plannedRR, tracker.maxLockedR, tracker.maxRiskR, tracker.maxGivebackR, tracker.slTightenCount, tracker.slWidenCount, tracker.entryAtrPoints, tracker.entryAdx, tracker.entryEmaGapPoints, tracker.entryPreviousDayPositionPct, tracker.balanceAtEntry, tracker.equityAtEntry, tracker.freeMarginAtEntry, tracker.riskPctEquity, tracker.openTradesAtEntry, tracker.sameSymbolTradesAtEntry);
    }
    FileClose(handle);
 }
@@ -439,7 +751,7 @@ void LoadTrackers()
    if(handle == INVALID_HANDLE) return;
    if(!FileIsEnding(handle))
    {
-      for(int headerColumn = 0; headerColumn < 21; headerColumn++) FileReadString(handle);
+      for(int headerColumn = 0; headerColumn < 61; headerColumn++) FileReadString(handle);
    }
    while(!FileIsEnding(handle))
    {
@@ -458,6 +770,30 @@ void LoadTrackers()
       tracker.initialRiskMoney = StringToDouble(FileReadString(handle));
       tracker.bestExitPrice = StringToDouble(FileReadString(handle));
       tracker.worstExitPrice = StringToDouble(FileReadString(handle));
+      tracker.trackingStartedAt = (datetime)StringToInteger(FileReadString(handle));
+      tracker.lastObservedAt = (datetime)StringToInteger(FileReadString(handle));
+      tracker.mfeTime = (datetime)StringToInteger(FileReadString(handle));
+      tracker.maeTime = (datetime)StringToInteger(FileReadString(handle));
+      tracker.trackingDelaySeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.monitoringGapSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.monitoredSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.favorableSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.adverseSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.sampleCount = (int)StringToInteger(FileReadString(handle));
+      tracker.first05RSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.first10RSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.first15RSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.first20RSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.first25RSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.first30RSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.firstMinus05RSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.firstMinus10RSeconds = (int)StringToInteger(FileReadString(handle));
+      tracker.lastStop = StringToDouble(FileReadString(handle));
+      tracker.lastTakeProfit = StringToDouble(FileReadString(handle));
+      tracker.stopChangeCount = (int)StringToInteger(FileReadString(handle));
+      tracker.takeProfitChangeCount = (int)StringToInteger(FileReadString(handle));
+      tracker.firstStopChangeTime = (datetime)StringToInteger(FileReadString(handle));
+      tracker.breakEvenTime = (datetime)StringToInteger(FileReadString(handle));
       tracker.entrySpreadPoints = StringToDouble(FileReadString(handle));
       tracker.maxSpreadPoints = StringToDouble(FileReadString(handle));
       tracker.regime = FileReadString(handle);
@@ -466,7 +802,30 @@ void LoadTrackers()
       tracker.session = FileReadString(handle);
       tracker.brokerUtcOffset = StringToDouble(FileReadString(handle));
       tracker.orderComment = FileReadString(handle);
-      tracker.captureQuality = "resumed_after_restart";
+      tracker.captureQuality = FileReadString(handle);
+      tracker.plannedRR = StringToDouble(FileReadString(handle));
+      tracker.maxLockedR = StringToDouble(FileReadString(handle));
+      tracker.maxRiskR = StringToDouble(FileReadString(handle));
+      tracker.maxGivebackR = StringToDouble(FileReadString(handle));
+      tracker.slTightenCount = (int)StringToInteger(FileReadString(handle));
+      tracker.slWidenCount = (int)StringToInteger(FileReadString(handle));
+      tracker.entryAtrPoints = StringToDouble(FileReadString(handle));
+      tracker.entryAdx = StringToDouble(FileReadString(handle));
+      tracker.entryEmaGapPoints = StringToDouble(FileReadString(handle));
+      tracker.entryPreviousDayPositionPct = StringToDouble(FileReadString(handle));
+      tracker.balanceAtEntry = StringToDouble(FileReadString(handle));
+      tracker.equityAtEntry = StringToDouble(FileReadString(handle));
+      tracker.freeMarginAtEntry = StringToDouble(FileReadString(handle));
+      tracker.riskPctEquity = StringToDouble(FileReadString(handle));
+      tracker.openTradesAtEntry = (int)StringToInteger(FileReadString(handle));
+      tracker.sameSymbolTradesAtEntry = (int)StringToInteger(FileReadString(handle));
+      int restartGap = tracker.lastObservedAt > 0 ? (int)MathMax(0, TimeCurrent() - tracker.lastObservedAt) : 0;
+      if(restartGap > MathMax(5, TimerSeconds * 3))
+      {
+         tracker.monitoringGapSeconds += restartGap;
+         tracker.captureQuality = AppendQualityToken(tracker.captureQuality, "resumed_after_restart");
+      }
+      tracker.lastObservedAt = TimeCurrent();
       if(tracker.ticket <= 0 || WasExported(tracker.ticket)) continue;
       int count = ArraySize(trackers);
       ArrayResize(trackers, count + 1);

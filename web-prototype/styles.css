@@ -4074,3 +4074,25 @@ td:nth-child(12) {
     grid-template-columns: 1fr;
   }
 }
+
+.table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.table-sort::after { content: "↕"; color: var(--muted); font-size: .78em; opacity: .45; }
+.table-sort.active { color: var(--accent, var(--teal)); }
+.table-sort.active[data-direction="asc"]::after { content: "↑"; opacity: 1; }
+.table-sort.active[data-direction="desc"]::after { content: "↓"; opacity: 1; }
+.table-sort:hover { color: var(--accent, var(--teal)); }

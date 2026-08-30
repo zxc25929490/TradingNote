@@ -42,6 +42,7 @@ let strategyVersions = loadStrategyVersions();
 let selectedPeriodMonth = monthKey(new Date());
 let selectedPeriodWeekStart = null;
 let reviewsExpanded = false;
+let tradeTableSort = { key: "date", direction: "desc" };
 let currentTradeImage = "";
 let monteCarloResult = null;
 let moveTradeCandidates = new Map();
@@ -260,6 +261,7 @@ const pageTitles = {
   strategy: "策略版本庫",
   "research-lab": "回測 vs 實盤研究室",
   checklist: "交易前檢查表",
+  "tp-analysis": "TP 統計分析",
   calculator: "風控手數計算",
 };
 
@@ -629,7 +631,7 @@ function enrichTradeFields(trade) {
       : null;
   const lots = Number.isFinite(Number(trade.lots)) && Number(trade.lots) > 0 ? Number(trade.lots) : null;
   const needsFallbackRisk = Boolean(trade.riskUnavailable || trade.r == null || !Number.isFinite(Number(trade.r)));
-  const canUseFallbackRisk = Boolean(fallbackSlPips && lots && (isEaTrade || needsFallbackRisk));
+  const canUseFallbackRisk = Boolean(fallbackSlPips && lots && needsFallbackRisk);
   const initialRiskMoney = canUseFallbackRisk ? lots * fallbackSlPips : recordedInitialRiskMoney;
   const riskUnavailable = Boolean(!canUseFallbackRisk && (trade.riskUnavailable || (isEaTrade && (!stopLoss || !initialRiskMoney))));
   const derivedSlPips =
@@ -657,7 +659,7 @@ function enrichTradeFields(trade) {
     takeProfit,
     initialRiskMoney,
     outcome: isSmallLossBe ? "be" : trade.outcome,
-    r: isSmallLossBe ? 0 : riskUnavailable ? null : fallbackR ?? trade.r,
+    r: riskUnavailable ? null : isSmallLossBe ? 0 : fallbackR ?? trade.r,
     grossR: riskUnavailable ? null : trade.grossR,
     mfeR: riskUnavailable ? null : trade.mfeR,
     maeR: riskUnavailable ? null : trade.maeR,
@@ -1368,6 +1370,39 @@ function sortByDate(items) {
     if (dateOrder) return dateOrder;
     const timeOrder = String(a.time || "").localeCompare(String(b.time || ""));
     return timeOrder || a.id - b.id;
+  });
+}
+
+function sortValue(value) {
+  if (value === "" || value == null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : String(value).toLocaleLowerCase();
+}
+
+function sortTradeTable(items) {
+  const { key, direction } = tradeTableSort;
+  const factor = direction === "asc" ? 1 : -1;
+  return items.slice().sort((a, b) => {
+    const rawA = key === "date" ? `${a.date || ""} ${a.time || ""}` : key === "source" ? (a.origin === "local" ? "手動新增" : a.source) : a[key];
+    const rawB = key === "date" ? `${b.date || ""} ${b.time || ""}` : key === "source" ? (b.origin === "local" ? "手動新增" : b.source) : b[key];
+    const valueA = sortValue(rawA);
+    const valueB = sortValue(rawB);
+    if (valueA == null && valueB == null) return 0;
+    if (valueA == null) return 1;
+    if (valueB == null) return -1;
+    const comparison = typeof valueA === "number" && typeof valueB === "number"
+      ? valueA - valueB
+      : String(valueA).localeCompare(String(valueB), "zh-Hant", { numeric: true });
+    return comparison * factor;
+  });
+}
+
+function updateTradeSortHeaders() {
+  document.querySelectorAll("[data-trade-sort]").forEach((button) => {
+    const active = button.dataset.tradeSort === tradeTableSort.key;
+    button.classList.toggle("active", active);
+    button.dataset.direction = active ? tradeTableSort.direction : "";
+    button.closest("th")?.setAttribute("aria-sort", active ? (tradeTableSort.direction === "asc" ? "ascending" : "descending") : "none");
   });
 }
 
@@ -2385,8 +2420,8 @@ function renderRows(items) {
     els.toggleReviews.textContent = reviewsExpanded ? "收合 Review" : "展開 Review";
     els.toggleReviews.setAttribute("aria-pressed", String(reviewsExpanded));
   }
-  els.rows.innerHTML = sortByDate(items)
-    .reverse()
+  updateTradeSortHeaders();
+  els.rows.innerHTML = sortTradeTable(items)
     .slice(0, 100)
     .map((trade) => {
       const isMissed = trade.recordType === "missed_opportunity" || trade.reviewClass === "missed_trade";
@@ -2848,6 +2883,13 @@ function openTradeDetail(trade) {
   const metric = (value, suffix = "", digits = 2) => Number.isFinite(Number(value))
     ? `${Number(value).toFixed(digits)}${suffix}`
     : "-";
+  const durationLabel = (value) => {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) return "-";
+    if (seconds < 60) return `${Math.round(seconds)} 秒`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} 分 ${Math.round(seconds % 60)} 秒`;
+    return `${Math.floor(seconds / 3600)} 小時 ${Math.floor((seconds % 3600) / 60)} 分`;
+  };
   const hasMt4Metrics = Boolean(trade.externalId || trade.source === "TradingNote MT4 EA");
   const mt4Metrics = hasMt4Metrics ? `
     <div class="detail-section-heading">
@@ -2870,6 +2912,15 @@ function openTradeDetail(trade) {
       <dt>出場原因／滑價</dt><dd>${trade.exitReason || "-"} · ${metric(trade.exitSlippagePoints, " pt", 1)}</dd>
       <dt>市場環境</dt><dd>${[trade.regime, trade.volatility, trade.htfAlignment].filter(Boolean).join(" · ") || "-"}</dd>
       <dt>Session</dt><dd>${trade.session || "-"}${trade.brokerUtcOffset == null ? "" : ` · UTC${Number(trade.brokerUtcOffset) >= 0 ? "+" : ""}${trade.brokerUtcOffset}`}</dd>
+      <dt>持倉／監控</dt><dd>${durationLabel(trade.holdingSeconds)} · 覆蓋 ${metric(trade.monitoringCoveragePct, "%", 1)} · 延遲 ${durationLabel(trade.trackingDelaySeconds)} · 中斷 ${durationLabel(trade.monitoringGapSeconds)}</dd>
+      <dt>最高／最低點時間</dt><dd>${trade.mfeTime || "-"}（${durationLabel(trade.mfeSeconds)}）· ${trade.maeTime || "-"}（${durationLabel(trade.maeSeconds)}）</dd>
+      <dt>首次到達</dt><dd>+1R ${durationLabel(trade.first10RSeconds)} · +1.5R ${durationLabel(trade.first15RSeconds)} · +2R ${durationLabel(trade.first20RSeconds)}</dd>
+      <dt>SL／保本管理</dt><dd>SL 修改 ${metric(trade.stopChangeCount, " 次", 0)} · 首次 ${trade.firstStopChangeTime || "-"} · 保本 ${trade.breakevenTime || "-"}</dd>
+      <dt>原定目標／風險變化</dt><dd>原定 ${metric(trade.plannedRR, "R")} · 最多鎖定 ${metric(trade.maxLockedR, "R")} · 最大擴大至 ${metric(trade.maxRiskR, "R")}</dd>
+      <dt>獲利回吐</dt><dd>持倉途中最多從高點回吐 ${metric(trade.maxGivebackR, "R")} · SL 收緊 ${metric(trade.slTightenCount, " 次", 0)} · 放寬 ${metric(trade.slWidenCount, " 次", 0)}</dd>
+      <dt>進場行情強度</dt><dd>ATR ${metric(trade.entryAtrPoints, " pt", 1)} · ADX ${metric(trade.entryAdx, "", 1)} · EMA 距離 ${metric(trade.entryEmaGapPoints, " pt", 1)}</dd>
+      <dt>昨日區間位置</dt><dd>${metric(trade.entryPreviousDayPositionPct, "%", 1)}（0% 為昨低、100% 為昨高）</dd>
+      <dt>進場帳戶風險</dt><dd>淨值 ${trade.equityAtEntry == null ? "-" : money(trade.equityAtEntry)} · 風險 ${metric(trade.riskPctEquity, "%", 2)} · 同時持倉 ${metric(trade.openTradesAtEntry, " 筆", 0)} · 同商品 ${metric(trade.sameSymbolTradesAtEntry, " 筆", 0)}</dd>
       <dt>資料品質</dt><dd>${captureQualityLabel(trade.captureQuality)}</dd>
     </dl>
   ` : "";
@@ -3136,6 +3187,7 @@ function render() {
   renderHomeComparisons();
   populateResearchLabControls();
   renderResearchLab();
+  window.renderTpAnalysis?.();
   els.tradeEmpty.hidden = items.length !== 0;
   document.querySelector(".table-wrap").hidden = items.length === 0;
 }
@@ -3150,6 +3202,7 @@ function setPage(pageName) {
   }
   if (nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "strategy" || nextPage === "research-lab") render();
   if (nextPage === "research-lab") window.requestAnimationFrame(() => renderMonteCarloSimulation(monteCarloResult));
+  if (nextPage === "tp-analysis") window.requestAnimationFrame(() => window.renderTpAnalysis?.());
   if (nextPage === "calculator") renderReturnSimulation();
 }
 
@@ -3160,7 +3213,7 @@ function csvEscape(value) {
 
 function exportFilteredCsv() {
   const items = filteredTrades();
-  const headers = ["id", "breakpointId", "breakpointName", "externalId", "account", "ticket", "magicNumber", "date", "time", "closeTime", "year", "pair", "direction", "outcome", "profit", "r", "grossProfit", "commission", "swap", "lots", "slPips", "entry", "stopLoss", "takeProfit", "exitPrice", "initialRiskMoney", "grossR", "mfeR", "maeR", "exitEfficiencyPct", "entrySpreadPoints", "exitSpreadPoints", "maxSpreadPoints", "spreadCostEstimate", "exitReason", "exitSlippagePoints", "regime", "volatility", "htfAlignment", "session", "captureQuality", "mambaDecision", "mambaR", "setup", "checklist", "source", "row", "lesson", "review", "improvement"];
+  const headers = ["id", "breakpointId", "breakpointName", "externalId", "account", "ticket", "magicNumber", "date", "time", "closeTime", "year", "pair", "direction", "outcome", "profit", "r", "grossProfit", "commission", "swap", "lots", "slPips", "entry", "stopLoss", "takeProfit", "exitPrice", "initialRiskMoney", "grossR", "mfePrice", "mfeR", "maePrice", "maeR", "exitEfficiencyPct", "entrySpreadPoints", "exitSpreadPoints", "maxSpreadPoints", "spreadCostEstimate", "exitReason", "exitSlippagePoints", "regime", "volatility", "htfAlignment", "session", "captureQuality", "trackingStartedAt", "trackingDelaySeconds", "monitoredSeconds", "monitoringGapSeconds", "monitoringCoveragePct", "sampleCount", "holdingSeconds", "mfeTime", "mfeSeconds", "maeTime", "maeSeconds", "first05RSeconds", "first10RSeconds", "first15RSeconds", "first20RSeconds", "first25RSeconds", "first30RSeconds", "firstMinus05RSeconds", "firstMinus10RSeconds", "finalStopLoss", "finalTakeProfit", "stopChangeCount", "firstStopChangeTime", "breakevenTime", "takeProfitChangeCount", "favorableSeconds", "adverseSeconds", "favorableTimePct", "plannedRR", "maxLockedR", "maxRiskR", "maxGivebackR", "slTightenCount", "slWidenCount", "entryAtrPoints", "entryAdx", "entryEmaGapPoints", "entryPreviousDayPositionPct", "balanceAtEntry", "equityAtEntry", "freeMarginAtEntry", "riskPctEquity", "openTradesAtEntry", "sameSymbolTradesAtEntry", "mambaDecision", "mambaR", "setup", "checklist", "source", "row", "lesson", "review", "improvement"];
   const rows = [
     headers.join(","),
     ...items.map((trade) => headers.map((key) => csvEscape(
@@ -3226,8 +3279,12 @@ function tradeRLabel(trade) {
 function captureQualityLabel(value) {
   const labels = {
     complete: "完整",
+    complete_partial_exit: "分批出場，路徑已重建",
+    partial_capture: "監控路徑不完整",
     attached_mid_trade: "EA 於持倉中途啟動",
     resumed_after_restart: "EA 重啟後續記",
+    monitoring_gap: "監控曾中斷",
+    sl_removed: "持倉期間曾移除 SL",
     missing_initial_sl: "缺少初始 SL，無法計算 R / MFE / MAE",
   };
   if (!value) return "未標記";
@@ -3632,9 +3689,55 @@ function normalizeMt4JournalRows(rows) {
       exitPrice: mt4Number(row, ["exit_price", "close_price"]),
       initialRiskMoney: riskMissing ? null : initialRiskMoney,
       grossR: riskMissing ? null : mt4Number(row, ["gross_r"]),
+      mfePrice: mt4PositiveNumber(row, ["mfe_price", "highest_price", "holding_high"]),
       mfeR: riskMissing ? null : mt4Number(row, ["mfe_r"]),
+      maePrice: mt4PositiveNumber(row, ["mae_price", "lowest_price", "holding_low"]),
       maeR: riskMissing ? null : mt4Number(row, ["mae_r"]),
       exitEfficiencyPct: riskMissing ? null : mt4Number(row, ["exit_efficiency_pct"]),
+      trackingStartedAt: String(pickRowValue(row, ["tracking_started_at"])).trim(),
+      trackingDelaySeconds: mt4Number(row, ["tracking_delay_seconds"]),
+      monitoredSeconds: mt4Number(row, ["monitored_seconds"]),
+      monitoringGapSeconds: mt4Number(row, ["monitoring_gap_seconds"]),
+      monitoringCoveragePct: mt4Number(row, ["monitoring_coverage_pct"]),
+      sampleCount: mt4Number(row, ["sample_count"]),
+      holdingSeconds: mt4Number(row, ["holding_seconds"]),
+      mfeTime: String(pickRowValue(row, ["mfe_time"])).trim(),
+      mfeSeconds: mt4Number(row, ["mfe_seconds"]),
+      maeTime: String(pickRowValue(row, ["mae_time"])).trim(),
+      maeSeconds: mt4Number(row, ["mae_seconds"]),
+      first05RSeconds: mt4Number(row, ["first_0_5r_seconds"]),
+      first10RSeconds: mt4Number(row, ["first_1r_seconds"]),
+      first15RSeconds: mt4Number(row, ["first_1_5r_seconds"]),
+      first20RSeconds: mt4Number(row, ["first_2r_seconds"]),
+      first25RSeconds: mt4Number(row, ["first_2_5r_seconds"]),
+      first30RSeconds: mt4Number(row, ["first_3r_seconds"]),
+      firstMinus05RSeconds: mt4Number(row, ["first_minus_0_5r_seconds"]),
+      firstMinus10RSeconds: mt4Number(row, ["first_minus_1r_seconds"]),
+      finalStopLoss: mt4PositiveNumber(row, ["final_stop_loss"]),
+      finalTakeProfit: mt4PositiveNumber(row, ["final_take_profit"]),
+      stopChangeCount: mt4Number(row, ["stop_change_count"]),
+      firstStopChangeTime: String(pickRowValue(row, ["first_stop_change_time"])).trim(),
+      breakevenTime: String(pickRowValue(row, ["breakeven_time"])).trim(),
+      takeProfitChangeCount: mt4Number(row, ["take_profit_change_count"]),
+      favorableSeconds: mt4Number(row, ["favorable_seconds"]),
+      adverseSeconds: mt4Number(row, ["adverse_seconds"]),
+      favorableTimePct: mt4Number(row, ["favorable_time_pct"]),
+      plannedRR: mt4Number(row, ["planned_rr"]),
+      maxLockedR: mt4Number(row, ["max_locked_r"]),
+      maxRiskR: mt4Number(row, ["max_risk_r"]),
+      maxGivebackR: mt4Number(row, ["max_giveback_r"]),
+      slTightenCount: mt4Number(row, ["sl_tighten_count"]),
+      slWidenCount: mt4Number(row, ["sl_widen_count"]),
+      entryAtrPoints: mt4Number(row, ["entry_atr_points"]),
+      entryAdx: mt4Number(row, ["entry_adx"]),
+      entryEmaGapPoints: mt4Number(row, ["entry_ema_gap_points"]),
+      entryPreviousDayPositionPct: mt4Number(row, ["entry_previous_day_position_pct"]),
+      balanceAtEntry: mt4Number(row, ["balance_at_entry"]),
+      equityAtEntry: mt4Number(row, ["equity_at_entry"]),
+      freeMarginAtEntry: mt4Number(row, ["free_margin_at_entry"]),
+      riskPctEquity: mt4Number(row, ["risk_pct_equity"]),
+      openTradesAtEntry: mt4Number(row, ["open_trades_at_entry"]),
+      sameSymbolTradesAtEntry: mt4Number(row, ["same_symbol_trades_at_entry"]),
       entrySpreadPoints: mt4Number(row, ["entry_spread_points"]),
       exitSpreadPoints: mt4Number(row, ["exit_spread_points"]),
       maxSpreadPoints: mt4Number(row, ["max_spread_points"]),
@@ -3694,11 +3797,23 @@ function consolidateMt4Position(positions) {
   for (const position of positions) {
     for (const leg of mt4TradeLegs(position)) {
       const key = `${leg.account || "unknown"}:${leg.ticket || leg.externalId || leg.localId}`;
-      if (!legsByTicket.has(key)) legsByTicket.set(key, { ...enrichTradeFields(leg), partialExits: undefined });
+      const incoming = { ...enrichTradeFields(leg), partialExits: undefined };
+      const existing = legsByTicket.get(key);
+      legsByTicket.set(key, existing ? {
+        ...existing,
+        ...incoming,
+        localId: existing.localId || incoming.localId,
+        batchId: existing.batchId || incoming.batchId,
+        lesson: existing.lesson || incoming.lesson,
+        review: existing.review || incoming.review,
+        improvement: existing.improvement || incoming.improvement,
+        strategyVersionId: existing.strategyVersionId || incoming.strategyVersionId,
+      } : incoming);
     }
   }
   const legs = [...legsByTicket.values()];
   const base = positions.find((trade) => Array.isArray(trade.partialExits)) || legs[0] || positions[0];
+  const earliestLeg = [...legs].sort((a, b) => `${a.date || ""} ${a.time || ""}`.localeCompare(`${b.date || ""} ${b.time || ""}`))[0] || base;
   const sum = (field) => legs.reduce((total, leg) => total + (Number.isFinite(Number(leg[field])) ? Number(leg[field]) : 0), 0);
   const lots = sum("lots");
   const profit = sum("profit");
@@ -3709,6 +3824,49 @@ function consolidateMt4Position(positions) {
   const closeTimes = legs.map((leg) => String(leg.closeTime || "")).filter(Boolean).sort();
   const groupKey = mt4PositionGroupKey(base || legs[0]);
   const reviews = [...new Set(legs.map((leg) => String(leg.review || "").trim()).filter(Boolean))];
+  const captureTokens = legs.flatMap((leg) => String(leg.captureQuality || "complete").toLowerCase().split("+").filter(Boolean));
+  const hasCompleteCapture = captureTokens.includes("complete") || captureTokens.includes("complete_partial_exit");
+  const canRebuildPartialPath = legs.length > 1
+    && hasCompleteCapture
+    && captureTokens.every((quality) => ["complete", "complete_partial_exit", "attached_mid_trade"].includes(quality));
+  const positionCaptureQuality = riskUnavailable
+    ? "missing_initial_sl"
+    : captureTokens.every((quality) => quality === "complete" || quality === "complete_partial_exit")
+      ? "complete"
+      : canRebuildPartialPath
+        ? "complete_partial_exit"
+        : "partial_capture";
+  const entry = mt4WeightedValue(legs, "entry");
+  const stopLoss = legs.map((leg) => Number(leg.stopLoss)).find((value) => Number.isFinite(value) && value > 0) || null;
+  const direction = String(base?.direction || legs[0]?.direction || "").trim().toLowerCase();
+  const mfePrices = legs.map((leg) => Number(leg.mfePrice)).filter((value) => Number.isFinite(value) && value > 0);
+  const maePrices = legs.map((leg) => Number(leg.maePrice)).filter((value) => Number.isFinite(value) && value > 0);
+  const mfePrice = !mfePrices.length ? null : direction === "short" ? Math.min(...mfePrices) : Math.max(...mfePrices);
+  const maePrice = !maePrices.length ? null : direction === "short" ? Math.max(...maePrices) : Math.min(...maePrices);
+  const mfeLeg = mfePrice == null ? null : legs.find((leg) => Number(leg.mfePrice) === mfePrice);
+  const maeLeg = maePrice == null ? null : legs.find((leg) => Number(leg.maePrice) === maePrice);
+  const lastLeg = [...legs].sort((a, b) => String(a.closeTime || "").localeCompare(String(b.closeTime || ""))).at(-1) || base;
+  const minimumPositive = (field) => {
+    const values = legs.map((leg) => Number(leg[field])).filter((value) => Number.isFinite(value) && value > 0);
+    return values.length ? Math.min(...values) : null;
+  };
+  const minimumFinite = (field) => {
+    const values = legs.map((leg) => leg[field]).filter((value) => value !== "" && value != null && Number.isFinite(Number(value))).map(Number);
+    return values.length ? Math.min(...values) : null;
+  };
+  const maximumFinite = (field) => {
+    const values = legs.map((leg) => leg[field]).filter((value) => value !== "" && value != null && Number.isFinite(Number(value))).map(Number);
+    return values.length ? Math.max(...values) : null;
+  };
+  const riskDistance = entry != null && stopLoss != null && entry !== stopLoss ? Math.abs(entry - stopLoss) : null;
+  const priceMfeR = riskDistance && mfePrice != null
+    ? (direction === "short" ? Math.max(0, entry - mfePrice) : Math.max(0, mfePrice - entry)) / riskDistance
+    : null;
+  const priceMaeR = riskDistance && maePrice != null
+    ? -(direction === "short" ? Math.max(0, maePrice - entry) : Math.max(0, entry - maePrice)) / riskDistance
+    : null;
+  const storedMfeValues = legs.map((leg) => Number(leg.mfeR)).filter(Number.isFinite);
+  const storedMaeValues = legs.map((leg) => Number(leg.maeR)).filter(Number.isFinite);
   return {
     ...base,
     localId: base?.localId || crypto.randomUUID(),
@@ -3724,17 +3882,66 @@ function consolidateMt4Position(positions) {
     commission: Number(sum("commission").toFixed(2)),
     swap: Number(sum("swap").toFixed(2)),
     initialRiskMoney,
-    r: isSmallLossBe ? 0 : riskUnavailable ? null : Number((profit / initialRiskMoney).toFixed(6)),
+    r: riskUnavailable ? null : isSmallLossBe ? 0 : Number((profit / initialRiskMoney).toFixed(6)),
     grossR: riskUnavailable ? null : Number((sum("grossProfit") / initialRiskMoney).toFixed(6)),
-    entry: mt4WeightedValue(legs, "entry"),
+    entry,
+    stopLoss,
     exitPrice: mt4WeightedValue(legs, "exitPrice"),
+    mfePrice,
+    mfeR: riskUnavailable ? null : priceMfeR ?? (storedMfeValues.length ? Math.max(...storedMfeValues) : null),
+    maePrice,
+    maeR: riskUnavailable ? null : priceMaeR ?? (storedMaeValues.length ? Math.min(...storedMaeValues) : null),
+    trackingStartedAt: legs.find((leg) => Number(leg.trackingDelaySeconds) === minimumFinite("trackingDelaySeconds"))?.trackingStartedAt || base?.trackingStartedAt || "",
+    trackingDelaySeconds: minimumFinite("trackingDelaySeconds"),
+    monitoredSeconds: maximumFinite("monitoredSeconds"),
+    monitoringGapSeconds: maximumFinite("monitoringGapSeconds"),
+    monitoringCoveragePct: maximumFinite("monitoringCoveragePct"),
+    sampleCount: maximumFinite("sampleCount"),
+    holdingSeconds: maximumFinite("holdingSeconds"),
+    mfeTime: mfeLeg?.mfeTime || base?.mfeTime || "",
+    mfeSeconds: mfeLeg?.mfeSeconds ?? maximumFinite("mfeSeconds"),
+    maeTime: maeLeg?.maeTime || base?.maeTime || "",
+    maeSeconds: maeLeg?.maeSeconds ?? maximumFinite("maeSeconds"),
+    first05RSeconds: minimumPositive("first05RSeconds"),
+    first10RSeconds: minimumPositive("first10RSeconds"),
+    first15RSeconds: minimumPositive("first15RSeconds"),
+    first20RSeconds: minimumPositive("first20RSeconds"),
+    first25RSeconds: minimumPositive("first25RSeconds"),
+    first30RSeconds: minimumPositive("first30RSeconds"),
+    firstMinus05RSeconds: minimumPositive("firstMinus05RSeconds"),
+    firstMinus10RSeconds: minimumPositive("firstMinus10RSeconds"),
+    finalStopLoss: lastLeg?.finalStopLoss ?? lastLeg?.stopLoss ?? null,
+    finalTakeProfit: lastLeg?.finalTakeProfit ?? lastLeg?.takeProfit ?? null,
+    stopChangeCount: maximumFinite("stopChangeCount"),
+    firstStopChangeTime: legs.map((leg) => leg.firstStopChangeTime).filter(Boolean).sort()[0] || "",
+    breakevenTime: legs.map((leg) => leg.breakevenTime).filter(Boolean).sort()[0] || "",
+    takeProfitChangeCount: maximumFinite("takeProfitChangeCount"),
+    favorableSeconds: maximumFinite("favorableSeconds"),
+    adverseSeconds: maximumFinite("adverseSeconds"),
+    favorableTimePct: maximumFinite("favorableTimePct"),
+    plannedRR: earliestLeg?.plannedRR ?? maximumFinite("plannedRR"),
+    maxLockedR: maximumFinite("maxLockedR"),
+    maxRiskR: maximumFinite("maxRiskR"),
+    maxGivebackR: maximumFinite("maxGivebackR"),
+    slTightenCount: maximumFinite("slTightenCount"),
+    slWidenCount: maximumFinite("slWidenCount"),
+    entryAtrPoints: earliestLeg?.entryAtrPoints ?? null,
+    entryAdx: earliestLeg?.entryAdx ?? null,
+    entryEmaGapPoints: earliestLeg?.entryEmaGapPoints ?? null,
+    entryPreviousDayPositionPct: earliestLeg?.entryPreviousDayPositionPct ?? null,
+    balanceAtEntry: earliestLeg?.balanceAtEntry ?? null,
+    equityAtEntry: earliestLeg?.equityAtEntry ?? null,
+    freeMarginAtEntry: earliestLeg?.freeMarginAtEntry ?? null,
+    riskPctEquity: earliestLeg?.riskPctEquity ?? null,
+    openTradesAtEntry: earliestLeg?.openTradesAtEntry ?? null,
+    sameSymbolTradesAtEntry: earliestLeg?.sameSymbolTradesAtEntry ?? null,
     entrySpreadPoints: mt4WeightedValue(legs, "entrySpreadPoints"),
     exitSpreadPoints: mt4WeightedValue(legs, "exitSpreadPoints"),
     maxSpreadPoints: Math.max(...legs.map((leg) => Number(leg.maxSpreadPoints)).filter(Number.isFinite), 0),
     spreadCostEstimate: Number(sum("spreadCostEstimate").toFixed(2)),
     outcome: isSmallLossBe ? "be" : profit > 0 ? "win" : "loss",
     riskUnavailable,
-    captureQuality: riskUnavailable ? "missing_initial_sl" : legs.every((leg) => !leg.captureQuality || leg.captureQuality === "complete") ? "complete" : "partial_capture",
+    captureQuality: positionCaptureQuality,
     exitReason: legs.length > 1 ? "partial_exit" : base?.exitReason,
     review: [`MT4 分批出場已合併：${legs.length} 段（Ticket ${tickets.join("、")}）`, ...reviews].join(" · "),
     source: "TradingNote MT4 EA",
@@ -3789,13 +3996,11 @@ function importMt4JournalText(text) {
   let skipped = 0;
   for (const [groupKey, incomingLegs] of groupedIncoming) {
     const existingPositions = localTrades.filter((trade) => trade.batchId === activeLiveBatch && mt4PositionGroupKey(trade) === groupKey);
-    const existingTickets = new Set(existingPositions.flatMap(mt4TradeLegs).map((leg) => `${leg.account || "unknown"}:${leg.ticket || leg.externalId}`));
     const uniqueIncoming = [...new Map(incomingLegs.map((leg) => [`${leg.account || "unknown"}:${leg.ticket || leg.externalId}`, leg])).values()];
-    const newLegs = uniqueIncoming.filter((leg) => !existingTickets.has(`${leg.account || "unknown"}:${leg.ticket || leg.externalId}`));
-    skipped += incomingLegs.length - newLegs.length;
-    if (!newLegs.length) continue;
+    skipped += incomingLegs.length - uniqueIncoming.length;
+    if (!uniqueIncoming.length) continue;
     localTrades = localTrades.filter((trade) => !(trade.batchId === activeLiveBatch && mt4PositionGroupKey(trade) === groupKey));
-    localTrades.push(consolidateMt4Position([...existingPositions, ...newLegs]));
+    localTrades.push(consolidateMt4Position([...existingPositions, ...uniqueIncoming]));
     added += 1;
   }
   saveLocalTrades();
@@ -4532,4 +4737,11 @@ els.navLinks.forEach((link) => {
 });
 
 window.addEventListener("hashchange", () => setPage(window.location.hash.slice(1)));
+document.querySelector("[data-page='trades'] thead")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-trade-sort]");
+  if (!button) return;
+  const key = button.dataset.tradeSort;
+  tradeTableSort = { key, direction: tradeTableSort.key === key && tradeTableSort.direction === "desc" ? "asc" : "desc" };
+  renderRows(filteredTrades());
+});
 setPage(window.location.hash.slice(1) || "dashboard");

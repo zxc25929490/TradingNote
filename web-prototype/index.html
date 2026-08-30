@@ -6,7 +6,8 @@
     <script>try{if(sessionStorage.getItem('tradingnote.system-switching')==='1')document.documentElement.classList.add('system-transition-pending')}catch(_){}</script>
     <title>TradingNote Analytics</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260821-2" />
+    <link rel="stylesheet" href="styles.css?v=20260829-sort-1" />
+    <link rel="stylesheet" href="tp-analysis.css?v=20260828-9" />
     <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2" />
   </head>
   <body>
@@ -33,6 +34,7 @@
         <a href="#trades" data-page-link="trades"><span aria-hidden="true">≡</span>交易紀錄</a>
         <span class="nav-section-title">實盤工具</span>
         <a href="#checklist" data-page-link="checklist"><span aria-hidden="true">✓</span>交易檢查</a>
+        <a href="#tp-analysis" data-page-link="tp-analysis"><span aria-hidden="true">⌁</span>TP 統計</a>
         <a href="#calculator" data-page-link="calculator"><span aria-hidden="true">％</span>風控計算</a>
       </nav>
     </aside>
@@ -495,21 +497,21 @@
             <table>
               <thead>
                 <tr>
-                  <th>日期</th>
-                  <th>#</th>
-                  <th>商品</th>
-                  <th>結果</th>
-                  <th>損益</th>
-                  <th>R 倍數</th>
-                  <th>手數</th>
-                  <th>止損點數</th>
-                  <th>Entry</th>
-                  <th>SL</th>
-                  <th>TP</th>
-                  <th>Mamba</th>
-                  <th>Mamba R</th>
-                  <th>策略</th>
-                  <th>來源</th>
+                  <th><button class="table-sort active" type="button" data-trade-sort="date" data-direction="desc">日期</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="id">#</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="pair">商品</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="outcome">結果</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="profit">損益</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="r">R 倍數</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="lots">手數</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="slPips">止損點數</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="entry">Entry</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="stopLoss">SL</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="takeProfit">TP</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="mambaDecision">Mamba</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="mambaR">Mamba R</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="setup">策略</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="source">來源</button></th>
                 </tr>
               </thead>
               <tbody id="tradeRows"></tbody>
@@ -655,6 +657,67 @@
           <div id="checklistItems" class="checklist"></div>
           <div id="tradeGate" class="trade-gate">NO TRADE</div>
         </section>
+      </section>
+
+      <section id="tp-analysis" class="page" data-page="tp-analysis">
+        <section class="tp-hero">
+          <div>
+            <p class="eyebrow">TP EXIT LAB</p>
+            <h2>用持倉最有利點校準 TP</h2>
+            <p>每筆交易只計算一次：從進場價到整段持倉最有利價格，換算成曾經走到幾 R；分批出場不改變這個最高點。</p>
+          </div>
+          <div class="tp-hero-status"><span>目前樣本</span><strong id="tpHeroSample">0</strong><small id="tpHeroBatch">尚無資料</small></div>
+        </section>
+
+        <form id="tpAnalysisForm" class="tp-controls">
+          <label>商品<select id="tpMarketFilter"><option value="all">全部商品</option></select></label>
+          <label>Setup<select id="tpSetupFilter"><option value="all">全部 Setup</option></select></label>
+          <label>Session<select id="tpSessionFilter"><option value="all">全部 Session</option></select></label>
+          <label>策略版本<select id="tpStrategyFilter"><option value="all">全部版本</option></select></label>
+          <label>測試 TP 從（R）<input id="tpMinInput" type="number" min="0.25" max="10" step="0.25" value="0.5" required /></label>
+          <label>測試 TP 到（R）<input id="tpMaxInput" type="number" min="0.5" max="10" step="0.25" value="5" required /></label>
+          <label>每次增加（R）<input id="tpStepInput" type="number" min="0.05" max="2" step="0.05" value="0.25" required /></label>
+          <label class="tp-reference-toggle"><input id="tpIncludeInterrupted" type="checkbox" checked /><span><b>納入監控曾中斷的交易</b><small>有最高浮盈與 R 就能測試 TP，但只當參考，不算高可信度樣本。</small></span></label>
+          <button class="primary-button" type="submit">重新分析</button>
+        </form>
+
+        <div class="tp-plain-guide" aria-label="名詞白話說明">
+          <article><strong>最多曾賺</strong><span>進場後到出場前，這筆交易最高一度來到幾 R；原本叫 MFE。</span></article>
+          <article><strong>最多曾虧</strong><span>進場後到出場前，這筆交易最深一度虧到幾 R；原本叫 MAE。</span></article>
+          <article><strong>計算方式</strong><span>做多：（持倉最高價－進場價）÷ 初始停損距離；做空：（進場價－持倉最低價）÷ 初始停損距離。</span></article>
+        </div>
+
+        <div id="tpQualityMetrics" class="tp-quality-metrics"></div>
+        <article id="tpRecommendation" class="tp-recommendation"></article>
+
+        <div class="tp-analysis-grid">
+          <article class="panel tp-study-panel">
+            <div class="panel-heading"><div><h3>各個 TP 曾經到達的比例</h3><p>例如 1R 顯示 60%，代表 10 筆完整持倉中約有 6 筆的最有利價格曾走到 +1R。</p></div></div>
+            <div id="tpReachChart" class="tp-reach-chart"></div>
+          </article>
+          <article class="panel tp-study-panel">
+            <div class="panel-heading"><div><h3>持倉最有利／不利距離分布</h3><p>只看行情從進場後實際曾走到多遠，不使用分批出場或最終損益。</p></div></div>
+            <div id="tpDistribution" class="tp-distribution"></div>
+          </article>
+        </div>
+
+        <article class="panel tp-table-panel">
+          <div class="panel-heading">
+            <div><h3>不同固定 TP 的純路徑測試</h3><p>最有利價格曾碰到測試 TP 就算 +TP R；未碰到一律按固定 SL -1R。完全忽略分批出場與實際出場結果。</p></div>
+            <span id="tpTableSummary" class="score-badge">等待資料</span>
+          </div>
+          <div class="table-wrap">
+            <table class="tp-result-table">
+              <thead><tr><th>測試 TP</th><th>曾到達比例</th><th>固定 SL 理論平均</th><th>最近樣本平均</th><th>獲利／虧損比</th><th>最大回落</th><th>比固定 1R 多／少</th><th>判讀</th></tr></thead>
+              <tbody id="tpResultRows"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <aside class="tp-method-note">
+          <strong>這份統計可以怎麼看</strong>
+          <p>同一筆交易不論分幾次出場都只算一筆。系統會從所有 Ticket 找出整段持倉最有利的價格，再以原始進場價與初始 SL 換算 R。所有候選 TP 都使用同一規則：碰到 TP 算 +TP R，沒碰到算 -1R；分批出場口數、各段結果與最終實際 R 完全不參與計算。</p>
+        </aside>
       </section>
 
       <section id="calculator" class="page" data-page="calculator">
@@ -881,17 +944,17 @@
           <div>
             <p class="eyebrow">MT4 JOURNAL BRIDGE</p>
             <h2>貼上 EA 交易記錄</h2>
-            <p>在記事本全選複製，貼到下方即可。同帳號、商品、方向、開倉時間與開倉價會合併成一筆，重複 Ticket 會略過。</p>
+            <p>在記事本全選複製，貼到下方即可。同帳號、商品、方向、開倉時間與開倉價會合併成一筆；相同 Ticket 會更新缺少的 EA 路徑資料。</p>
           </div>
           <button class="icon-button" value="cancel" type="button" id="closeMt4ImportDialog" aria-label="關閉">×</button>
         </div>
         <div class="mt4-import-guide">
           <span><b>1</b> MT4：檔案 → 開啟資料夾 → MQL4 → Files</span>
-          <span><b>2</b> 打開 <code>TradingNote_MT4_Journal.tsv</code> 並複製全部</span>
+          <span><b>2</b> 新版 EA：打開 <code>TradingNote_MT4_Journal_v3.tsv</code> 並複製全部</span>
           <span><b>3</b> 貼上、匯入，之後可手動清空記事本</span>
         </div>
         <label class="mt4-paste-label" for="mt4PasteInput">記事本內容</label>
-        <textarea id="mt4PasteInput" class="mt4-import-textarea" rows="13" spellcheck="false" placeholder="record_version&#9;source&#9;account&#9;ticket&#9;...&#10;1&#9;TradingNote MT4 EA&#9;123456&#9;987654&#9;..."></textarea>
+        <textarea id="mt4PasteInput" class="mt4-import-textarea" rows="13" spellcheck="false" placeholder="record_version&#9;source&#9;account&#9;ticket&#9;...&#10;2&#9;TradingNote MT4 EA&#9;123456&#9;987654&#9;..."></textarea>
         <div id="mt4ImportPreview" class="batch-preview mt4-import-preview">
           <strong>等待貼上</strong>
           <span>必須包含 EA 產生的標題列；空白內容不會改動網站資料。</span>
@@ -940,7 +1003,8 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
-    <script src="app.js?v=20260826-be-not-loss"></script>
+    <script src="tp-analysis.js?v=20260828-9"></script>
+    <script src="app.js?v=20260829-sort-1"></script>
     <script src="../shared/system-transition.js?v=20260821-2"></script>
   </body>
 </html>

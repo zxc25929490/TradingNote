@@ -44,6 +44,7 @@ const functionNames = [
   "prepareBackupTrade",
   "prepareTradeForActiveBatch",
   "tradesInActiveBatch",
+  "enrichTradeFields",
   "parseMt4Journal",
   "mt4Number",
   "mt4PositiveNumber",
@@ -71,11 +72,18 @@ const headers = [
   "commission", "swap", "net_profit", "gross_r", "net_r", "mfe_price", "mfe_r", "mae_price", "mae_r",
   "exit_efficiency_pct", "entry_spread_points", "exit_spread_points", "max_spread_points", "spread_cost_estimate",
   "exit_reason", "exit_slippage_points", "regime", "volatility", "htf_alignment", "session", "broker_utc_offset",
-  "comment", "capture_quality",
+  "comment", "capture_quality", "tracking_started_at", "tracking_delay_seconds", "monitored_seconds", "monitoring_gap_seconds",
+  "monitoring_coverage_pct", "sample_count", "holding_seconds", "mfe_time", "mfe_seconds", "mae_time", "mae_seconds",
+  "first_0_5r_seconds", "first_1r_seconds", "first_1_5r_seconds", "first_2r_seconds", "first_2_5r_seconds", "first_3r_seconds",
+  "first_minus_0_5r_seconds", "first_minus_1r_seconds", "final_stop_loss", "final_take_profit", "stop_change_count",
+  "first_stop_change_time", "breakeven_time", "take_profit_change_count", "favorable_seconds", "adverse_seconds", "favorable_time_pct",
+  "planned_rr", "max_locked_r", "max_risk_r", "max_giveback_r", "sl_tighten_count", "sl_widen_count",
+  "entry_atr_points", "entry_adx", "entry_ema_gap_points", "entry_previous_day_position_pct", "balance_at_entry",
+  "equity_at_entry", "free_margin_at_entry", "risk_pct_equity", "open_trades_at_entry", "same_symbol_trades_at_entry",
 ];
 
 const values = {
-  record_version: "1",
+  record_version: "2",
   source: "TradingNote MT4 EA",
   account: "123456",
   ticket: "987654",
@@ -116,6 +124,50 @@ const values = {
   broker_utc_offset: "3.0",
   comment: "manual setup",
   capture_quality: "complete",
+  tracking_started_at: "2026-08-18 09:31:23",
+  tracking_delay_seconds: "1",
+  monitored_seconds: "2420",
+  monitoring_gap_seconds: "0",
+  monitoring_coverage_pct: "99.20",
+  sample_count: "1800",
+  holding_seconds: "2440",
+  mfe_time: "2026-08-18 10:05:00",
+  mfe_seconds: "2020",
+  mae_time: "2026-08-18 09:35:00",
+  mae_seconds: "218",
+  first_0_5r_seconds: "300",
+  first_1r_seconds: "720",
+  first_1_5r_seconds: "1200",
+  first_2r_seconds: "1800",
+  first_2_5r_seconds: "",
+  first_3r_seconds: "",
+  first_minus_0_5r_seconds: "",
+  first_minus_1r_seconds: "",
+  final_stop_loss: "23100.5",
+  final_take_profit: "23200.5",
+  stop_change_count: "2",
+  first_stop_change_time: "2026-08-18 09:50:00",
+  breakeven_time: "2026-08-18 09:55:00",
+  take_profit_change_count: "1",
+  favorable_seconds: "1700",
+  adverse_seconds: "720",
+  favorable_time_pct: "70.25",
+  planned_rr: "2.0000",
+  max_locked_r: "1.0000",
+  max_risk_r: "1.2000",
+  max_giveback_r: "1.3500",
+  sl_tighten_count: "2",
+  sl_widen_count: "1",
+  entry_atr_points: "450.0",
+  entry_adx: "27.5",
+  entry_ema_gap_points: "125.0",
+  entry_previous_day_position_pct: "72.5",
+  balance_at_entry: "10000.0",
+  equity_at_entry: "9950.0",
+  free_margin_at_entry: "9200.0",
+  risk_pct_equity: "2.5126",
+  open_trades_at_entry: "2",
+  same_symbol_trades_at_entry: "1",
 };
 
 const row = headers.map((header) => values[header] ?? "").join("\t");
@@ -130,9 +182,22 @@ assert.equal(trades[0].pair, "NAS100");
 assert.equal(trades[0].direction, "Long");
 assert.equal(trades[0].profit, 405.5);
 assert.equal(trades[0].r, 1.622);
+assert.equal(trades[0].mfePrice, 23220.5);
 assert.equal(trades[0].mfeR, 2.4);
+assert.equal(trades[0].maePrice, 23080.5);
 assert.equal(trades[0].maeR, -0.4);
 assert.equal(trades[0].exitEfficiencyPct, 67.58);
+assert.equal(trades[0].holdingSeconds, 2440);
+assert.equal(trades[0].first20RSeconds, 1800);
+assert.equal(trades[0].monitoringCoveragePct, 99.2);
+assert.equal(trades[0].stopChangeCount, 2);
+assert.equal(trades[0].breakevenTime, "2026-08-18 09:55:00");
+assert.equal(trades[0].plannedRR, 2);
+assert.equal(trades[0].maxLockedR, 1);
+assert.equal(trades[0].maxGivebackR, 1.35);
+assert.equal(trades[0].entryAdx, 27.5);
+assert.equal(trades[0].riskPctEquity, 2.5126);
+assert.equal(trades[0].sameSymbolTradesAtEntry, 1);
 assert.equal(sandbox.tradeIdentityFingerprint(trades[0]), sandbox.tradeIdentityFingerprint(trades[1]));
 
 const partialExitValues = {
@@ -147,6 +212,8 @@ const partialExitValues = {
   swap: "-0.50",
   net_profit: "247.75",
   net_r: "1.9820",
+  mfe_price: "23250.5",
+  mae_price: "23070.5",
 };
 const partialJournal = `${headers.join("\t")}\n${row}\n${headers.map((header) => partialExitValues[header] ?? "").join("\t")}\n`;
 const partialTrades = sandbox.normalizeMt4JournalRows(sandbox.parseMt4Journal(partialJournal));
@@ -158,7 +225,33 @@ assert.equal(consolidated.profit, 653.25);
 assert.equal(consolidated.initialRiskMoney, 375);
 assert.equal(consolidated.r, 1.742);
 assert.equal(consolidated.closeTime, "2026-08-18 10:35:00");
+assert.equal(consolidated.mfePrice, 23250.5);
+assert.equal(consolidated.mfeR, 3);
+assert.equal(consolidated.maePrice, 23070.5);
+assert.equal(consolidated.maeR, -0.6);
+assert.equal(consolidated.maxGivebackR, 1.35);
+assert.equal(consolidated.riskPctEquity, 2.5126);
 assert.match(consolidated.review, /分批出場已合併：2 段/);
+const oldImportedLeg = {
+  ...partialTrades[0],
+  localId: "keep-existing-id",
+  mfePrice: null,
+  maePrice: null,
+  mfeR: 0.4,
+  maeR: -0.2,
+  lesson: "保留既有復盤",
+};
+const refreshedExistingTicket = sandbox.consolidateMt4Position([oldImportedLeg, partialTrades[0]]);
+assert.equal(refreshedExistingTicket.mfePrice, 23220.5, "re-importing the same ticket must backfill its favorable price");
+assert.equal(refreshedExistingTicket.maePrice, 23080.5, "re-importing the same ticket must backfill its adverse price");
+assert.equal(refreshedExistingTicket.mfeR, 2.4);
+assert.equal(refreshedExistingTicket.localId, "keep-existing-id");
+assert.equal(refreshedExistingTicket.lesson, "保留既有復盤");
+const reconstructedPartial = sandbox.consolidateMt4Position([
+  partialTrades[0],
+  { ...partialTrades[1], captureQuality: "attached_mid_trade" },
+]);
+assert.equal(reconstructedPartial.captureQuality, "complete_partial_exit");
 assert.equal(
   sandbox.consolidateMt4Trades([
     { ...partialTrades[0], batchId: "live-a" },
@@ -189,7 +282,9 @@ assert.equal(missingRiskTrade.takeProfit, null);
 assert.equal(missingRiskTrade.slPips, null);
 assert.equal(missingRiskTrade.initialRiskMoney, null);
 assert.equal(missingRiskTrade.r, null);
+assert.equal(missingRiskTrade.mfePrice, 23220.5);
 assert.equal(missingRiskTrade.mfeR, null);
+assert.equal(missingRiskTrade.maePrice, 23080.5);
 assert.equal(missingRiskTrade.maeR, null);
 assert.equal(missingRiskTrade.exitEfficiencyPct, null);
 assert.equal(missingRiskTrade.riskUnavailable, true);

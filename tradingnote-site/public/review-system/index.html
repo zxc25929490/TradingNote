@@ -11,6 +11,10 @@
   <link rel="stylesheet" href="analysis-switcher.css?v=20260822-1">
   <link rel="stylesheet" href="review-form.css?v=20260823-1">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
+  <style>
+    .table-sort{display:inline-flex;align-items:center;gap:6px;width:max-content;padding:2px 0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;white-space:nowrap;cursor:pointer}
+    .table-sort::after{content:"↕";color:var(--muted);font-size:.78em;opacity:.45}.table-sort.active{color:var(--teal)}.table-sort.active[data-direction="asc"]::after{content:"↑";opacity:1}.table-sort.active[data-direction="desc"]::after{content:"↓";opacity:1}.table-sort:hover{color:var(--teal)}
+  </style>
 </head>
 <body>
   <aside class="sidebar">
@@ -51,7 +55,7 @@
         <label class="search">搜尋<input id="searchInput" type="search" placeholder="日期、商品、Setup 或筆記"></label>
       </div>
       <div class="table-wrap" id="reviewTableWrap">
-        <table><thead><tr><th>日期</th><th>商品／Setup</th><th>策略版本</th><th>結果</th><th>復盤分類</th><th>R 落差</th><th></th></tr></thead><tbody id="reviewRows"></tbody></table>
+        <table><thead><tr><th><button class="table-sort active" type="button" data-review-sort="date" data-direction="desc">日期</button></th><th><button class="table-sort" type="button" data-review-sort="pair">商品／Setup</button></th><th><button class="table-sort" type="button" data-review-sort="strategy">策略版本</button></th><th><button class="table-sort" type="button" data-review-sort="r">結果</button></th><th><button class="table-sort" type="button" data-review-sort="reviewClass">復盤分類</button></th><th><button class="table-sort" type="button" data-review-sort="gap">R 落差</button></th><th></th></tr></thead><tbody id="reviewRows"></tbody></table>
       </div>
       <div id="emptyState" class="empty" hidden><b>這個篩選沒有紀錄</b><span>切換分類，或新增一筆符合策略但漏掉的機會。</span></div>
     </section>
@@ -100,7 +104,7 @@
   </dialog>
   <div id="toast" class="toast" hidden></div>
   <script src="../web-prototype/data/trades.js"></script>
-  <script src="app.js?v=20260821-1"></script>
+  <script src="app.js?v=20260829-sort-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
 </body>
 </html>

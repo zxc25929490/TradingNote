@@ -10,6 +10,10 @@
   <link rel="stylesheet" href="readability.css?v=20260821-1">
   <link rel="stylesheet" href="research-ui.css?v=20260821-1">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
+  <style>
+    .table-sort{display:inline-flex;align-items:center;gap:6px;width:max-content;padding:2px 0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;white-space:nowrap;cursor:pointer}
+    .table-sort::after{content:"↕";color:var(--muted);font-size:.78em;opacity:.45}.table-sort.active{color:var(--teal)}.table-sort.active[data-direction="asc"]::after{content:"↑";opacity:1}.table-sort.active[data-direction="desc"]::after{content:"↓";opacity:1}.table-sort:hover{color:var(--teal)}
+  </style>
 </head>
 <body>
   <aside class="sidebar">
@@ -64,7 +68,7 @@
       <div class="grid two"><article class="panel wide"><div class="panel-head"><span><b>Equity Curve</b><small>累積 R · 回測樣本</small></span></div><div id="equityChart" class="line-chart"></div></article><article class="panel"><div class="panel-head"><span><b>Monthly R</b><small>按月份比較策略表現</small></span></div><div id="monthlyBars" class="v-bars"></div></article></div>
       <div class="grid three"><article class="panel"><div class="panel-head"><span><b>Win / Loss</b><small>結果分布</small></span></div><div id="resultDonut" class="donut"></div></article><article class="panel"><div class="panel-head"><span><b>Mistake Distribution</b><small>最常重複的決策錯誤</small></span></div><div id="mistakeBars" class="h-bars"></div></article><article class="panel focus"><span>01</span><b>降低與 Mamba 的方向分歧</b><p>優先驗證「高週期方向」與「等待收線」兩條規則。</p></article></div>
     </section>
-    <section id="journal" class="page"><div class="toolbar"><input id="search" placeholder="搜尋編號、市場、筆記或錯誤…"><select id="marketFilter"><option value="all">全部市場</option><option>DJ30</option><option>NAS100</option></select></div><div class="table-wrap"><table><thead><tr><th>日期 / ID</th><th>市場</th><th>模型</th><th>我的決策</th><th>Mamba</th><th>一致</th><th>信心</th><th>結果</th><th>錯誤標籤</th></tr></thead><tbody id="tradeRows"></tbody></table></div></section>
+    <section id="journal" class="page"><div class="toolbar"><input id="search" placeholder="搜尋編號、市場、筆記或錯誤…"><select id="marketFilter"><option value="all">全部市場</option><option>DJ30</option><option>NAS100</option></select></div><div class="table-wrap"><table><thead><tr><th><button class="table-sort active" type="button" data-journal-sort="date" data-direction="desc">日期 / ID</button></th><th><button class="table-sort" type="button" data-journal-sort="market">市場</button></th><th><button class="table-sort" type="button" data-journal-sort="setup">模型</button></th><th><button class="table-sort" type="button" data-journal-sort="mine">我的決策</button></th><th><button class="table-sort" type="button" data-journal-sort="mentor">Mamba</button></th><th><button class="table-sort" type="button" data-journal-sort="agreement">一致</button></th><th><button class="table-sort" type="button" data-journal-sort="confidence">信心</button></th><th><button class="table-sort" type="button" data-journal-sort="r">結果</button></th><th><button class="table-sort" type="button" data-journal-sort="mistakes">錯誤標籤</button></th></tr></thead><tbody id="tradeRows"></tbody></table></div></section>
     <section id="strategies" class="page"><div class="hero strategy-hero"><span><small>STRATEGY VERSION CONTROL</small><b>策略版本庫</b><p>回測前先固定規則；鎖定後只能複製新版，避免事後改寫條件。</p></span><button id="addStrategy" class="primary">＋ 新增策略版本</button></div><div id="strategyCards" class="strategy-cards"></div><div id="strategyEmpty" class="empty-state" hidden>尚未建立策略版本。</div></section>
     <section id="differences" class="page"><div class="hero"><span><small>DECISION GAP LAB</small><b>只研究「我和 Mamba 不一樣」的時刻</b><p>分歧不是錯誤本身，而是最有價值的學習樣本。</p></span><strong id="diffCount">0<small>筆決策分歧</small></strong></div><div id="differenceGrid" class="cards"></div></section>
     <section id="rules" class="page"><div class="rule-shell"><div class="rule-list"><div class="section-title"><span><small>SYSTEM DNA</small><b>Trading Rule Book</b></span><button id="addRule">＋</button></div><div id="ruleList"></div></div><div id="ruleDetail" class="rule-detail"></div></div></section>
@@ -134,7 +138,7 @@
     </form>
   </dialog>
   <script src="../web-prototype/data/trades.js"></script>
-  <script src="app.js?v=20260821-2"></script>
+  <script src="app.js?v=20260829-sort-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
 </body>
 </html>
