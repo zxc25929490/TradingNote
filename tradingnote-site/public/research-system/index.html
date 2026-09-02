@@ -9,10 +9,12 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="readability.css?v=20260821-1">
   <link rel="stylesheet" href="research-ui.css?v=20260821-1">
+  <link rel="stylesheet" href="tp-simulator.css?v=20260901-1">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
   <style>
     .table-sort{display:inline-flex;align-items:center;gap:6px;width:max-content;padding:2px 0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;white-space:nowrap;cursor:pointer}
     .table-sort::after{content:"↕";color:var(--muted);font-size:.78em;opacity:.45}.table-sort.active{color:var(--teal)}.table-sort.active[data-direction="asc"]::after{content:"↑";opacity:1}.table-sort.active[data-direction="desc"]::after{content:"↓";opacity:1}.table-sort:hover{color:var(--teal)}
+    .sidebar{display:block;overflow-x:hidden;overflow-y:auto;scrollbar-width:auto;scrollbar-color:#74797b transparent}.sidebar nav{min-height:auto;overflow:visible;padding-bottom:8px}.sidebar::-webkit-scrollbar{width:13px}.sidebar::-webkit-scrollbar-track{background:transparent}.sidebar::-webkit-scrollbar-thumb{border:3px solid transparent;border-radius:999px;background:#74797b;background-clip:padding-box}.sidebar::-webkit-scrollbar-thumb:hover{background:#93989a;background-clip:padding-box}.cycle{position:static;margin:24px 4px 0}@media(max-width:760px){.cycle{display:none}}
   </style>
 </head>
 <body>
@@ -27,6 +29,7 @@
     <nav id="nav">
       <button class="active" data-view="dashboard">▦ <span>研究總覽</span></button>
       <button data-view="journal">◎ <span>回測紀錄</span></button>
+      <button data-view="tpsimulator">◎ <span>TP 模擬器</span></button>
       <button data-view="strategies">◇ <span>策略版本</span></button>
       <button data-view="differences">≠ <span>決策差異</span><em id="diffBadge">0</em></button>
       <button data-view="rules">✓ <span>Rule Book</span></button>
@@ -74,6 +77,21 @@
     <section id="rules" class="page"><div class="rule-shell"><div class="rule-list"><div class="section-title"><span><small>SYSTEM DNA</small><b>Trading Rule Book</b></span><button id="addRule">＋</button></div><div id="ruleList"></div></div><div id="ruleDetail" class="rule-detail"></div></div></section>
     <section id="mistakes" class="page"><div class="hero"><span><small>PATTERN RECOGNITION</small><b>重複錯誤資料庫</b><p>消除會重複出現的行為模式。</p></span></div><div id="mistakeTable" class="mistake-table"></div></section>
     <section id="analytics" class="page"><div id="analyticsCards" class="metrics four"></div><div class="grid two"><article class="panel"><div class="panel-head"><b>Expectancy by Confidence</b></div><div id="confidenceBars" class="v-bars tall"></div></article><article class="panel"><div class="panel-head"><b>Agreement Edge</b></div><div id="agreementBars" class="v-bars tall"></div></article></div></section>
+    <section id="tpsimulator" class="page">
+      <div class="hero tp-hero"><span><small>TP EXIT LAB</small><b>TP 出場模擬器</b><p>把每筆回測 R 視為最高曾到達的 R，估算固定 TP 與分批出場的命中率、期望值及回撤。</p></span><strong id="tpSampleCount">0<small>筆可用樣本</small></strong></div>
+      <form id="tpSimulatorForm" class="tp-controls panel">
+        <div class="tp-leg-head"><b>出場段</b><span>TP R</span><span>出場比例</span></div>
+        <label><b>TP1</b><input name="tp1" type="number" min="0.25" step="0.25" value="1"><input name="pct1" type="number" min="0" max="100" step="5" value="30"></label>
+        <label><b>TP2</b><input name="tp2" type="number" min="0.25" step="0.25" value="2"><input name="pct2" type="number" min="0" max="100" step="5" value="30"></label>
+        <label><b>TP3</b><input name="tp3" type="number" min="0.25" step="0.25" value="3"><input name="pct3" type="number" min="0" max="100" step="5" value="40"></label>
+        <div class="tp-assumptions"><label>未命中虧損<input name="lossR" type="number" min="0" step="0.05" value="1"><small>R</small></label><label>第一段命中後<select name="protection"><option value="be">其餘未命中部位保本</option><option value="sl">其餘部位仍可能 -SL</option></select></label><button class="primary" type="submit">重新模擬</button></div>
+        <p id="tpPlanMessage" class="tp-plan-message"></p>
+      </form>
+      <div id="tpMetrics" class="metrics four"></div>
+      <div class="grid two tp-grid"><article class="panel"><div class="panel-head"><span><b>模擬累積 R</b><small>依目前斷點的交易日期排序</small></span></div><div id="tpEquityChart" class="line-chart tp-equity-chart"></div></article><article class="panel"><div class="panel-head"><span><b>各 TP 命中率</b><small>命中率本身已包含勝敗樣本</small></span></div><div id="tpHitBars" class="tp-hit-bars"></div></article></div>
+      <article class="panel"><div class="panel-head"><span><b>固定 TP 建議排行</b><small>以 0.25R 間距探索；這是樣本內統計，請用新資料驗證。</small></span></div><div class="table-wrap"><table><thead><tr><th>排名</th><th>固定 TP</th><th>命中</th><th>命中率</th><th>期望值</th><th>總 R</th><th>最大回撤</th></tr></thead><tbody id="tpRecommendationRows"></tbody></table></div></article>
+      <p class="tp-disclaimer">限制：最高 R 無法判斷同一根 K 棒內 TP 與 SL 的先後順序。本模擬依「曾達到 TP 即成交」計算，適合篩選出場區間，不等同逐 Tick 回放。</p>
+    </section>
     <section id="reality" class="page">
       <div class="hero reality-hero"><span><small>BACKTEST REALITY CHECK</small><b>同日期回測 vs 實盤績效</b><p>只比較兩邊都有資料的日期，找出策略理論與實際執行之間的落差。</p></span><div class="reality-actions"><span id="actualSource">尚未讀取實盤資料</span><button id="refreshActual" class="secondary">重新讀取 TradingNote</button><button id="importActual" class="secondary">匯入實盤 JSON</button><input id="actualFile" type="file" accept="application/json,.json" hidden></div></div>
       <div id="realityMetrics" class="metrics four"></div>
@@ -138,7 +156,8 @@
     </form>
   </dialog>
   <script src="../web-prototype/data/trades.js"></script>
-  <script src="app.js?v=20260829-sort-1"></script>
+  <script src="tp-simulator-core.js?v=20260901-1"></script>
+  <script src="app.js?v=20260901-tp-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
 </body>
 </html>

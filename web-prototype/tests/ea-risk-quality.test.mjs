@@ -63,6 +63,40 @@ assert.equal(repaired.initialRiskMoney, null);
 assert.equal(repaired.r, null);
 assert.equal(repaired.captureQuality, "missing_initial_sl");
 
+const correctedNasR = sandbox.enrichTradeFields({
+  source: "TradingNote MT4 EA",
+  externalId: "MT4:test:225",
+  pair: "NAS100.R",
+  entry: 29115.15,
+  stopLoss: 29140.15,
+  lots: 12,
+  slPips: 2500,
+  profit: 585,
+  grossProfit: 600,
+  initialRiskMoney: 30000,
+  r: 0.0195,
+  grossR: 0.02,
+});
+assert.equal(correctedNasR.slPips, 25);
+assert.equal(correctedNasR.initialRiskMoney, 300);
+assert.equal(correctedNasR.r, 1.95);
+assert.equal(correctedNasR.grossR, 2);
+
+const correctedDjR = sandbox.enrichTradeFields({
+  source: "TradingNote MT4 EA",
+  externalId: "MT4:test:small-loss",
+  pair: "DJ30.R",
+  entry: 53666.31,
+  stopLoss: 53636.31,
+  lots: 10,
+  profit: -25,
+  initialRiskMoney: 300,
+  r: -0.083333,
+  outcome: "loss",
+});
+assert.equal(correctedDjR.r, -25 / 300);
+assert.equal(correctedDjR.outcome, "loss");
+
 const stats = sandbox.computeStats([
   { pair: "NAS100", profit: 100, r: 1, riskUnavailable: false },
   { pair: "US30", profit: -20, r: null, riskUnavailable: true },

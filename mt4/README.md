@@ -1,4 +1,4 @@
-# TradingNote MT4 Journal EA
+# TradingNote MT4 Journal EA v4
 
 這個 EA 不會下單或修改訂單，只負責監控帳戶中的市價單，並在平倉後把交易追加到純文字檔，供 TradingNote local index 貼上匯入。
 
@@ -6,7 +6,7 @@
 
 1. 在 MT4 選擇「檔案 → 開啟資料夾」。
 2. 把 `TradingNoteJournalEA.mq4` 複製到 `MQL4/Experts/`。
-3. 用 MT4 的 MetaEditor 開啟 `.mq4` 後按 Compile，產生新版 `.ex4`。資料夾內既有的 `.ex4` 是舊版，不包含 v3 完整分析資料。
+3. 用 MT4 的 MetaEditor 開啟 `.mq4` 後按 Compile，產生 v4 `.ex4`。未重新編譯前，資料夾內既有的 `.ex4` 不包含 v4 修正。
 4. 回到 MT4，在導覽器重新整理 EA，拖到任一張持續有報價的圖表。
 5. 保持 MT4、EA 及 AutoTrading 開啟。EA 不會送單，但 MT4 必須允許 EA 執行。
 
@@ -15,12 +15,12 @@
 ## 匯入網站
 
 1. 在 MT4 選擇「檔案 → 開啟資料夾 → MQL4 → Files」。
-2. 用記事本打開 `TradingNote_MT4_Journal_v3.tsv`，全選並複製。
+2. 用記事本打開 `TradingNote_MT4_Journal_v4.tsv`，全選並複製。
 3. 在 local index 選擇「資料管理 → 貼上 MT4 EA 記錄」。
 4. 貼上並按「智慧合併」。網站以 `帳號 + Ticket` 去重。
-5. 匯入完成後，可手動清空 `TradingNote_MT4_Journal_v3.tsv`。下一筆平倉時 EA 會自動補回標題列。
+5. 匯入完成後，可手動清空 `TradingNote_MT4_Journal_v4.tsv`。下一筆平倉時 EA 會自動補回標題列。
 
-不要刪除 `TradingNote_MT4_ExportedTickets_v3.txt`，它負責避免清空記事本後重新輸出舊單。`TradingNote_MT4_OpenState_v3.tsv` 保存未平倉交易的路徑與風控事件進度。
+不要刪除 `TradingNote_MT4_ExportedTickets_v4.txt`，它負責避免清空記事本後重新輸出舊單。`TradingNote_MT4_OpenState_v4.tsv` 保存未平倉交易的路徑與風控事件進度。首次啟動 v4 時，EA 會讀取既有 v3 checkpoint 與 open-state，避免重複輸出並延續尚未平倉的追蹤資料。
 
 ## 記錄內容
 
@@ -30,7 +30,7 @@
 - SL／TP 出場滑價（正數代表較有利）
 - H1 趨勢／盤整、波動程度、HTF 同向性與券商時段
 
-## v3 完整持倉資料
+## v4 完整持倉資料
 
 - 持倉最高／最低可成交價，以及各自發生時間。
 - 首次到達 +0.5R、+1R、+1.5R、+2R、+2.5R、+3R 與 -0.5R、-1R 的秒數。

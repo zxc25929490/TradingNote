@@ -1,4 +1,4 @@
-const KEYS={trades:'tradingnote.localTrades',deleted:'tradingnote.deletedTrades',batches:'tradingnote.liveBatches',active:'tradingnote.activeLiveBatch',strategies:'tradingnote.strategyVersions.v1',backtests:'trs.trades',backtestBatches:'trs.batches',activeBacktest:'trs.activeBatch'};
+const KEYS={trades:'tradingnote.localTrades',deleted:'tradingnote.deletedTrades',batches:'tradingnote.liveBatches',active:'tradingnote.activeLiveBatch',strategies:'tradingnote.strategyVersions.v1',backtests:'trs.trades',backtestBatches:'trs.batches',activeBacktest:'trs.activeBatch',tolerance:'tradingnote.analysisTolerance'};
 const ATTR=[['missedTradeR','漏單'],['earlyExitR','提早出場'],['extraTradeR','額外亂做'],['lateEntryR','進場位置不同'],['slippageR','滑價／交易成本'],['marketDriftR','市場狀態差異']];
 const ACTIONS={missedTradeR:'固定交易時段並建立漏單提醒；沒有下單也要留下機會紀錄。',earlyExitR:'出場前先檢查原始失效條件，避免只因浮盈回吐就手動平倉。',extraTradeR:'把不符合策略的單獨立標記，連續出現時啟用當日停手機制。',lateEntryR:'把進場觸發條件寫成可觀察事件，降低猶豫後追價。',slippageR:'記錄點差與滑價，只在成本仍符合最低 RR 時執行。',marketDriftR:'把波動、新聞與市場狀態加入策略適用條件。'};
 const $=selector=>document.querySelector(selector),$$=selector=>[...document.querySelectorAll(selector)];
@@ -29,6 +29,8 @@ function refreshData(){
   backtestTrades=readArray(KEYS.backtests);backtestBatches=readArray(KEYS.backtestBatches);strategies=readArray(KEYS.strategies);
   activeLive=localStorage.getItem(KEYS.active)||activeLive||liveBatches[0].id;
   activeBacktest=localStorage.getItem(KEYS.activeBacktest)||activeBacktest||backtestBatches[0]?.id||'';
+  const savedToleranceRaw=localStorage.getItem(KEYS.tolerance),savedTolerance=Number(savedToleranceRaw);
+  if(savedToleranceRaw!==null&&Number.isFinite(savedTolerance))tolerance=Math.max(.05,Math.min(2,savedTolerance));
 }
 
 function batchLive(){return activeLive==='live-all'?liveTrades:liveTrades.filter(trade=>(trade.batchId||'live-default')===activeLive)}
@@ -48,6 +50,10 @@ function stats(items){
 function trend(items){const values=items.filter(trade=>finite(trade.r)).map(trade=>Number(trade.r));if(values.length<8)return{ready:false,delta:0};const cut=Math.max(4,Math.floor(values.length*.65)),before=values.slice(0,cut),recent=values.slice(cut),avg=list=>list.reduce((sum,value)=>sum+value,0)/list.length;return{ready:true,delta:avg(recent)-avg(before),recent:avg(recent),before:avg(before)}}
 function reviewRate(live){return live.length?live.filter(trade=>trade.reviewClass).length/live.length*100:0}
 function pairedDates(live,backtest){const dates=new Set(live.map(dateOf).filter(Boolean));return new Set(backtest.map(dateOf).filter(date=>dates.has(date))).size}
+function consistencyScore(executionGap,strategyGap,directGap,currentTolerance=tolerance){
+  const closeness=gap=>Math.max(0,1-Math.abs(gap)/(Math.max(.01,currentTolerance)*2));
+  return Math.round((closeness(executionGap)*.4+closeness(strategyGap)*.35+closeness(directGap)*.25)*100);
+}
 
 function diagnose(data){
   const live=stats(data.live),review=stats(data.review),backtest=stats(data.backtest),reviewed=reviewRate(data.live),paired=pairedDates(data.live,data.backtest);
@@ -61,7 +67,9 @@ function diagnose(data){
   else if(strategyAligned)scenario={number:'3',key:'replicated',label:'③ EDGE REPLICATED',title:'三層績效目前基本一致',description:'策略理論值、當下規則判讀與真正執行都落在容許範圍內，實盤正在複製回測 Edge。',tone:'good'};
   else if(strategyGap>tolerance&&enough)scenario={number:'4',key:'regime',label:'④ STRATEGY / REGIME WATCH',title:'執行接近復盤，但長期低於回測',description:'執行不是主要問題。檢查策略適用環境、波動結構與 Edge 是否衰退；不要只因單月差異就改規則。',tone:'warn'};
   else scenario={number:'2',key:'quality',label:'② BACKTEST QUALITY GAP',title:'實盤執行接近復盤，但與回測判讀不同',description:'優先檢查 Hindsight Bias、支撐壓力主觀性、規則版本與回測是否使用未來資訊。',tone:'warn'};
-  return{live,review,backtest,reviewed,paired,executionGap,strategyGap,directGap,executionAligned,strategyAligned,directAligned,enough,trends,allDeclining,scenario};
+  const consistency=live.count&&review.count&&backtest.count?consistencyScore(executionGap,strategyGap,directGap):null;
+  const confidence=Math.round((Math.min(1,live.count/20)*.4+Math.min(1,backtest.count/20)*.4+Math.min(1,reviewed/60)*.2)*100);
+  return{live,review,backtest,reviewed,paired,executionGap,strategyGap,directGap,executionAligned,strategyAligned,directAligned,consistency,confidence,enough,trends,allDeclining,scenario};
 }
 
 function populateControls(){
@@ -72,6 +80,7 @@ function populateControls(){
   $('#marketSelect').innerHTML='<option value="all">全部商品</option>'+markets.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join('');$('#marketSelect').value=markets.includes(oldMarket)?oldMarket:'all';
   const ids=[...new Set([...batchLive(),...batchBacktest()].map(strategyOf))],label=id=>{if(id==='unassigned')return'未綁定策略';const item=strategies.find(strategy=>String(strategy.id)===String(id));return item?`${item.name} ${item.version}`:'已刪除的策略版本'};
   $('#strategySelect').innerHTML='<option value="all">全部版本</option>'+ids.map(id=>`<option value="${esc(id)}">${esc(label(id))}</option>`).join('');$('#strategySelect').value=ids.includes(oldStrategy)?oldStrategy:'all';
+  $('#toleranceInput').value=String(tolerance);$('#toleranceValue').textContent=`${tolerance.toFixed(2)}R`;
 }
 
 function metric(label,value,note,tone=''){return`<article class="${tone}"><span>${label}</span><b>${value}</b><small>${note}</small></article>`}
@@ -81,11 +90,12 @@ function renderHero(result){
 function renderChain(result){
   [['backtest',result.backtest],['live',result.live],['review',result.review]].forEach(([name,value])=>{$(`#${name}Total`).textContent=value.count?signed(value.total):'—';$(`#${name}Meta`).textContent=value.count?`${value.count} 筆有 R · Avg ${signed(value.avg)}`:'目前沒有可計算 R 的資料'});
   const retention=result.backtest.avg?result.live.avg/result.backtest.avg*100:null;
-  $('#gapMetrics').innerHTML=[metric('Execution Gap',result.review.count&&result.live.count?signed(result.live.avg-result.review.avg,'R／筆'):'—','實盤 − 復盤',result.executionAligned?'good':'bad'),metric('Strategy Definition Gap',result.backtest.count&&result.review.count?signed(result.review.avg-result.backtest.avg,'R／筆'):'—','復盤 − 回測',result.strategyAligned?'good':'warn'),metric('Edge 複製率',retention!=null?`${retention.toFixed(1)}%`:'—','實盤 Avg R ÷ 回測 Avg R',retention!=null&&retention>=80?'good':'warn'),metric('同日期覆蓋',`${result.paired} 天`,'兩邊同日有紀錄',result.paired>=10?'good':'')].join('');
+  const consistencyTone=result.consistency==null?'':result.consistency>=80?'good':result.consistency>=60?'warn':'bad';
+  $('#gapMetrics').innerHTML=[metric('三層一致性評分',result.consistency==null?'—':`${result.consistency} 分`,`樣本可信度 ${result.confidence}% · 容許值 ±${tolerance.toFixed(2)}R`,consistencyTone),metric('Execution Gap',result.review.count&&result.live.count?signed(result.live.avg-result.review.avg,'R／筆'):'—','實盤 − 復盤',result.executionAligned?'good':'bad'),metric('Strategy Definition Gap',result.backtest.count&&result.review.count?signed(result.review.avg-result.backtest.avg,'R／筆'):'—','復盤 − 回測',result.strategyAligned?'good':'warn'),metric('Edge 複製率',retention!=null?`${retention.toFixed(1)}%`:'—','實盤 Avg R ÷ 回測 Avg R',retention!=null&&retention>=80?'good':'warn'),metric('同日期覆蓋',`${result.paired} 天`,'兩邊同日有紀錄',result.paired>=10?'good':'')].join('');
 }
 function curvePoints(values,min,max){let total=0;const totals=values.map(value=>(total+=value));if(!totals.length)return'';return totals.map((value,index)=>`${values.length===1?500:index/(values.length-1)*980+10},${245-(value-min)/(max-min||1)*225}`).join(' ')}
 function renderCurve(result){
-  const series=[result.backtest.values,result.live.values,result.review.values],all=[0];series.forEach(values=>{let total=0;values.forEach(value=>{total+=value;all.push(total)})});if(series.some(values=>!values.length)){$('#tripleCurve').innerHTML='<div class="empty">三層都具有 R 資料後，才會顯示完整曲線。</div>';return}const min=Math.min(...all),max=Math.max(...all),colors=['#7392ff','#27d3b4','#b094ff'];$('#tripleCurve').innerHTML=`<svg viewBox="0 0 1000 260" preserveAspectRatio="none" aria-label="回測、實盤與復盤累積 R 曲線">${series.map((values,index)=>{const points=curvePoints(values,min,max),last=points.split(' ').at(-1).split(',');return`<polyline class="${['bt','lv','rv'][index]}" points="${points}"/><circle cx="${last[0]}" cy="${last[1]}" r="4" fill="${colors[index]}"/>`}).join('')}</svg>`;
+  const series=[{className:'bt',color:'#7392ff',values:result.backtest.values},{className:'rv',color:'#b094ff',values:result.review.values},{className:'lv',color:'#27d3b4',values:result.live.values}],all=[0];series.forEach(item=>{let total=0;item.values.forEach(value=>{total+=value;all.push(total)})});if(series.some(item=>!item.values.length)){$('#tripleCurve').innerHTML='<div class="empty">三層都具有 R 資料後，才會顯示完整曲線。</div>';return}const min=Math.min(...all),max=Math.max(...all);$('#tripleCurve').innerHTML=`<svg viewBox="0 0 1000 260" preserveAspectRatio="none" aria-label="回測、實盤與復盤累積 R 曲線">${series.map(item=>{const points=curvePoints(item.values,min,max),last=points.split(' ').at(-1).split(','),liveStyle=item.className==='lv'?'style="stroke-width:3;stroke-dasharray:8 5"':'';return`<polyline class="${item.className}" ${liveStyle} points="${points}"/><circle class="${item.className}" cx="${last[0]}" cy="${last[1]}" r="4" fill="${item.color}"/>`}).join('')}</svg>`;
 }
 function check(label,note,ok,warning=false){const tone=ok?'good':warning?'warn':'bad';return`<article class="${tone}"><i>${ok?'✓':warning?'!':'×'}</i><div><b>${label}</b><small>${note}</small></div><strong>${ok?'一致':warning?'觀察':'有落差'}</strong></article>`}
 function renderRelationships(result){
@@ -149,7 +159,7 @@ function toast(message){const node=$('#toast');node.textContent=message;node.hid
 $('#liveBatchSelect').onchange=event=>{activeLive=event.target.value;localStorage.setItem(KEYS.active,activeLive);populateControls();render()};
 $('#backtestBatchSelect').onchange=event=>{activeBacktest=event.target.value;if(activeBacktest)localStorage.setItem(KEYS.activeBacktest,activeBacktest);populateControls();render()};
 ['marketSelect','strategySelect'].forEach(id=>$('#'+id).onchange=render);
-$('#toleranceInput').oninput=event=>{tolerance=Number(event.target.value);$('#toleranceValue').textContent=`${tolerance.toFixed(2)}R`;render()};
+$('#toleranceInput').oninput=event=>{tolerance=Number(event.target.value);localStorage.setItem(KEYS.tolerance,String(tolerance));$('#toleranceValue').textContent=`${tolerance.toFixed(2)}R`;render()};
 $('#refreshButton').onclick=()=>{reload();toast('已重新讀取實盤、復盤與回測資料。')};
 $('#monteCarloForm').onsubmit=event=>{event.preventDefault();runMonteCarlo()};
 $$('nav button').forEach(button=>button.onclick=()=>{$$('nav button').forEach(item=>item.classList.toggle('active',item===button));$$('.page').forEach(page=>page.classList.toggle('active',page.id===button.dataset.view));$('#pageTitle').textContent={diagnosis:'三層績效診斷',execution:'Execution Gap 分析',strategy:'策略與 Edge 診斷',montecarlo:'三層 Monte Carlo'}[button.dataset.view];if(button.dataset.view==='montecarlo')requestAnimationFrame(()=>{if(!monteCarloResults)runMonteCarlo();else ['Live','Review','Backtest'].forEach(name=>drawMonteCarlo($(`#mc${name}Chart`),monteCarloResults[name]))})});

@@ -196,7 +196,13 @@ button {
   position: fixed;
   inset: 0 auto 0 0;
   width: 232px;
+  max-height: 100dvh;
   padding: 22px 16px;
+  padding-bottom: 32px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   background: #15191d;
   color: #f4f7f8;
 }
@@ -1343,8 +1349,11 @@ input[readonly] {
   margin-top: 5px;
 }
 
-.best-day-track {
+.best-day-rule .best-day-track {
   grid-column: 1 / -1;
+  height: 8px;
+  padding: 0;
+  border: 0;
 }
 
 .ftmo-discipline {
@@ -3370,6 +3379,8 @@ td:nth-child(12) {
   .sidebar {
     position: static;
     width: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   nav {

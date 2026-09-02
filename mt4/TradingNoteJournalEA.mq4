@@ -1,10 +1,12 @@
 #property strict
-#property version   "3.00"
+#property version   "4.00"
 #property description "Records MT4 closed trades for TradingNote local import."
 
-input string JournalFileName = "TradingNote_MT4_Journal_v3.tsv";
-input string StateFileName = "TradingNote_MT4_OpenState_v3.tsv";
-input string ExportedTicketsFileName = "TradingNote_MT4_ExportedTickets_v3.txt";
+input string JournalFileName = "TradingNote_MT4_Journal_v4.tsv";
+input string StateFileName = "TradingNote_MT4_OpenState_v4.tsv";
+input string ExportedTicketsFileName = "TradingNote_MT4_ExportedTickets_v4.txt";
+string LegacyStateFileName = "TradingNote_MT4_OpenState_v3.tsv";
+string LegacyExportedTicketsFileName = "TradingNote_MT4_ExportedTickets_v3.txt";
 input int TimerSeconds = 1;
 input int MagicNumberFilter = -1; // -1 = all manual and EA trades
 input ENUM_TIMEFRAMES AnalysisTimeframe = PERIOD_H1;
@@ -180,6 +182,11 @@ double PointSize(string symbol)
 
 double MoneyForDistance(string symbol, double lots, double priceDistance)
 {
+   // These broker index symbols expose tick value at a scale that does not
+   // match realized account P/L. Use displayed index points and lots directly.
+   if(symbol == "NAS100.R" || symbol == "US100.R" || symbol == "DJ30.R" || symbol == "US30.R")
+      return MathAbs(priceDistance) * lots;
+
    double point = PointSize(symbol);
    double tickSizePoints = MarketInfo(symbol, MODE_TICKSIZE);
    double tickValue = MarketInfo(symbol, MODE_TICKVALUE);
@@ -306,10 +313,9 @@ void AddExportedTicket(int ticket)
    FileClose(handle);
 }
 
-void LoadExportedTickets()
+void LoadExportedTicketsFromFile(string fileName)
 {
-   ArrayResize(exportedTickets, 0);
-   int handle = FileOpen(ExportedTicketsFileName, FILE_READ | FILE_TXT | FILE_ANSI | FILE_SHARE_READ | FILE_SHARE_WRITE);
+   int handle = FileOpen(fileName, FILE_READ | FILE_TXT | FILE_ANSI | FILE_SHARE_READ | FILE_SHARE_WRITE);
    if(handle == INVALID_HANDLE) return;
    while(!FileIsEnding(handle))
    {
@@ -321,6 +327,28 @@ void LoadExportedTickets()
       exportedTickets[count] = ticket;
    }
    FileClose(handle);
+}
+
+void SaveExportedTicketsCheckpoint()
+{
+   int handle = FileOpen(ExportedTicketsFileName, FILE_WRITE | FILE_TXT | FILE_ANSI | FILE_SHARE_READ | FILE_SHARE_WRITE);
+   if(handle == INVALID_HANDLE)
+   {
+      Print("TradingNote: cannot migrate exported-ticket checkpoint. Error ", GetLastError());
+      return;
+   }
+   for(int i = 0; i < ArraySize(exportedTickets); i++)
+      FileWriteString(handle, IntegerToString(exportedTickets[i]) + "\r\n");
+   FileClose(handle);
+}
+
+void LoadExportedTickets()
+{
+   ArrayResize(exportedTickets, 0);
+   bool hasV4Checkpoint = FileIsExist(ExportedTicketsFileName);
+   if(!hasV4Checkpoint) LoadExportedTicketsFromFile(LegacyExportedTicketsFileName);
+   LoadExportedTicketsFromFile(ExportedTicketsFileName);
+   if(!hasV4Checkpoint && ArraySize(exportedTickets) > 0) SaveExportedTicketsCheckpoint();
 }
 
 void AddSelectedOrder()
@@ -626,7 +654,7 @@ bool ExportClosedTracker(int index)
 
    string values[];
    ArrayResize(values, 85);
-   values[0] = "2";
+   values[0] = "4";
    values[1] = "TradingNote MT4 EA";
    values[2] = IntegerToString(AccountNumber());
    values[3] = IntegerToString(ticket);
@@ -641,7 +669,8 @@ bool ExportClosedTracker(int index)
    values[12] = tracker.initialStop > 0 ? NumberText(tracker.initialStop, (int)MarketInfo(tracker.symbol, MODE_DIGITS)) : "";
    values[13] = tracker.takeProfit > 0 ? NumberText(tracker.takeProfit, (int)MarketInfo(tracker.symbol, MODE_DIGITS)) : "";
    values[14] = NumberText(closePrice, (int)MarketInfo(tracker.symbol, MODE_DIGITS));
-   values[15] = tracker.initialRiskPrice > 0 ? NumberText(tracker.initialRiskPrice / PointSize(tracker.symbol), 1) : "";
+   bool isCashIndexR = tracker.symbol == "NAS100.R" || tracker.symbol == "US100.R" || tracker.symbol == "DJ30.R" || tracker.symbol == "US30.R";
+   values[15] = tracker.initialRiskPrice > 0 ? NumberText(isCashIndexR ? tracker.initialRiskPrice : tracker.initialRiskPrice / PointSize(tracker.symbol), 1) : "";
    values[16] = tracker.initialRiskMoney > 0 ? NumberText(tracker.initialRiskMoney, 2) : "";
    values[17] = NumberText(grossProfit, 2);
    values[18] = NumberText(commission, 2);
@@ -747,7 +776,10 @@ void SaveTrackers()
 void LoadTrackers()
 {
    ArrayResize(trackers, 0);
-   int handle = FileOpen(StateFileName, FILE_READ | FILE_CSV | FILE_ANSI | FILE_SHARE_READ, '\t');
+   string loadStateFileName = StateFileName;
+   if(!FileIsExist(loadStateFileName) && FileIsExist(LegacyStateFileName))
+      loadStateFileName = LegacyStateFileName;
+   int handle = FileOpen(loadStateFileName, FILE_READ | FILE_CSV | FILE_ANSI | FILE_SHARE_READ, '\t');
    if(handle == INVALID_HANDLE) return;
    if(!FileIsEnding(handle))
    {

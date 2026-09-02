@@ -632,21 +632,29 @@ function enrichTradeFields(trade) {
   const lots = Number.isFinite(Number(trade.lots)) && Number(trade.lots) > 0 ? Number(trade.lots) : null;
   const needsFallbackRisk = Boolean(trade.riskUnavailable || trade.r == null || !Number.isFinite(Number(trade.r)));
   const canUseFallbackRisk = Boolean(fallbackSlPips && lots && needsFallbackRisk);
-  const initialRiskMoney = canUseFallbackRisk ? lots * fallbackSlPips : recordedInitialRiskMoney;
-  const riskUnavailable = Boolean(!canUseFallbackRisk && (trade.riskUnavailable || (isEaTrade && (!stopLoss || !initialRiskMoney))));
   const derivedSlPips =
     entry && stopLoss && entry !== stopLoss
       ? Math.abs(entry - stopLoss)
       : null;
-  const slPips = Number.isFinite(Number(trade.slPips)) && Number(trade.slPips) > 0
-    ? Number(trade.slPips)
+  // Some `.R` index exports carry initial risk/net R at the wrong scale.
+  // Rebuild cash risk from the same lots and initial SL distance shown in the UI.
+  const isRecalculatedIndex = /^(?:NAS100|US100|DJ30|US30)\.R$/.test(pair);
+  const recalculatedIndexRisk = isRecalculatedIndex && lots && derivedSlPips
+    ? lots * derivedSlPips
+    : null;
+  const initialRiskMoney = recalculatedIndexRisk ?? (canUseFallbackRisk ? lots * fallbackSlPips : recordedInitialRiskMoney);
+  const riskUnavailable = Boolean(!canUseFallbackRisk && (trade.riskUnavailable || (isEaTrade && (!stopLoss || !initialRiskMoney))));
+  const slPips = recalculatedIndexRisk != null
+    ? derivedSlPips
+    : Number.isFinite(Number(trade.slPips)) && Number(trade.slPips) > 0
+      ? Number(trade.slPips)
     : canUseFallbackRisk
       ? fallbackSlPips
       : derivedSlPips;
-  const fallbackR = canUseFallbackRisk && Number.isFinite(Number(trade.profit))
+  const fallbackR = (canUseFallbackRisk || recalculatedIndexRisk != null) && Number.isFinite(Number(trade.profit))
     ? Number(trade.profit) / initialRiskMoney
     : null;
-  const isSmallLossBe = Number.isFinite(Number(trade.profit)) && Number(trade.profit) >= -50 && Number(trade.profit) <= 0;
+  const isSmallLossBe = Number.isFinite(Number(trade.profit)) && Number(trade.profit) === 0;
   const derivedLots =
     slPips && Number(trade.r) !== 0 && Number.isFinite(Number(trade.profit)) && Number.isFinite(Number(trade.r))
       ? Math.abs(Number(trade.profit) / (Number(trade.r) * slPips))
@@ -660,7 +668,11 @@ function enrichTradeFields(trade) {
     initialRiskMoney,
     outcome: isSmallLossBe ? "be" : trade.outcome,
     r: riskUnavailable ? null : isSmallLossBe ? 0 : fallbackR ?? trade.r,
-    grossR: riskUnavailable ? null : trade.grossR,
+    grossR: riskUnavailable
+      ? null
+      : recalculatedIndexRisk != null && Number.isFinite(Number(trade.grossProfit))
+        ? Number(trade.grossProfit) / initialRiskMoney
+        : trade.grossR,
     mfeR: riskUnavailable ? null : trade.mfeR,
     maeR: riskUnavailable ? null : trade.maeR,
     exitEfficiencyPct: riskUnavailable ? null : trade.exitEfficiencyPct,
@@ -3817,7 +3829,7 @@ function consolidateMt4Position(positions) {
   const sum = (field) => legs.reduce((total, leg) => total + (Number.isFinite(Number(leg[field])) ? Number(leg[field]) : 0), 0);
   const lots = sum("lots");
   const profit = sum("profit");
-  const isSmallLossBe = profit >= -50 && profit <= 0;
+  const isSmallLossBe = profit === 0;
   const riskUnavailable = legs.some((leg) => leg.riskUnavailable || !Number.isFinite(Number(leg.initialRiskMoney)) || Number(leg.initialRiskMoney) <= 0);
   const initialRiskMoney = riskUnavailable ? null : sum("initialRiskMoney");
   const tickets = legs.map((leg) => String(leg.ticket || "")).filter(Boolean);
