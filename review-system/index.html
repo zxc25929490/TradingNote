@@ -93,17 +93,36 @@
         <label class="opportunity-only">紀錄類型<select name="recordType"><option value="missed_opportunity">符合策略但漏單</option></select></label>
         <label class="opportunity-only">策略版本<select name="strategyVersionId"><option value="">未綁定策略</option></select></label>
         <label class="full opportunity-only">Setup<input name="setup" type="text" placeholder="當時符合哪個模型或條件"></label>
-        <label class="full">復盤分類<select name="reviewClass" required><option value="">請選擇</option><option value="correct_execution">符合策略且執行正確</option><option value="execution_error">符合策略但執行錯誤</option><option value="rule_violation">不符合策略卻進場</option><option value="missed_trade">符合策略但漏單</option></select></label>
-        <fieldset class="full"><legend>少掉的 R（選填，填正數）</legend><label>漏單<input name="missedTradeR" type="number" step=".01" min="0"></label><label>提早出場<input name="earlyExitR" type="number" step=".01" min="0"></label><label>額外亂做<input name="extraTradeR" type="number" step=".01" min="0"></label><label>太晚進場<input name="lateEntryR" type="number" step=".01" min="0"></label><label>滑價／成本<input name="slippageR" type="number" step=".01" min="0"></label><label>市場狀態差異<input name="marketDriftR" type="number" step=".01" min="0"></label></fieldset>
-        <label class="full">這次發生什麼錯誤？<textarea name="review" rows="4" placeholder="當時怎麼判斷、哪個環節偏離規則、造成什麼結果"></textarea></label>
-        <label class="full">如何改善／下次行動<textarea name="improvement" rows="4" placeholder="下次遇到相同情境時，要等待什麼、停止什麼、具體怎麼做"></textarea></label>
+        <label class="replay-only">Replay 決策<select name="replayDecision"><option value="entry">進場</option><option value="skip">不進場</option></select></label>
+        <label class="replay-only replay-entry-field">Replay 方向<select name="replayDirection"><option value="Long">Long</option><option value="Short">Short</option></select></label>
+        <label class="replay-only replay-entry-field">Replay 進場時間<input name="replayEntryTime" type="time" step="1"></label>
+        <label class="replay-only replay-entry-field">Replay 最大到達 R<input name="replayR" type="number" step=".01" placeholder="例如 3.00 或 -1.00"></label>
+        <p class="full replay-only replay-hint">請依當時可見行情作答。提交前不會顯示原始方向、進場時間與結果。</p>
+        <label class="full opportunity-only">復盤分類<select name="reviewClass"><option value="">請選擇</option><option value="correct_execution">符合策略且執行正確</option><option value="execution_error">符合策略但執行錯誤</option><option value="rule_violation">不符合策略卻進場</option><option value="missed_trade">符合策略但漏單</option></select></label>
+        <fieldset class="full opportunity-only"><legend>少掉的 R（選填，填正數）</legend><label>漏單<input name="missedTradeR" type="number" step=".01" min="0"></label><label>提早出場<input name="earlyExitR" type="number" step=".01" min="0"></label><label>額外亂做<input name="extraTradeR" type="number" step=".01" min="0"></label><label>太晚進場<input name="lateEntryR" type="number" step=".01" min="0"></label><label>滑價／成本<input name="slippageR" type="number" step=".01" min="0"></label><label>市場狀態差異<input name="marketDriftR" type="number" step=".01" min="0"></label></fieldset>
+        <label class="full">Replay 判斷筆記（選填）<textarea name="review" rows="4" placeholder="當時看到哪些條件，以及為什麼在這個時間進場"></textarea></label>
+        <label class="full opportunity-only">如何改善／下次行動<textarea name="improvement" rows="4" placeholder="下次遇到相同情境時，要等待什麼、停止什麼、具體怎麼做"></textarea></label>
         <figure id="tradeImage" class="trade-image" hidden><img alt="交易截圖"><figcaption>原交易截圖</figcaption></figure>
       </div>
-      <footer><button id="cancelDialog" type="button">取消</button><button class="primary" type="submit">儲存復盤</button></footer>
+      <footer><button id="cancelDialog" type="button">取消</button><button class="primary" type="submit">提交並比較</button></footer>
+    </form>
+  </dialog>
+  <dialog id="sessionReplayDialog">
+    <form id="sessionReplayForm">
+      <input name="sessionKey" type="hidden">
+      <div class="dialog-head"><div><small>BLIND SESSION REPLAY</small><h2 id="sessionReplayTitle">交易時段 Replay</h2><p id="sessionReplaySummary"></p></div><button id="closeSessionReplay" type="button">×</button></div>
+      <section id="sessionReplayContext" class="review-context"></section>
+      <div class="session-replay-body">
+        <div class="session-replay-head"><div><b>你的 Replay 決策</b><small>沒有進場訊號就保持空白，直接提交。</small></div><button id="addReplayDecision" type="button">＋ 新增進場</button></div>
+        <div id="replayDecisionRows" class="replay-decision-rows"></div>
+        <label class="full">Replay 判斷筆記（選填）<textarea name="sessionNote" rows="3" placeholder="記錄當天的市場狀態與判斷依據"></textarea></label>
+      </div>
+      <footer><button id="cancelSessionReplay" type="button">取消</button><button class="primary" type="submit">提交並自動配對</button></footer>
     </form>
   </dialog>
   <div id="toast" class="toast" hidden></div>
   <script src="../web-prototype/data/trades.js"></script>
+  <script src="../shared/partial-exit.js?v=20260906-3"></script>
   <script src="app.js?v=20260829-sort-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
 </body>

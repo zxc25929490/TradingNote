@@ -34,11 +34,12 @@ function refreshData(){
 }
 
 function batchLive(){return activeLive==='live-all'?liveTrades:liveTrades.filter(trade=>(trade.batchId||'live-default')===activeLive)}
-function batchBacktest(){return backtestTrades.filter(trade=>String(trade.batchId||backtestBatches[0]?.id||'')===String(activeBacktest))}
+function maximumToRealized(value){return window.TradingNotePartialExit?.realizedR(value)??value}
+function batchBacktest(){return backtestTrades.filter(trade=>String(trade.batchId||backtestBatches[0]?.id||'')===String(activeBacktest)).map(trade=>({...trade,maximumR:trade.r,r:maximumToRealized(trade.r)}))}
 function filterItems(items){const market=$('#marketSelect').value||'all',strategy=$('#strategySelect').value||'all';return items.filter(trade=>(market==='all'||marketOf(trade)===market)&&(strategy==='all'||strategyOf(trade)===strategy))}
 function selectedData(){
   const live=filterItems(batchLive()),backtest=filterItems(batchBacktest());
-  const review=live.map(trade=>{const base=finite(trade.r)?Number(trade.r):0,recoverable=gapOf(trade);return{...trade,r:base+recoverable,liveR:finite(trade.r)?Number(trade.r):null,recoverable}}).filter(trade=>trade.liveR!=null||trade.recoverable>0);
+  const review=live.map(trade=>{const base=finite(trade.r)?Number(trade.r):0,recoverable=gapOf(trade),hasReplay=trade.replayDecision==='entry'&&finite(trade.replayR),replayValue=trade.replayDecision==='skip'?0:hasReplay?maximumToRealized(trade.replayR):base+recoverable;return{...trade,r:replayValue,maximumR:hasReplay?Number(trade.replayR):null,liveR:finite(trade.r)?Number(trade.r):null,recoverable}}).filter(trade=>trade.liveR!=null||trade.recoverable>0||trade.replayDecision);
   return{live,review,backtest};
 }
 
@@ -88,7 +89,7 @@ function renderHero(result){
   const item=result.scenario,node=$('#diagnosisHero');node.dataset.number=item.number;node.innerHTML=`<span class="status">${item.label}</span><h2>${item.title}</h2><p>${item.description}</p><footer><span>判斷容許值 ±${tolerance.toFixed(2)}R／筆</span><span>${result.enough?'樣本達基本門檻':'樣本仍需累積'}</span><span>復盤完成率 ${result.reviewed.toFixed(1)}%</span></footer>`;
 }
 function renderChain(result){
-  [['backtest',result.backtest],['live',result.live],['review',result.review]].forEach(([name,value])=>{$(`#${name}Total`).textContent=value.count?signed(value.total):'—';$(`#${name}Meta`).textContent=value.count?`${value.count} 筆有 R · Avg ${signed(value.avg)}`:'目前沒有可計算 R 的資料'});
+  [['backtest',result.backtest],['live',result.live],['review',result.review]].forEach(([name,value])=>{$(`#${name}Total`).textContent=value.count?signed(value.avg,'R AVG'):'—';$(`#${name}Meta`).textContent=value.count?`${value.count} 筆有 R · 總計 ${signed(value.total)}`:'目前沒有可計算 R 的資料'});
   const retention=result.backtest.avg?result.live.avg/result.backtest.avg*100:null;
   const consistencyTone=result.consistency==null?'':result.consistency>=80?'good':result.consistency>=60?'warn':'bad';
   $('#gapMetrics').innerHTML=[metric('三層一致性評分',result.consistency==null?'—':`${result.consistency} 分`,`樣本可信度 ${result.confidence}% · 容許值 ±${tolerance.toFixed(2)}R`,consistencyTone),metric('Execution Gap',result.review.count&&result.live.count?signed(result.live.avg-result.review.avg,'R／筆'):'—','實盤 − 復盤',result.executionAligned?'good':'bad'),metric('Strategy Definition Gap',result.backtest.count&&result.review.count?signed(result.review.avg-result.backtest.avg,'R／筆'):'—','復盤 − 回測',result.strategyAligned?'good':'warn'),metric('Edge 複製率',retention!=null?`${retention.toFixed(1)}%`:'—','實盤 Avg R ÷ 回測 Avg R',retention!=null&&retention>=80?'good':'warn'),metric('同日期覆蓋',`${result.paired} 天`,'兩邊同日有紀錄',result.paired>=10?'good':'')].join('');
@@ -162,5 +163,6 @@ $('#backtestBatchSelect').onchange=event=>{activeBacktest=event.target.value;if(
 $('#toleranceInput').oninput=event=>{tolerance=Number(event.target.value);localStorage.setItem(KEYS.tolerance,String(tolerance));$('#toleranceValue').textContent=`${tolerance.toFixed(2)}R`;render()};
 $('#refreshButton').onclick=()=>{reload();toast('已重新讀取實盤、復盤與回測資料。')};
 $('#monteCarloForm').onsubmit=event=>{event.preventDefault();runMonteCarlo()};
+window.addEventListener('tradingnote:partial-exit-change',reload);
 $$('nav button').forEach(button=>button.onclick=()=>{$$('nav button').forEach(item=>item.classList.toggle('active',item===button));$$('.page').forEach(page=>page.classList.toggle('active',page.id===button.dataset.view));$('#pageTitle').textContent={diagnosis:'三層績效診斷',execution:'Execution Gap 分析',strategy:'策略與 Edge 診斷',montecarlo:'三層 Monte Carlo'}[button.dataset.view];if(button.dataset.view==='montecarlo')requestAnimationFrame(()=>{if(!monteCarloResults)runMonteCarlo();else ['Live','Review','Backtest'].forEach(name=>drawMonteCarlo($(`#mc${name}Chart`),monteCarloResults[name]))})});
 reload();

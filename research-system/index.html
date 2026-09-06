@@ -111,7 +111,7 @@
         <label>我的決策<select name="mine"><option>Long</option><option>Short</option><option>No Trade</option></select></label>
         <label>Mamba 決策（選填）<select name="mentor"><option value="" selected>未記錄</option><option>Long</option><option>Short</option><option>No Trade</option></select></label>
         <label>Mamba TP（選填）<input name="mambaTp" type="number" step=".01" placeholder="例如 3 代表 3R"></label>
-        <label>R Multiple（選填）<input name="r" type="number" step=".01" placeholder="沒有交易可留空"></label>
+        <label>最大到達 R（選填）<input name="r" type="number" step=".01" placeholder="沒有交易可留空；系統依分批 TP 換算"></label>
         <label>Confidence<select name="confidence"><option>A</option><option>B</option><option>C</option></select></label>
         <label class="full">錯誤標籤（逗號分隔）<input name="mistakes" placeholder="Breakout Chase, FOMO"></label>
         <label class="full">交易筆記<textarea name="notes"></textarea></label>
@@ -156,6 +156,7 @@
     </form>
   </dialog>
   <script src="../web-prototype/data/trades.js"></script>
+  <script src="../shared/partial-exit.js?v=20260906-3"></script>
   <script src="tp-simulator-core.js?v=20260901-1"></script>
   <script src="app.js?v=20260901-tp-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
