@@ -262,6 +262,7 @@ const checklist = [
 const pageTitles = {
   dashboard: "交易績效儀表板",
   objectives: "挑戰目標與風險",
+  "income-goals": "收入目標",
   analytics: "深度數據分析",
   review: "行為與紀律分析",
   period: "週/月績效分析",
@@ -3183,6 +3184,7 @@ function refreshAfterDataChange() {
 }
 
 function render() {
+  window.renderIncomeGoals?.(tradesForActiveView(), activeLiveBatch, accountRules.initialBalance, liveBatchLabel(activeLiveBatch));
   const items = filteredTrades();
   const activeCount = [
     els.year.value !== "all",
@@ -3223,6 +3225,7 @@ function setPage(pageName) {
   if (nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "strategy" || nextPage === "research-lab") render();
   if (nextPage === "research-lab") window.requestAnimationFrame(() => renderMonteCarloSimulation(monteCarloResult));
   if (nextPage === "tp-analysis") window.requestAnimationFrame(() => window.renderTpAnalysis?.());
+  if (nextPage === "income-goals") window.renderIncomeGoals?.(tradesForActiveView(), activeLiveBatch, accountRules.initialBalance, liveBatchLabel(activeLiveBatch));
   if (nextPage === "calculator") renderReturnSimulation();
 }
 

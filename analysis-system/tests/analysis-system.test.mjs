@@ -5,6 +5,8 @@ const app = fs.readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const monteCarloCss = fs.readFileSync(new URL("../monte-carlo.css", import.meta.url), "utf8");
+const statistical = fs.readFileSync(new URL("../statistical-confidence.js", import.meta.url), "utf8");
+const statisticalCss = fs.readFileSync(new URL("../statistical-confidence.css", import.meta.url), "utf8");
 const siblingPages = [
   new URL("../../web-prototype/index.html", import.meta.url),
   new URL("../../research-system/index.html", import.meta.url),
@@ -47,6 +49,16 @@ assert.match(app, /三層一致性評分/);
 assert.match(app, /signed\(value\.avg,'R AVG'\)/);
 assert.match(app, /總計.*signed\(value\.total\)/);
 assert.match(app, /樣本可信度/);
+assert.match(html, /目前的交易樣本有多可靠？/);
+assert.match(html, /id="targetMoeSelect"/);
+assert.match(html, /id="practicalThresholdInput"/);
+assert.match(app, /TradingNoteStatistics/);
+assert.match(app, /策略從回測保留到復盤的比例/);
+assert.match(app, /復盤結果真正做到實盤的比例/);
+assert.match(statistical, /function welch/);
+assert.match(statistical, /樣本還不夠/);
+assert.match(statistical, /實盤明顯低於回測/);
+assert.match(statisticalCss, /statistical-layers/);
 assert.match(css, /performance-chain/);
 assert.match(css, /triple-curve/);
 assert.match(fs.readFileSync(new URL("../workflow-guide.css", import.meta.url), "utf8"), /workflow-path/);

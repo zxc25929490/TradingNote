@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="styles.css?v=20260822-1">
   <link rel="stylesheet" href="workflow-guide.css?v=20260823-1">
   <link rel="stylesheet" href="monte-carlo.css?v=20260822-1">
+  <link rel="stylesheet" href="statistical-confidence.css?v=20260911-1">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
 </head>
 <body>
@@ -55,6 +56,13 @@
       </section>
 
       <div id="gapMetrics" class="gap-metrics"></div>
+
+      <article class="panel statistical-panel">
+        <div class="panel-head statistical-head"><div><h3>目前的交易樣本有多可靠？</h3><p>依照每筆交易的起伏估算，不用固定筆數判斷。樣本不足不代表策略失效。</p></div><div class="statistical-controls"><label>希望誤差縮小到<select id="targetMoeSelect"><option value="0.30">±0.30R</option><option value="0.25">±0.25R</option><option value="0.20" selected>±0.20R</option><option value="0.15">±0.15R</option><option value="0.10">±0.10R</option></select></label><label>值得注意的最小落差<input id="practicalThresholdInput" type="number" min="0.01" step="0.01" value="0.20"><span>R／筆</span></label></div></div>
+        <div id="statisticalLayers" class="statistical-layers"></div>
+        <div id="statisticalComparison" class="statistical-comparison"></div>
+        <div id="retentionDiagnostics" class="retention-diagnostics"></div>
+      </article>
 
       <div class="grid two">
         <article class="panel chart-panel">
@@ -169,7 +177,8 @@
   <div id="toast" class="toast" hidden></div>
   <script src="../web-prototype/data/trades.js"></script>
   <script src="../shared/partial-exit.js?v=20260906-3"></script>
-  <script src="app.js?v=20260826-backtest-live-review"></script>
+  <script src="statistical-confidence.js?v=20260911-1"></script>
+  <script src="app.js?v=20260911-statistical-confidence"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
 </body>
 </html>

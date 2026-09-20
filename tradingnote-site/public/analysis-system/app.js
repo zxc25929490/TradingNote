@@ -1,4 +1,4 @@
-const KEYS={trades:'tradingnote.localTrades',deleted:'tradingnote.deletedTrades',batches:'tradingnote.liveBatches',active:'tradingnote.activeLiveBatch',strategies:'tradingnote.strategyVersions.v1',backtests:'trs.trades',backtestBatches:'trs.batches',activeBacktest:'trs.activeBatch',tolerance:'tradingnote.analysisTolerance'};
+const KEYS={trades:'tradingnote.localTrades',deleted:'tradingnote.deletedTrades',batches:'tradingnote.liveBatches',active:'tradingnote.activeLiveBatch',strategies:'tradingnote.strategyVersions.v1',backtests:'trs.trades',backtestBatches:'trs.batches',activeBacktest:'trs.activeBatch',tolerance:'tradingnote.analysisTolerance',targetMoe:'tradingnote.analysisTargetMoe',practicalThreshold:'tradingnote.analysisPracticalThreshold'};
 const ATTR=[['missedTradeR','漏單'],['earlyExitR','提早出場'],['extraTradeR','額外亂做'],['lateEntryR','進場位置不同'],['slippageR','滑價／交易成本'],['marketDriftR','市場狀態差異']];
 const ACTIONS={missedTradeR:'固定交易時段並建立漏單提醒；沒有下單也要留下機會紀錄。',earlyExitR:'出場前先檢查原始失效條件，避免只因浮盈回吐就手動平倉。',extraTradeR:'把不符合策略的單獨立標記，連續出現時啟用當日停手機制。',lateEntryR:'把進場觸發條件寫成可觀察事件，降低猶豫後追價。',slippageR:'記錄點差與滑價，只在成本仍符合最低 RR 時執行。',marketDriftR:'把波動、新聞與市場狀態加入策略適用條件。'};
 const $=selector=>document.querySelector(selector),$$=selector=>[...document.querySelectorAll(selector)];
@@ -18,7 +18,7 @@ function normalizeLiveTrade(trade){
   const smallLossBe=Number.isFinite(profit)&&profit>=-50&&profit<=0;
   return{...trade,outcome:smallLossBe?'be':trade.outcome,r:smallLossBe?0:isEa&&fallbackPips&&lots>0&&Number.isFinite(profit)?profit/(lots*fallbackPips):trade.r,slPips:isEa&&fallbackPips&&lots>0?fallbackPips:trade.slPips};
 }
-let liveTrades=[],liveBatches=[],backtestTrades=[],backtestBatches=[],strategies=[],activeLive='live-default',activeBacktest='',tolerance=.2,monteCarloResults=null;
+let liveTrades=[],liveBatches=[],backtestTrades=[],backtestBatches=[],strategies=[],activeLive='live-default',activeBacktest='',tolerance=.2,targetMoe=.2,practicalThreshold=.2,monteCarloResults=null;
 
 function refreshData(){
   const local=readArray(KEYS.trades).map((trade,index)=>normalizeLiveTrade({...trade,id:trade.id??100000+index,origin:'local',batchId:trade.batchId||'live-default'}));
@@ -31,14 +31,18 @@ function refreshData(){
   activeBacktest=localStorage.getItem(KEYS.activeBacktest)||activeBacktest||backtestBatches[0]?.id||'';
   const savedToleranceRaw=localStorage.getItem(KEYS.tolerance),savedTolerance=Number(savedToleranceRaw);
   if(savedToleranceRaw!==null&&Number.isFinite(savedTolerance))tolerance=Math.max(.05,Math.min(2,savedTolerance));
+  const savedMoe=Number(localStorage.getItem(KEYS.targetMoe)),savedPractical=Number(localStorage.getItem(KEYS.practicalThreshold));
+  if([.3,.25,.2,.15,.1].includes(savedMoe))targetMoe=savedMoe;
+  if(savedPractical>0&&Number.isFinite(savedPractical))practicalThreshold=savedPractical;
 }
 
 function batchLive(){return activeLive==='live-all'?liveTrades:liveTrades.filter(trade=>(trade.batchId||'live-default')===activeLive)}
-function batchBacktest(){return backtestTrades.filter(trade=>String(trade.batchId||backtestBatches[0]?.id||'')===String(activeBacktest))}
+function maximumToRealized(value){return window.TradingNotePartialExit?.realizedR(value)??value}
+function batchBacktest(){return backtestTrades.filter(trade=>String(trade.batchId||backtestBatches[0]?.id||'')===String(activeBacktest)).map(trade=>({...trade,maximumR:trade.r,r:maximumToRealized(trade.r)}))}
 function filterItems(items){const market=$('#marketSelect').value||'all',strategy=$('#strategySelect').value||'all';return items.filter(trade=>(market==='all'||marketOf(trade)===market)&&(strategy==='all'||strategyOf(trade)===strategy))}
 function selectedData(){
   const live=filterItems(batchLive()),backtest=filterItems(batchBacktest());
-  const review=live.map(trade=>{const base=finite(trade.r)?Number(trade.r):0,recoverable=gapOf(trade);return{...trade,r:base+recoverable,liveR:finite(trade.r)?Number(trade.r):null,recoverable}}).filter(trade=>trade.liveR!=null||trade.recoverable>0);
+  const review=live.map(trade=>{const base=finite(trade.r)?Number(trade.r):0,recoverable=gapOf(trade),hasReplay=trade.replayDecision==='entry'&&finite(trade.replayR),replayValue=trade.replayDecision==='skip'?0:hasReplay?maximumToRealized(trade.replayR):base+recoverable;return{...trade,r:replayValue,maximumR:hasReplay?Number(trade.replayR):null,liveR:finite(trade.r)?Number(trade.r):null,recoverable}}).filter(trade=>trade.liveR!=null||trade.recoverable>0||trade.replayDecision);
   return{live,review,backtest};
 }
 
@@ -81,6 +85,7 @@ function populateControls(){
   const ids=[...new Set([...batchLive(),...batchBacktest()].map(strategyOf))],label=id=>{if(id==='unassigned')return'未綁定策略';const item=strategies.find(strategy=>String(strategy.id)===String(id));return item?`${item.name} ${item.version}`:'已刪除的策略版本'};
   $('#strategySelect').innerHTML='<option value="all">全部版本</option>'+ids.map(id=>`<option value="${esc(id)}">${esc(label(id))}</option>`).join('');$('#strategySelect').value=ids.includes(oldStrategy)?oldStrategy:'all';
   $('#toleranceInput').value=String(tolerance);$('#toleranceValue').textContent=`${tolerance.toFixed(2)}R`;
+  $('#targetMoeSelect').value=targetMoe.toFixed(2);$('#practicalThresholdInput').value=practicalThreshold.toFixed(2);
 }
 
 function metric(label,value,note,tone=''){return`<article class="${tone}"><span>${label}</span><b>${value}</b><small>${note}</small></article>`}
@@ -88,7 +93,7 @@ function renderHero(result){
   const item=result.scenario,node=$('#diagnosisHero');node.dataset.number=item.number;node.innerHTML=`<span class="status">${item.label}</span><h2>${item.title}</h2><p>${item.description}</p><footer><span>判斷容許值 ±${tolerance.toFixed(2)}R／筆</span><span>${result.enough?'樣本達基本門檻':'樣本仍需累積'}</span><span>復盤完成率 ${result.reviewed.toFixed(1)}%</span></footer>`;
 }
 function renderChain(result){
-  [['backtest',result.backtest],['live',result.live],['review',result.review]].forEach(([name,value])=>{$(`#${name}Total`).textContent=value.count?signed(value.total):'—';$(`#${name}Meta`).textContent=value.count?`${value.count} 筆有 R · Avg ${signed(value.avg)}`:'目前沒有可計算 R 的資料'});
+  [['backtest',result.backtest],['live',result.live],['review',result.review]].forEach(([name,value])=>{$(`#${name}Total`).textContent=value.count?signed(value.avg,'R AVG'):'—';$(`#${name}Meta`).textContent=value.count?`${value.count} 筆有 R · 總計 ${signed(value.total)}`:'目前沒有可計算 R 的資料'});
   const retention=result.backtest.avg?result.live.avg/result.backtest.avg*100:null;
   const consistencyTone=result.consistency==null?'':result.consistency>=80?'good':result.consistency>=60?'warn':'bad';
   $('#gapMetrics').innerHTML=[metric('三層一致性評分',result.consistency==null?'—':`${result.consistency} 分`,`樣本可信度 ${result.confidence}% · 容許值 ±${tolerance.toFixed(2)}R`,consistencyTone),metric('Execution Gap',result.review.count&&result.live.count?signed(result.live.avg-result.review.avg,'R／筆'):'—','實盤 − 復盤',result.executionAligned?'good':'bad'),metric('Strategy Definition Gap',result.backtest.count&&result.review.count?signed(result.review.avg-result.backtest.avg,'R／筆'):'—','復盤 − 回測',result.strategyAligned?'good':'warn'),metric('Edge 複製率',retention!=null?`${retention.toFixed(1)}%`:'—','實盤 Avg R ÷ 回測 Avg R',retention!=null&&retention>=80?'good':'warn'),metric('同日期覆蓋',`${result.paired} 天`,'兩邊同日有紀錄',result.paired>=10?'good':'')].join('');
@@ -101,6 +106,17 @@ function check(label,note,ok,warning=false){const tone=ok?'good':warning?'warn':
 function renderRelationships(result){
   $('#relationshipChecks').innerHTML=[check('實盤 vs 回測',`相差 ${Math.abs(result.directGap).toFixed(2)}R／筆；直接檢查實盤是否複製回測 Edge。`,result.directAligned),check('復盤 vs 實盤',`相差 ${Math.abs(result.executionGap).toFixed(2)}R／筆；用來看人的執行。`,result.executionAligned),check('回測 vs 復盤',`相差 ${Math.abs(result.strategyGap).toFixed(2)}R／筆；用來看策略定義與回測品質。`,result.strategyAligned),check('三者後段趨勢',result.allDeclining?'三層樣本後段都同步下降，需觀察市場環境。':'尚未出現三層同步惡化的完整證據。',!result.allDeclining,!result.enough)].join('');
   const data=selectedData();$('#coverageChecks').innerHTML=[`<div><b>${result.live.count} 筆實盤 R</b><span>${result.live.count>=20?'已達基本診斷門檻':'建議至少累積 20 筆'}</span></div>`,`<div><b>${result.backtest.count} 筆回測 R</b><span>${result.backtest.count>=20?'已達基本診斷門檻':'建議至少累積 20 筆'}</span></div>`,`<div><b>${result.reviewed.toFixed(1)}% 已復盤</b><span>${result.reviewed>=60?'足以觀察執行分布':'完成率過低會低估 Execution Gap'}</span></div>`,`<div><b>${result.paired} 個同日期</b><span>${result.paired?'可分離市場日差異':'目前只能比較整體分布'}</span></div>`].join('');
+}
+
+function statNumber(value,digits=2){return Number.isFinite(value)?Number(value).toFixed(digits):'N/A'}
+function statInterval(ci){return ci&&ci.every(Number.isFinite)?`[${signed(ci[0])}, ${signed(ci[1])}]`:'N/A'}
+function renderStatisticalConfidence(result){
+  const api=window.TradingNoteStatistics,layers={backtest:api.sample(result.backtest.values,targetMoe),live:api.sample(result.live.values,targetMoe),review:api.sample(result.review.values,targetMoe)},labels={backtest:'Backtest',live:'Live',review:'Review / Replay'};
+  $('#statisticalLayers').innerHTML=Object.entries(layers).map(([key,item])=>{const edge=item.edge==='positive'?'目前有足夠證據支持平均 R 大於 0':item.edge==='negative'?'目前有足夠證據顯示平均 R 小於 0':item.edge==='uncertain'?'目前還不能確定平均 R 是否真的大於 0':'至少需要 2 筆交易才能估算';return`<article class="stat-layer ${key}"><header><b>${labels[key]}</b><span>每筆 R 的起伏 ${item.sd==null?'N/A':`${statNumber(item.sd)}R`}</span></header><div class="stat-progress"><i style="width:${item.progress??0}%"></i></div><div class="stat-row"><span>目前筆數／估計需要</span><b>${item.requiredN==null?`${item.n} / N/A`:`${item.n} / ${item.requiredN} · ${statNumber(item.progress,1)}%`}</b></div><div class="stat-row"><span>平均 R／可能範圍</span><b>${item.mean==null?'N/A':signed(item.mean)} · ${statInterval(item.ci)}</b></div><div class="stat-row"><span>目前誤差／希望誤差</span><b>${item.moe==null?'N/A':`±${statNumber(item.moe)}R`} / ±${targetMoe.toFixed(2)}R</b></div><p class="stat-edge">${edge}${key==='backtest'&&!item.sufficient?'。回測本身的筆數也還不夠穩定':''}</p></article>`}).join('');
+  const comparison=api.welch(result.live.values,result.backtest.values),verdict=api.classify(layers.live,layers.backtest,comparison,practicalThreshold),p=comparison.p==null?'N/A':comparison.p<.001?'p < 0.001':`p = ${comparison.p.toFixed(3)}`,practical=comparison.difference==null?'N/A':Math.abs(comparison.difference)>=practicalThreshold?'有實務意義':'未達實務門檻';
+  $('#statisticalComparison').innerHTML=`<div><span>實盤比回測高／低多少</span><b>${comparison.difference==null?'N/A':signed(comparison.difference,'R／筆')}</b></div><div><span>真正落差可能在哪裡</span><b>${statInterval(comparison.ci)}</b></div><div><span>落差只是運氣的可能性</span><b>${p}</b></div><div><span>落差是否值得處理</span><b>${practical}</b></div><div class="verdict ${verdict.tone}"><span>目前結論</span><b>${verdict.label}</b><small>${verdict.message}</small></div>`;
+  const safeRatio=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&b!==0&&a>=0&&b>0?a/b*100:null,strategyRetention=result.review.count&&result.backtest.count?safeRatio(result.review.avg,result.backtest.avg):null,executionRetention=result.live.count&&result.review.count?safeRatio(result.live.avg,result.review.avg):null,totalRetention=result.live.count&&result.backtest.count?safeRatio(result.live.avg,result.backtest.avg):null,absolute=(a,b,ready)=>ready&&Number.isFinite(a)&&Number.isFinite(b)?signed(a-b,'R / trade'):'N/A';
+  $('#retentionDiagnostics').innerHTML=`<div><span>策略從回測保留到復盤的比例</span><b>${strategyRetention==null?'N/A':`${strategyRetention.toFixed(1)}%`}</b><small>平均每筆相差 ${absolute(result.review.avg,result.backtest.avg,result.review.count&&result.backtest.count)}</small></div><div><span>復盤結果真正做到實盤的比例</span><b>${executionRetention==null?'N/A':`${executionRetention.toFixed(1)}%`}</b><small>平均每筆相差 ${absolute(result.live.avg,result.review.avg,result.live.count&&result.review.count)}</small></div><div><span>回測優勢最後保留下來的比例</span><b>${totalRetention==null?'N/A':`${totalRetention.toFixed(1)}%`}</b><small>如果平均 R 是負數，請優先看每筆相差多少</small></div>`;
 }
 
 function attribution(data){return ATTR.map(([field,label])=>({field,label,value:data.live.reduce((sum,trade)=>sum+Math.max(0,Number(trade[field])||0),0)}))}
@@ -152,7 +168,7 @@ function runMonteCarlo(){
   const data=selectedData(),settings={balance:Math.max(1,Number($('#mcBalance').value)||100000),risk:Math.max(.01,Math.min(20,Number($('#mcRisk').value)||1)),trades:Math.max(10,Math.min(1000,Math.round(Number($('#mcTrades').value)||100))),runs:Math.max(100,Math.min(5000,Math.round(Number($('#mcRuns').value)||1000)))},values={Live:stats(data.live).values.filter(value=>value!==0),Review:stats(data.review).values.filter(value=>value!==0),Backtest:stats(data.backtest).values.filter(value=>value!==0)};monteCarloResults=Object.fromEntries(Object.entries(values).map(([key,list])=>[key,simulateMonteCarlo(list,settings)]));$('#mcSampleNote').innerHTML=`目前條件：實盤 <b>${values.Live.length}</b> 筆、復盤 <b>${values.Review.length}</b> 筆、回測 <b>${values.Backtest.length}</b> 筆非 0R 樣本。綠線 P90、紫線 P50、紅線 P10。`;['Live','Review','Backtest'].forEach(name=>renderMonteCarloPanel(name,name,monteCarloResults[name]));renderMonteCarloComparison(monteCarloResults);
 }
 
-function render(){const data=selectedData(),result=diagnose(data);monteCarloResults=null;renderHero(result);renderChain(result);renderCurve(result);renderRelationships(result);renderSameDates(data);renderExecution(data,result);renderStrategy(data,result)}
+function render(){const data=selectedData(),result=diagnose(data);monteCarloResults=null;renderHero(result);renderChain(result);renderStatisticalConfidence(result);renderCurve(result);renderRelationships(result);renderSameDates(data);renderExecution(data,result);renderStrategy(data,result)}
 function reload(){refreshData();populateControls();render()}
 function toast(message){const node=$('#toast');node.textContent=message;node.hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.hidden=true,2200)}
 
@@ -160,7 +176,10 @@ $('#liveBatchSelect').onchange=event=>{activeLive=event.target.value;localStorag
 $('#backtestBatchSelect').onchange=event=>{activeBacktest=event.target.value;if(activeBacktest)localStorage.setItem(KEYS.activeBacktest,activeBacktest);populateControls();render()};
 ['marketSelect','strategySelect'].forEach(id=>$('#'+id).onchange=render);
 $('#toleranceInput').oninput=event=>{tolerance=Number(event.target.value);localStorage.setItem(KEYS.tolerance,String(tolerance));$('#toleranceValue').textContent=`${tolerance.toFixed(2)}R`;render()};
+$('#targetMoeSelect').onchange=event=>{targetMoe=Number(event.target.value);localStorage.setItem(KEYS.targetMoe,String(targetMoe));render()};
+$('#practicalThresholdInput').onchange=event=>{const value=Number(event.target.value);practicalThreshold=Number.isFinite(value)&&value>0?value:.2;event.target.value=practicalThreshold.toFixed(2);localStorage.setItem(KEYS.practicalThreshold,String(practicalThreshold));render()};
 $('#refreshButton').onclick=()=>{reload();toast('已重新讀取實盤、復盤與回測資料。')};
 $('#monteCarloForm').onsubmit=event=>{event.preventDefault();runMonteCarlo()};
+window.addEventListener('tradingnote:partial-exit-change',reload);
 $$('nav button').forEach(button=>button.onclick=()=>{$$('nav button').forEach(item=>item.classList.toggle('active',item===button));$$('.page').forEach(page=>page.classList.toggle('active',page.id===button.dataset.view));$('#pageTitle').textContent={diagnosis:'三層績效診斷',execution:'Execution Gap 分析',strategy:'策略與 Edge 診斷',montecarlo:'三層 Monte Carlo'}[button.dataset.view];if(button.dataset.view==='montecarlo')requestAnimationFrame(()=>{if(!monteCarloResults)runMonteCarlo();else ['Live','Review','Backtest'].forEach(name=>drawMonteCarlo($(`#mc${name}Chart`),monteCarloResults[name]))})});
 reload();

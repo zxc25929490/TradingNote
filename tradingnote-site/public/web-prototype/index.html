@@ -7,6 +7,7 @@
     <title>TradingNote Analytics</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=20260901-best-day-track-1" />
+    <link rel="stylesheet" href="income-goals.css?v=20260918-2" />
     <link rel="stylesheet" href="tp-analysis.css?v=20260828-9" />
     <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2" />
   </head>
@@ -28,6 +29,7 @@
       <nav aria-label="主要導覽">
         <span class="nav-section-title">實盤管理</span>
         <a class="active" href="#dashboard" data-page-link="dashboard"><span aria-hidden="true">⌂</span>績效總覽</a>
+        <a href="#income-goals" data-page-link="income-goals"><span aria-hidden="true">◎</span>收入目標</a>
         <a href="#objectives" data-page-link="objectives"><span aria-hidden="true">◉</span>挑戰目標</a>
         <a href="#analytics" data-page-link="analytics"><span aria-hidden="true">⌁</span>深度分析</a>
         <a href="#period" data-page-link="period"><span aria-hidden="true">▦</span>週月績效</a>
@@ -232,6 +234,7 @@
         </section>
       </section>
 
+      <section id="income-goals" class="page" data-page="income-goals"><div id="incomeGoalContent"></div></section>
       <section id="objectives" class="page" data-page="objectives">
         <section class="objective-hero panel">
           <div>
@@ -1004,7 +1007,8 @@
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
     <script src="tp-analysis.js?v=20260828-9"></script>
-    <script src="app.js?v=20260829-sort-1"></script>
+    <script src="income-goals.js?v=20260919-1"></script>
+    <script src="app.js?v=20260918-income-1"></script>
     <script src="../shared/system-transition.js?v=20260821-2"></script>
   </body>
 </html>
