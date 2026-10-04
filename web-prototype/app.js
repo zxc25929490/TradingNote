@@ -884,7 +884,7 @@ function attachCustomCursor() {
     cursor.style.left = `${event.clientX}px`;
     cursor.style.top = `${event.clientY}px`;
     cursor.classList.add("visible");
-    const interactive = event.target.closest("button, a, input, select, textarea, label, [tabindex]");
+    const interactive = event.target.closest?.("button, a, input, select, textarea, label, [tabindex]");
     cursor.classList.toggle("interactive", Boolean(interactive));
   };
 
@@ -1872,8 +1872,7 @@ function renderChart(items) {
   const canvas = els.chart;
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = Math.max(640, rect.width * dpr);
+  canvas.width = Math.max(640, canvas.clientWidth * dpr);
   canvas.height = 320 * dpr;
   ctx.scale(dpr, dpr);
 
@@ -1970,22 +1969,12 @@ function renderChart(items) {
   els.equityLatestPoint.style.left = `${px(last.x)}px`;
   els.equityLatestPoint.style.top = `${py(last.y)}px`;
   els.equityLatestPoint.hidden = false;
-  ctx.strokeStyle = accent2;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(px(last.x), py(last.y), 9, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = accent2;
-  ctx.beginPath();
-  ctx.arc(px(last.x), py(last.y), 5, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function drawLineChart(canvas, series, options = {}) {
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = Math.max(640, rect.width * dpr);
+  canvas.width = Math.max(640, canvas.clientWidth * dpr);
   canvas.height = (options.height || 320) * dpr;
   ctx.scale(dpr, dpr);
 

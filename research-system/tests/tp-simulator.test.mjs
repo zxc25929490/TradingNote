@@ -42,5 +42,6 @@ assert.match(html, /id="tpSimulatorForm"/);
 assert.match(html, /最高 R 無法判斷同一根 K 棒內 TP 與 SL 的先後順序/);
 assert.match(app, /TradingNoteTpSimulator\.scanTargets/);
 assert.match(app, /renderTpSimulator\(\)/);
+assert.match(app, /maximumR:Math\.max\(0,Number\(trade\.maximumR\?\?trade\.r\)\)/, "TP simulator must sample the raw maximum R, not the partial-exit realized R");
 
 console.log("TP simulator tests passed");
