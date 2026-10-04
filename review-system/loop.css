@@ -1,0 +1,38 @@
+/* 改善追蹤 view (see loop.js) */
+.loop-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; }
+.loop-card { display: grid; gap: 7px; align-content: start; min-height: 108px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.loop-card span, .loop-card small { color: var(--muted); }
+.loop-card span { font-size: .78rem; font-weight: 700; }
+.loop-card strong { font-size: 1.45rem; line-height: 1.15; }
+.loop-card small { font-size: .78rem; line-height: 1.45; }
+.loop-card.good strong { color: var(--teal); }
+.loop-card.bad strong { color: var(--red); }
+.loop-card.warn strong { color: var(--amber); }
+
+.loop-panel { margin-top: 16px; }
+.loop-panel .panel-head p { max-width: 80ch; line-height: 1.55; }
+.loop-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.loop-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: .86rem; font-variant-numeric: tabular-nums; }
+.loop-table th, .loop-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.loop-table thead th { color: var(--muted); font-size: .74rem; font-weight: 700; white-space: nowrap; }
+.loop-table tbody tr:last-child td { border-bottom: 0; }
+.loop-table small { display: block; margin-top: 3px; color: var(--muted); font-size: .72rem; }
+.loop-table.actions { min-width: 900px; }
+.loop-action { max-width: 320px; line-height: 1.5; white-space: pre-wrap; }
+
+.loop-bar { display: inline-block; width: 90px; height: 7px; margin-right: 8px; border-radius: 999px; background: #203139; vertical-align: middle; overflow: hidden; }
+.loop-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--amber), var(--red)); }
+.loop-bar i.amber { background: var(--amber); }
+
+.loop-good { color: var(--teal); }
+.loop-bad { color: var(--red); }
+.loop-flat { color: var(--muted); }
+.loop-chip { display: inline-flex; padding: 5px 9px; border-radius: 999px; background: var(--surface2); color: var(--muted); font-size: .72rem; font-weight: 800; white-space: nowrap; }
+.loop-chip.good { background: rgba(39, 211, 180, .12); color: var(--teal); }
+.loop-chip.warn { background: rgba(242, 184, 75, .12); color: var(--amber); }
+.loop-chip.bad { background: rgba(255, 100, 124, .12); color: var(--red); }
+
+@media (max-width: 640px) {
+  .loop-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .loop-card strong { font-size: 1.2rem; }
+}

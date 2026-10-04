@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="typography.css?v=20260821-1">
   <link rel="stylesheet" href="analysis-switcher.css?v=20260822-1">
   <link rel="stylesheet" href="review-form.css?v=20260823-1">
+  <link rel="stylesheet" href="loop.css?v=20261004-2">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261004-1">
   <style>
@@ -30,6 +31,7 @@
       <button class="active" data-view="queue"><span>◫</span>復盤工作台</button>
       <button data-view="patterns"><span>⌁</span>執行落差</button>
       <button data-view="lessons"><span>✓</span>復盤結論</button>
+      <button data-view="loop"><span>↻</span>改善追蹤</button>
     </nav>
     <div class="cycle"><i></i><span><b>復盤流程</b><small>分類 → 歸因 → 改進</small></span></div>
   </aside>
@@ -78,6 +80,11 @@
         <a href="../research-system/index.html"><span>前往歷史回測</span><b>驗證策略 Edge →</b></a>
       </div>
     </section>
+
+    <section id="loop" class="page">
+      <div class="hero compact"><div><small>REVIEW LOOP</small><h2>我有沒有真的變好？</h2><p>追蹤哪種錯誤最貴、執行有沒有進步，以及每個改善行動是否真的減少了同一類錯誤。</p></div></div>
+      <div id="loopContent"></div>
+    </section>
   </main>
 
   <dialog id="reviewDialog">
@@ -124,7 +131,9 @@
   <div id="toast" class="toast" hidden></div>
   <script src="../web-prototype/data/trades.js"></script>
   <script src="../shared/partial-exit.js?v=20261003-zero-1"></script>
-  <script src="app.js?v=20260829-sort-1"></script>
+  <script src="../shared/review-loop.js?v=20261004-2"></script>
+  <script src="loop.js?v=20261004-2"></script>
+  <script src="app.js?v=20261004-1"></script>
   <script src="../shared/cursor-fx.js?v=20261004-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
 </body>
