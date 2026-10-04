@@ -264,6 +264,7 @@ const pageTitles = {
   objectives: "挑戰目標與風險",
   "income-goals": "收入目標",
   analytics: "深度數據分析",
+  "advanced-stats": "進階統計：風險、出場、成本與交叉分析",
   review: "行為與紀律分析",
   period: "週/月績效分析",
   trades: "交易紀錄",
