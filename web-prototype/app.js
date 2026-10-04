@@ -2033,6 +2033,7 @@ function renderEdgeAnalytics(items) {
 function renderAnalytics(items) {
   renderProfitAnalytics(items);
   renderEdgeAnalytics(items);
+  window.TradingNoteAdvancedAnalytics?.render(items, { accountRules, strategyLabel: strategyVersionLabel });
 }
 
 function renderPairBars(items) {
