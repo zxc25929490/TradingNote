@@ -13,6 +13,14 @@ const LEGACY_RESEARCH_TRADE_KEY = "trs.trades";
 const LEGACY_RESEARCH_RULE_KEY = "trs.rules";
 const LEGACY_RESEARCH_BATCH_KEY = "trs.batches";
 const LEGACY_RESEARCH_ACTIVE_BATCH_KEY = "trs.activeBatch";
+const APP_STORAGE_PREFIXES = ["tradingnote.", "trading-research.", "trs."];
+const STRUCTURED_BACKUP_KEYS = new Set([
+  STORAGE_KEY, DELETED_KEY, LIVE_BATCH_KEY, LIVE_ACTIVE_BATCH_KEY,
+  ACCOUNT_RULES_KEY, STRATEGY_VERSIONS_KEY, RESEARCH_TRADE_KEY,
+  RESEARCH_RULE_KEY, LEGACY_RESEARCH_TRADE_KEY, LEGACY_RESEARCH_RULE_KEY,
+  LEGACY_RESEARCH_BATCH_KEY, LEGACY_RESEARCH_ACTIVE_BATCH_KEY,
+]);
+const REPLAY_SESSIONS_KEY = "tradingnote.replaySessions.v1";
 const DEFAULT_RESEARCH_RULES = [
   { id: "R-001", title: "等待 K 棒收線確認突破", description: "突破只能在 5m 或 15m K 棒收線後成立，避免假突破與追價。", status: "Verified", confidence: 88, linkedTrades: ["BT-002", "BT-003", "BT-011"] },
   { id: "R-002", title: "高週期方向不一致則 No Trade", description: "1H bias 與執行方向相反時，不以短週期訊號覆蓋。", status: "Testing", confidence: 76, linkedTrades: ["BT-006", "BT-014", "BT-016"] },
@@ -836,99 +844,6 @@ function attachRippleFeedback() {
     ripple.style.top = `${event.clientY - rect.top - size / 2}px`;
     target.appendChild(ripple);
     ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
-  });
-}
-
-function attachCursorClickEffects() {
-  document.addEventListener("pointerdown", (event) => {
-    if (!motionAllowed || event.pointerType === "touch") return;
-    const burst = document.createElement("span");
-    burst.className = "cursor-click-burst";
-    burst.style.left = `${event.clientX}px`;
-    burst.style.top = `${event.clientY}px`;
-    document.body.appendChild(burst);
-    burst.addEventListener("animationend", () => burst.remove(), { once: true });
-
-    for (let index = 0; index < 6; index += 1) {
-      const spark = document.createElement("span");
-      const angle = (Math.PI * 2 * index) / 6 + Math.random() * 0.35;
-      const distance = 14 + Math.random() * 18;
-      spark.className = "cursor-click-spark";
-      spark.style.left = `${event.clientX}px`;
-      spark.style.top = `${event.clientY}px`;
-      spark.style.setProperty("--tx", `${Math.cos(angle) * distance}px`);
-      spark.style.setProperty("--ty", `${Math.sin(angle) * distance}px`);
-      document.body.appendChild(spark);
-      spark.addEventListener("animationend", () => spark.remove(), { once: true });
-    }
-  });
-}
-
-function attachCustomCursor() {
-  if (!motionAllowed || window.matchMedia("(pointer: coarse)").matches) return;
-  const cursor = document.createElement("span");
-  cursor.className = "custom-cursor-dot";
-  document.body.appendChild(cursor);
-  document.body.classList.add("custom-cursor-enabled");
-
-  const moveCursor = (event) => {
-    if (event.pointerType === "touch") return;
-    cursor.style.left = `${event.clientX}px`;
-    cursor.style.top = `${event.clientY}px`;
-    cursor.classList.add("visible");
-    const interactive = event.target.closest("button, a, input, select, textarea, label, [tabindex]");
-    cursor.classList.toggle("interactive", Boolean(interactive));
-  };
-
-  document.addEventListener("pointermove", moveCursor);
-  document.addEventListener("pointerdown", () => cursor.classList.add("dragging"));
-  document.addEventListener("pointerup", () => cursor.classList.remove("dragging"));
-  document.addEventListener("pointercancel", () => cursor.classList.remove("dragging"));
-  document.addEventListener("pointerleave", () => cursor.classList.remove("visible"));
-  document.addEventListener("pointerenter", (event) => {
-    moveCursor(event);
-  });
-}
-
-function attachCursorTrailEffects() {
-  let lastTrailAt = 0;
-  let dragging = false;
-  document.addEventListener("pointerdown", (event) => {
-    if (event.pointerType !== "touch") dragging = true;
-  });
-  document.addEventListener("pointerup", () => {
-    dragging = false;
-  });
-  document.addEventListener("pointercancel", () => {
-    dragging = false;
-  });
-  document.addEventListener("pointermove", (event) => {
-    if (!motionAllowed || event.pointerType === "touch") return;
-    const now = performance.now();
-    if (now - lastTrailAt < (dragging ? 14 : 30)) return;
-    lastTrailAt = now;
-
-    const dot = document.createElement("span");
-    const speed = Math.min(24, Math.abs(event.movementX) + Math.abs(event.movementY));
-    const size = (dragging ? 13 : 8) + speed * (dragging ? 0.62 : 0.32);
-    dot.className = `cursor-trail-dot ${dragging ? "dragging" : ""}`;
-    dot.style.left = `${event.clientX}px`;
-    dot.style.top = `${event.clientY}px`;
-    dot.style.width = `${size}px`;
-    dot.style.height = `${size}px`;
-    document.body.appendChild(dot);
-    dot.addEventListener("animationend", () => dot.remove(), { once: true });
-
-    if (!dragging) return;
-    const streak = document.createElement("span");
-    const angle = Math.atan2(event.movementY || 0, event.movementX || 1) * (180 / Math.PI);
-    streak.className = "cursor-drag-streak";
-    streak.style.left = `${event.clientX}px`;
-    streak.style.top = `${event.clientY}px`;
-    streak.style.width = `${42 + speed * 3}px`;
-    streak.style.rotate = `${angle}deg`;
-    document.body.appendChild(streak);
-    streak.addEventListener("animationend", () => streak.remove(), { once: true });
   });
 }
 
@@ -1864,8 +1779,7 @@ function renderChart(items) {
   const canvas = els.chart;
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = Math.max(640, rect.width * dpr);
+  canvas.width = Math.max(640, canvas.clientWidth * dpr);
   canvas.height = 320 * dpr;
   ctx.scale(dpr, dpr);
 
@@ -1962,22 +1876,12 @@ function renderChart(items) {
   els.equityLatestPoint.style.left = `${px(last.x)}px`;
   els.equityLatestPoint.style.top = `${py(last.y)}px`;
   els.equityLatestPoint.hidden = false;
-  ctx.strokeStyle = accent2;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(px(last.x), py(last.y), 9, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = accent2;
-  ctx.beginPath();
-  ctx.arc(px(last.x), py(last.y), 5, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function drawLineChart(canvas, series, options = {}) {
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = Math.max(640, rect.width * dpr);
+  canvas.width = Math.max(640, canvas.clientWidth * dpr);
   canvas.height = (options.height || 320) * dpr;
   ctx.scale(dpr, dpr);
 
@@ -2129,6 +2033,7 @@ function renderEdgeAnalytics(items) {
 function renderAnalytics(items) {
   renderProfitAnalytics(items);
   renderEdgeAnalytics(items);
+  window.TradingNoteAdvancedAnalytics?.render(items, { accountRules, strategyLabel: strategyVersionLabel });
 }
 
 function renderPairBars(items) {
@@ -3462,6 +3367,54 @@ function storedArray(key) {
   }
 }
 
+function appStorageSnapshot() {
+  const snapshot = {};
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key && APP_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+      snapshot[key] = localStorage.getItem(key);
+    }
+  }
+  return snapshot;
+}
+
+function mergeReplaySessions(currentValue, incomingValue) {
+  try {
+    const current = JSON.parse(currentValue || "[]");
+    const incoming = JSON.parse(incomingValue || "[]");
+    if (!Array.isArray(current) || !Array.isArray(incoming)) return incomingValue;
+    const sessions = new Map(incoming.filter((item) => item?.key).map((item) => [item.key, item]));
+    current.filter((item) => item?.key).forEach((item) => sessions.set(item.key, item));
+    return JSON.stringify([...sessions.values()]);
+  } catch {
+    return incomingValue;
+  }
+}
+
+function restoreAuxiliaryStorage(snapshot, mode = "merge") {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return 0;
+  const entries = Object.entries(snapshot).filter(([key, value]) =>
+    APP_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix)) &&
+    !STRUCTURED_BACKUP_KEYS.has(key) && typeof value === "string"
+  );
+  if (mode === "replace") {
+    const incomingKeys = new Set(entries.map(([key]) => key));
+    const removable = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key && APP_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix)) && !STRUCTURED_BACKUP_KEYS.has(key) && !incomingKeys.has(key)) removable.push(key);
+    }
+    removable.forEach((key) => localStorage.removeItem(key));
+  }
+  entries.forEach(([key, value]) => {
+    const restored = mode === "merge" && key === REPLAY_SESSIONS_KEY
+      ? mergeReplaySessions(localStorage.getItem(key), value)
+      : value;
+    localStorage.setItem(key, restored);
+  });
+  return entries.length;
+}
+
 function exportFullBackup() {
   const researchTrades = JSON.parse(localStorage.getItem(RESEARCH_TRADE_KEY) || "null");
   const researchRules = JSON.parse(localStorage.getItem(RESEARCH_RULE_KEY) || "null") || DEFAULT_RESEARCH_RULES;
@@ -3472,7 +3425,7 @@ function exportFullBackup() {
   const visibleSnapshot = uniqueTrades(trades.map(backupTradeRecord));
   const backup = {
     app: "TradingNoteAll",
-    version: 4,
+    version: 5,
     exportedAt: new Date().toISOString(),
     suggestedFolder: "backups",
     live: {
@@ -3492,11 +3445,12 @@ function exportFullBackup() {
       legacyBatches: Array.isArray(legacyResearchBatches) ? legacyResearchBatches : null,
       legacyActiveBatch: legacyResearchActiveBatch || null,
     },
+    storage: appStorageSnapshot(),
   };
   const researchCount = (backup.research.trades?.length || 0) + (backup.research.legacyTrades?.length || 0);
   downloadFile(`backups_tradingnote-all-${isoDate(new Date())}.json`, JSON.stringify(backup, null, 2), "application/json");
   const ruleCount = (backup.research.rules?.length || 0) + (backup.research.legacyRules?.length || 0);
-  showToast(`已建立完整快照：${liveBatches.length} 個實盤斷點、${visibleSnapshot.length} 筆斷點交易、回測 ${researchCount} 筆、Rule Book ${ruleCount} 條。`);
+  showToast(`已建立完整快照：${liveBatches.length} 個實盤斷點、${visibleSnapshot.length} 筆斷點交易、回測 ${researchCount} 筆、Rule Book ${ruleCount} 條、${Object.keys(backup.storage).length} 項本機資料與設定。`);
 }
 
 function restoreUnifiedBackup(payload, mode = "merge") {
@@ -3511,6 +3465,7 @@ function restoreUnifiedBackup(payload, mode = "merge") {
   let researchAdded = 0;
   let rulesAdded = 0;
   let strategiesAdded = 0;
+  let storageRestored = 0;
 
   if (mode === "replace") {
     localTrades = incomingTrades.map(prepareBackupTrade);
@@ -3578,6 +3533,8 @@ function restoreUnifiedBackup(payload, mode = "merge") {
     }
   }
 
+  storageRestored = restoreAuxiliaryStorage(payload?.storage, mode);
+
   saveAccountRules();
   saveStrategyVersions();
   populateAccountRulesForm();
@@ -3588,8 +3545,8 @@ function restoreUnifiedBackup(payload, mode = "merge") {
   saveLiveBatches();
   refreshAfterDataChange();
   showToast(mode === "replace"
-    ? `強制覆蓋完成：目前實盤 ${trades.length} 筆。`
-    : `智慧合併完成：新增實盤 ${liveAdded} 筆、回測 ${researchAdded} 筆、策略版本 ${strategiesAdded} 個、規則 ${rulesAdded} 條；重複資料已略過。`);
+    ? `強制覆蓋完成：目前實盤 ${trades.length} 筆，還原 ${storageRestored} 項設定與附加資料。`
+    : `智慧合併完成：新增實盤 ${liveAdded} 筆、回測 ${researchAdded} 筆、策略版本 ${strategiesAdded} 個、規則 ${rulesAdded} 條，還原 ${storageRestored} 項設定與附加資料；重複資料已略過。`);
 }
 
 async function importBackupFile(file, mode = "merge") {
@@ -4300,9 +4257,6 @@ renderCalc();
 runReturnSimulation();
 resetTradeForm();
 attachRippleFeedback();
-attachCustomCursor();
-attachCursorClickEffects();
-attachCursorTrailEffects();
 render();
 
 [els.year, els.pair, els.outcome, els.window, els.search].forEach((el) => el.addEventListener("input", render));

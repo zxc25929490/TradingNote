@@ -1,0 +1,107 @@
+/* Advanced statistics panel (see advanced-analytics.js) */
+.advanced-panel { margin-top: 18px; }
+.advanced-panel .panel-heading { align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.advanced-panel .segmented { flex-wrap: wrap; }
+
+.adv-block { margin-top: 26px; }
+.adv-block:first-child { margin-top: 18px; }
+.adv-block > header h3 { margin: 0; font-size: 1rem; }
+.adv-block > header p { margin: 5px 0 14px; color: var(--muted); font-size: .85rem; line-height: 1.55; max-width: 78ch; }
+
+.adv-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.adv-card {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 92px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+}
+.adv-card span { color: var(--muted); font-size: .78rem; font-weight: 700; }
+.adv-card strong { font-size: 1.45rem; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.adv-card small { color: var(--muted); font-size: .76rem; line-height: 1.4; }
+
+.adv-verdict {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+}
+.adv-verdict p { margin: 0; color: var(--muted); line-height: 1.6; font-size: .86rem; }
+.adv-verdict.good { border-left-color: var(--win); }
+.adv-verdict.warn { border-left-color: var(--accent-2); }
+.adv-verdict.bad { border-left-color: var(--loss); }
+.adv-verdict + .adv-chart, .adv-verdict + .adv-table-wrap { margin-top: 12px; }
+
+.adv-inputs { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.adv-inputs label { display: grid; gap: 5px; min-width: 130px; color: var(--muted); font-size: .76rem; font-weight: 700; }
+.adv-inputs input, .adv-inputs select {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.adv-coverage {
+  margin: 14px 0 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--muted);
+  font-size: .82rem;
+}
+.adv-coverage.low { background: color-mix(in srgb, var(--accent-2) 14%, transparent); }
+.adv-empty { padding: 28px 8px; text-align: center; }
+.adv-note { margin: 10px 0 0; color: var(--muted); font-size: .78rem; line-height: 1.6; }
+
+.adv-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.adv-table { width: 100%; border-collapse: collapse; font-size: .86rem; font-variant-numeric: tabular-nums; }
+.adv-table th, .adv-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.adv-table thead th { color: var(--muted); font-size: .76rem; font-weight: 700; background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.adv-table tbody tr:last-child th, .adv-table tbody tr:last-child td { border-bottom: 0; }
+
+.adv-bar { display: inline-block; width: 90px; height: 7px; margin-right: 8px; border-radius: 999px; background: var(--surface-2); vertical-align: middle; overflow: hidden; }
+.adv-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.adv-bar i.neg { background: var(--loss); }
+
+.adv-chart { position: relative; margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 40%, var(--surface)); overflow: hidden; }
+.adv-chart svg { display: block; width: 100%; height: 150px; }
+.adv-chart.scatter svg { height: auto; }
+.adv-chart .adv-zero { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; opacity: .5; }
+.adv-chart .adv-guide { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 5; }
+.adv-chart .adv-axis { position: absolute; right: 8px; color: var(--muted); font-size: .68rem; font-variant-numeric: tabular-nums; pointer-events: none; }
+.adv-chart .adv-axis.hi { top: 4px; }
+.adv-chart .adv-axis.lo { bottom: 4px; }
+.adv-chart .adv-label { fill: var(--muted); font-size: 11px; }
+.adv-chart circle.win { fill: color-mix(in srgb, var(--win) 80%, transparent); stroke: var(--win); }
+.adv-chart circle.loss { fill: color-mix(in srgb, var(--loss) 80%, transparent); stroke: var(--loss); }
+.adv-chart circle.be { fill: color-mix(in srgb, var(--muted) 60%, transparent); stroke: var(--muted); }
+
+/* Cross-tab heat map */
+.adv-table.cross th:first-child { position: sticky; left: 0; background: var(--surface); }
+.adv-table.cross tbody th { color: var(--ink); font-weight: 700; }
+.adv-cell { position: relative; text-align: center !important; min-width: 84px; }
+.adv-cell b { display: block; font-size: .92rem; }
+.adv-cell small { display: block; color: var(--muted); font-size: .68rem; }
+.adv-cell.pos { background: color-mix(in srgb, var(--win) calc(var(--strength, 0) * 100%), transparent); }
+.adv-cell.neg { background: color-mix(in srgb, var(--loss) calc(var(--strength, 0) * 100%), transparent); }
+.adv-cell.thin { opacity: .45; }
+.adv-cell.none { color: var(--muted); opacity: .4; }
+.adv-cell em { position: absolute; top: 3px; right: 5px; color: var(--accent-2); font-size: .7rem; font-style: normal; }
+.adv-cell em.weak { opacity: .55; }
+
+@media (max-width: 640px) {
+  .adv-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adv-card strong { font-size: 1.2rem; }
+  .adv-inputs label { min-width: 0; flex: 1 1 130px; }
+}
+
+.adv-table th { text-transform: none; letter-spacing: 0; }

@@ -8,8 +8,11 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=20260901-best-day-track-1" />
     <link rel="stylesheet" href="income-goals.css?v=20260918-2" />
+    <link rel="stylesheet" href="advanced-analytics.css?v=20261004-2" />
     <link rel="stylesheet" href="tp-analysis.css?v=20260828-9" />
+    <link rel="stylesheet" href="effects.css?v=20261004-1" />
     <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2" />
+  <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261004-1">
   </head>
   <body>
     <aside class="sidebar">
@@ -394,6 +397,25 @@
             <div class="panel-heading"><div><h2>星期績效</h2><p>辨識一週中的強勢與弱勢日。</p></div></div>
             <div id="weekdayAnalysis" class="breakdown-list"></div>
           </section>
+        </section>
+
+        <section id="advancedAnalytics" class="panel advanced-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>進階統計</h2>
+              <p>風險調整、序列衰退、出場品質、持倉、成本、風險暴露與交叉分析。</p>
+            </div>
+            <div class="segmented" role="group" aria-label="進階統計類別">
+              <button class="active" type="button" data-adv-tab="risk">風險調整</button>
+              <button type="button" data-adv-tab="sequence">序列與衰退</button>
+              <button type="button" data-adv-tab="exit">出場品質</button>
+              <button type="button" data-adv-tab="hold">持倉時間</button>
+              <button type="button" data-adv-tab="cost">成本</button>
+              <button type="button" data-adv-tab="exposure">風險暴露</button>
+              <button type="button" data-adv-tab="cross">交叉表</button>
+            </div>
+          </div>
+          <div id="advancedBody"></div>
         </section>
       </section>
 
@@ -1007,9 +1029,14 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
+    <script src="../shared/partial-exit.js?v=20261003-zero-1"></script>
+    <script src="../shared/stats.js?v=20261004-1"></script>
+    <script src="advanced-analytics.js?v=20261004-3"></script>
     <script src="tp-analysis.js?v=20260828-9"></script>
     <script src="income-goals.js?v=20260919-1"></script>
-    <script src="app.js?v=20261003-inherit-1"></script>
-    <script src="../shared/system-transition.js?v=20260821-2"></script>
+    <script src="app.js?v=20261004-2"></script>
+    <script src="effects.js?v=20261004-1"></script>
+    <script src="../shared/cursor-fx.js?v=20261004-1"></script>
+  <script src="../shared/system-transition.js?v=20260821-2"></script>
   </body>
 </html>
