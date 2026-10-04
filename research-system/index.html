@@ -49,7 +49,8 @@
             <summary class="secondary menu-more" aria-label="管理研究斷點" title="斷點管理"><span class="dot-menu-icon" aria-hidden="true"><i></i><i></i><i></i></span></summary>
             <div class="research-menu-popover">
               <div class="menu-heading"><b>斷點管理</b><small>建立或清理不同研究階段</small></div>
-              <button id="addBreakpoint" class="menu-action" type="button"><i aria-hidden="true">＋</i><span><b>新增斷點</b><small>建立一個全新的研究樣本</small></span></button>
+              <button id="addBreakpoint" class="menu-action" type="button"><i aria-hidden="true">＋</i><span><b>新增斷點</b><small>建立空白研究斷點</small></span></button>
+              <button id="inheritBreakpoint" class="menu-action" type="button"><i aria-hidden="true">⎘</i><span><b>繼承目前斷點</b><small>複製回測紀錄，建立後各自獨立</small></span></button>
               <button id="deleteBreakpoint" class="menu-action danger" type="button"><i aria-hidden="true">×</i><span><b>刪除目前斷點</b><small id="deleteBreakpointHint">會一併移除其中的回測紀錄</small></span></button>
             </div>
           </details>
@@ -156,9 +157,9 @@
     </form>
   </dialog>
   <script src="../web-prototype/data/trades.js"></script>
-  <script src="../shared/partial-exit.js?v=20260906-3"></script>
+  <script src="../shared/partial-exit.js?v=20261003-zero-1"></script>
   <script src="tp-simulator-core.js?v=20260901-1"></script>
-  <script src="app.js?v=20260901-tp-1"></script>
+  <script src="app.js?v=20261003-inherit-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
 </body>
 </html>

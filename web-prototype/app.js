@@ -522,7 +522,7 @@ function openLiveBatchDialog() {
   const dates = candidates.map((trade) => normalizeDateValue(trade.date)).filter(Boolean).sort();
   const fallback = `實盤斷點 ${liveBatches.length + 1}`;
   els.liveBatchName.value = fallback;
-  els.liveBatchMode.value = candidates.length ? "history" : "empty";
+  els.liveBatchMode.value = "empty";
   els.liveBatchStart.value = dates[0] || "";
   els.liveBatchEnd.value = dates.at(-1) || "";
   els.liveBatchStart.min = dates[0] || "";
@@ -534,7 +534,7 @@ function openLiveBatchDialog() {
 }
 
 function cloneTradeForBatch(trade, batchId) {
-  const { id, origin, baseKey, row, ...record } = trade;
+  const { id, origin, baseKey, row, ...record } = JSON.parse(JSON.stringify(trade));
   return {
     ...record,
     localId: crypto.randomUUID(),
@@ -542,6 +542,26 @@ function cloneTradeForBatch(trade, batchId) {
     source: "Live breakpoint history copy",
     copiedFrom: trade.localId || trade.baseKey || trade.id || "",
   };
+}
+
+function inheritLiveBreakpoint() {
+  if (!requireWritableLiveBatch()) return;
+  const source = liveBatches.find(batch => batch.id === activeLiveBatch);
+  const selected = tradesForActiveView();
+  if (!selected.length) { showToast('目前斷點沒有交易可繼承，請先切換到有資料的斷點。', 'error'); return; }
+  const name = prompt('從「' + source.name + '」複製 ' + selected.length + ' 筆交易，建立後各自獨立。\n請輸入新斷點名稱：', source.name + '（繼承）');
+  if (name === null || !name.trim()) return;
+  const id = 'live-' + crypto.randomUUID();
+  const copies = selected.map(trade => cloneTradeForBatch(trade, id));
+  liveBatches.push({ id, name: name.trim(), createdAt: isoDate(new Date()), inheritedFrom: source.id });
+  localTrades.push(...copies);
+  saveLocalTrades();
+  activeLiveBatch = id;
+  saveLiveBatches();
+  refreshAfterDataChange();
+  closeActionMenus();
+  animateBatchControl();
+  showToast('已建立「' + name.trim() + '」，繼承 ' + copies.length + ' 筆交易。');
 }
 
 function createLiveBatchFromDialog() {
@@ -4354,6 +4374,7 @@ els.liveBatch.addEventListener("change", () => {
   runMonteCarloSimulation();
   animateBatchControl();
 });
+document.querySelector("#inheritLiveBatchButton").addEventListener("click", inheritLiveBreakpoint);
 els.addLiveBatch.addEventListener("click", () => {
   closeActionMenus();
   openLiveBatchDialog();

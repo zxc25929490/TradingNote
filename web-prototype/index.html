@@ -64,6 +64,7 @@
                   <span class="menu-icon" aria-hidden="true">＋</span>
                   <span><strong>新增斷點</strong><small>建立空白斷點或複製歷史區間</small></span>
                 </button>
+                <button id="inheritLiveBatchButton" class="menu-action" type="button" role="menuitem"><span class="menu-icon" aria-hidden="true">⎘</span><span><strong>繼承目前斷點</strong><small>複製全部交易，建立後各自獨立</small></span></button>
                 <button id="deleteLiveBatchButton" class="menu-action danger-menu-action" type="button" role="menuitem">
                   <span class="menu-icon" aria-hidden="true">×</span>
                   <span><strong>刪除目前斷點</strong><small id="deleteLiveBatchHint">會一併移除其中的交易</small></span>
@@ -918,7 +919,7 @@
         <div class="modal-heading">
           <div>
             <h2>新增實盤斷點</h2>
-            <p>建立空白斷點，或從歷史交易日期區間複製一份做樣本。</p>
+            <p>建立空白斷點，或依日期區間複製歷史交易。要複製目前整個斷點，也可使用「繼承目前斷點」。</p>
           </div>
           <button class="icon-button" value="cancel" type="button" id="closeLiveBatchDialog">×</button>
         </div>
@@ -1006,10 +1007,10 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
-    <script src="../shared/partial-exit.js?v=20260906-3"></script>
+    <script src="../shared/partial-exit.js?v=20261003-zero-1"></script>
     <script src="tp-analysis.js?v=20260828-9"></script>
     <script src="income-goals.js?v=20260919-1"></script>
-    <script src="app.js?v=20260918-income-1"></script>
+    <script src="app.js?v=20261003-inherit-1"></script>
     <script src="../shared/system-transition.js?v=20260821-2"></script>
   </body>
 </html>

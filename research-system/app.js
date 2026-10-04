@@ -80,9 +80,22 @@ let journalSort={key:'date',direction:'desc'};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const fmt=(v,d=1)=>Number(v||0).toFixed(d), decision=v=>!v?'未記錄':v==='No Trade'?'不交易':v==='Long'?'做多':'做空', hasR=t=>Number.isFinite(t.r), rText=t=>hasR(t)?`${t.r>0?'+':''}${t.r}R`:'—', rClass=t=>hasR(t)?(t.r>=0?'pos':'neg'):'';
 function syncBatch(){trades=allTrades.filter(t=>t.batchId===activeBatch).map(t=>({...t,maximumR:t.r,r:window.TradingNotePartialExit?.realizedR(t.r)??t.r}));localStorage.setItem('trs.trades',JSON.stringify(allTrades));localStorage.setItem('trs.batches',JSON.stringify(batches));localStorage.setItem('trs.activeBatch',activeBatch);renderBatchSelect()}
-function renderBatchSelect(){const select=$('#batchSelect');select.innerHTML=batches.map(b=>`<option value="${b.id}" ${b.id===activeBatch?'selected':''}>${b.name}（${allTrades.filter(t=>t.batchId===b.id).length}）</option>`).join('');const count=allTrades.filter(t=>t.batchId===activeBatch).length,canDelete=batches.length>1,button=$('#deleteBreakpoint'),hint=$('#deleteBreakpointHint');if(button)button.disabled=!canDelete;if(hint)hint.textContent=canDelete?`會一併移除其中 ${count} 筆回測紀錄`:'至少需要保留一個斷點'}
+function renderBatchSelect(){const select=$('#batchSelect');select.innerHTML=batches.map(b=>`<option value="${b.id}" ${b.id===activeBatch?'selected':''}>${String(b.name).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}（${allTrades.filter(t=>t.batchId===b.id).length}）</option>`).join('');const count=allTrades.filter(t=>t.batchId===activeBatch).length,canDelete=batches.length>1,button=$('#deleteBreakpoint'),hint=$('#deleteBreakpointHint');if(button)button.disabled=!canDelete;if(hint)hint.textContent=canDelete?`會一併移除其中 ${count} 筆回測紀錄`:'至少需要保留一個斷點'}
 function closeResearchMenus(){$$('.research-menu').forEach(menu=>menu.open=false)}
 function animateBatchControl(){const control=$('#batchControl');control.classList.remove('batch-updated');requestAnimationFrame(()=>control.classList.add('batch-updated'))}
+function copyResearchTrades(items,sourceBatchId,targetBatchId){
+ return items.filter(trade=>trade.batchId===sourceBatchId).map(trade=>({...JSON.parse(JSON.stringify(trade)),id:'BT-'+crypto.randomUUID(),batchId:targetBatchId,sourceTradeId:String(trade.id)}));
+}
+function inheritResearchBreakpoint(){
+ const source=batches.find(batch=>batch.id===activeBatch);if(!source)return;
+ const count=allTrades.filter(trade=>trade.batchId===source.id).length;
+ if(!count){alert('目前斷點沒有回測紀錄可繼承，請先切換到有資料的斷點。');return;}
+ const name=prompt('從「'+source.name+'」複製 '+count+' 筆原始回測紀錄。建立後交易各自獨立；策略版本與 Rule Book 仍為共用。\n請輸入新斷點名稱：',source.name+'（繼承）');
+ if(name===null||!name.trim())return;
+ const id='batch-'+crypto.randomUUID(),copied=copyResearchTrades(allTrades,source.id,id);
+ batches.push({id,name:name.trim(),createdAt:new Date().toISOString().slice(0,10),inheritedFrom:source.id});
+ allTrades.push(...copied);activeBatch=id;closeResearchMenus();syncBatch();render();animateBatchControl();
+}
 function deleteActiveBreakpoint(){const batch=batches.find(item=>item.id===activeBatch);if(!batch)return;if(batches.length<=1){alert('至少需要保留一個研究斷點。');return}const count=allTrades.filter(t=>t.batchId===batch.id).length;if(!confirm(`確定刪除研究斷點「${batch.name}」？\n\n其中 ${count} 筆回測紀錄會一併移除。建議先從「備份管理」匯出備份。`))return;const index=batches.findIndex(item=>item.id===batch.id);allTrades=allTrades.filter(t=>t.batchId!==batch.id);batches=batches.filter(item=>item.id!==batch.id);activeBatch=batches[Math.min(index,batches.length-1)]?.id||batches[0].id;closeResearchMenus();syncBatch();render();animateBatchControl()}
 async function importResearchBreakpointFile(file){
  const backup=JSON.parse(await file.text());
@@ -209,6 +222,7 @@ const originalExportBreakpoint=$('#exportBreakpoint').onclick;
 $('#exportBreakpoint').onclick=event=>{closeResearchMenus();originalExportBreakpoint.call(event.currentTarget,event)};
 const originalAddBreakpoint=$('#addBreakpoint').onclick;
 $('#addBreakpoint').onclick=event=>{closeResearchMenus();originalAddBreakpoint.call(event.currentTarget,event);animateBatchControl()};
+$('#inheritBreakpoint').onclick=inheritResearchBreakpoint;
 $('#deleteBreakpoint').onclick=deleteActiveBreakpoint;
 $('#batchSelect').onchange=event=>{activeBatch=event.target.value;syncBatch();render();animateBatchControl()};
 $$('.research-menu').forEach(menu=>menu.addEventListener('toggle',()=>{if(menu.open)$$('.research-menu').forEach(other=>{if(other!==menu)other.open=false})}));
