@@ -566,9 +566,73 @@
     return { rows: [...rowSet], cols: [...colSet], cell: (row, col) => result.get(`${row}\u0000${col}`) || null, testedCells: tested, adjustedAlpha: adjusted };
   }
 
+  // ---- Strategy version comparison (pairwise Welch tests, Bonferroni-corrected) ----
+  function versionComparison(items, labelOf, { minN = 5, alpha = 0.05 } = {}) {
+    const groups = new Map();
+    for (const trade of items || []) {
+      const r = rOf(trade);
+      const label = labelOf(trade);
+      if (r === null || !label) continue;
+      const bucket = groups.get(label) || [];
+      bucket.push(r);
+      groups.set(label, bucket);
+    }
+    const everything = [...groups.values()].flat();
+    const rows = [...groups.entries()].map(([label, values]) => {
+      const core = basics(values);
+      const rest = everything.length - values.length;
+      return { label, ...core, enough: values.length >= minN, vsRest: values.length >= minN && rest >= minN ? welch(values, restOf(groups, label)) : null };
+    }).sort((a, b) => b.mean - a.mean);
+    const eligible = rows.filter((row) => row.enough);
+    const pairs = [];
+    for (let i = 0; i < eligible.length; i += 1) {
+      for (let j = i + 1; j < eligible.length; j += 1) {
+        const test = welch(groups.get(eligible[i].label), groups.get(eligible[j].label));
+        pairs.push({ a: eligible[i].label, b: eligible[j].label, diff: test.diff, p: test.p });
+      }
+    }
+    const adjusted = pairs.length ? alpha / pairs.length : alpha;
+    return { rows, pairs: pairs.map((pair) => ({ ...pair, significant: pair.p < adjusted, looksSignificant: pair.p < alpha })), adjustedAlpha: adjusted };
+  }
+  function restOf(groups, label) {
+    return [...groups.entries()].filter(([key]) => key !== label).flatMap(([, values]) => values);
+  }
+
+  // ---- Partial exits: which leg earns the R, and do scale-outs beat single exits? ----
+  function partialExitAnalysis(items) {
+    const list = (items || []).filter((trade) => rOf(trade) !== null);
+    const scaled = list.filter((trade) => Array.isArray(trade.partialExits) && trade.partialExits.length >= 2);
+    const single = list.filter((trade) => !(Array.isArray(trade.partialExits) && trade.partialExits.length >= 2));
+    const base = { total: list.length, scaled: scaled.length, single: single.length };
+    const legRows = [];
+    for (const trade of scaled) {
+      const risk = num(trade.initialRiskMoney);
+      if (!risk || risk <= 0) continue;
+      const legs = [...trade.partialExits].sort((a, b) => String(a.closeTime || "").localeCompare(String(b.closeTime || "")));
+      legs.forEach((leg, index) => {
+        const profit = num(leg.profit);
+        if (profit !== null) legRows.push({ index: Math.min(index, 2), contribution: profit / risk, last: index === legs.length - 1 });
+      });
+    }
+    const labels = ["第 1 筆出場", "第 2 筆出場", "第 3 筆以後"];
+    const legs = labels.map((label, index) => {
+      const values = legRows.filter((row) => row.index === index).map((row) => row.contribution);
+      return { label, n: values.length, mean: values.length ? mean(values) : null, total: sum(values) };
+    });
+    const totalContribution = sum(legRows.map((row) => row.contribution));
+    const comparison = scaled.length >= 3 && single.length >= 3 ? welch(scaled.map(rOf), single.map(rOf)) : null;
+    return {
+      ...base,
+      legs: legs.map((row) => ({ ...row, share: totalContribution ? row.total / totalContribution : null })),
+      scaledStats: scaled.length ? basics(scaled.map(rOf)) : null,
+      singleStats: single.length ? basics(single.map(rOf)) : null,
+      comparison,
+    };
+  }
+
   root.TradingNoteStats = {
     finite, num, mean, sd, median, quantile, mulberry32, tTwoSidedP, welch, basics, edgeSignificance, drawdownProfile,
     dailyR, empiricalKelly, riskAdjusted, breachProbability, rollingMetrics, edgeDecay, afterLosses, runsTest,
-    exitQuality, holdingAnalysis, costAnalysis, exposureAnalysis, crossTab, pearson,
+    exitQuality, holdingAnalysis, costAnalysis, exposureAnalysis, crossTab, pearson, versionComparison, partialExitAnalysis,
   };
 })(globalThis);

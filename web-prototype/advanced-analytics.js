@@ -293,7 +293,33 @@
       <p class="adv-note">★ 校正後顯著（α = ${tab.adjustedAlpha.toFixed(4)}，共檢定 ${tab.testedCells} 格）　☆ 未校正顯著，很可能只是運氣　灰色＝少於 5 筆，不檢定</p>`)}`;
   }
 
-  const RENDERERS = { risk: renderRisk, sequence: renderSequence, exit: renderExit, hold: renderHold, cost: renderCost, exposure: renderExposure, cross: renderCross };
+  function renderVersions(items) {
+    const info = S.versionComparison(items, (trade) => (trade.strategyVersionId && context.strategyLabel ? context.strategyLabel(trade.strategyVersionId) : null));
+    const partial = S.partialExitAnalysis(items);
+    const versionBlock = !info.rows.length
+      ? block("策略版本比較", "", empty("交易還沒有綁定策略版本。在交易紀錄中選擇策略版本後，這裡會比較各版本的期望值是否真的不同。"))
+      : block("策略版本比較", "每個版本的表現，以及版本之間的差距是否顯著。少於 5 筆的版本只列出、不檢定。", `
+        ${table(["版本", "筆數", "平均 R", "勝率", "Profit Factor", "總 R", "對其他版本"], info.rows.map((row) => [
+          esc(row.label), String(row.n), `<b class="${tone(row.mean)}">${signedR(row.mean)}</b>`, pct(row.winRate, 0), fixed(row.profitFactor), `<span class="${tone(row.total)}">${signedR(row.total)}</span>`,
+          row.vsRest ? `${signedR(row.vsRest.diff)}（p = ${fixed(row.vsRest.p, 3)}）` : '<span class="adv-muted">樣本不足</span>',
+        ]))}
+        ${info.pairs.length ? `<div class="adv-table-wrap adv-gap">${table(["比較", "平均 R 差", "p 值", "結論"], info.pairs.map((pair) => [
+          `${esc(pair.a)} vs ${esc(pair.b)}`, signedR(pair.diff), fixed(pair.p, 3),
+          pair.significant ? "<b class=\"profit-pos\">差異顯著（校正後）</b>" : pair.looksSignificant ? "未校正顯著，可能是雜訊" : "看不出差異",
+        ]))}</div><p class="adv-note">兩兩比較共 ${info.pairs.length} 組，校正後門檻 α = ${info.adjustedAlpha.toFixed(4)}。版本差距小、樣本少時，看不出差異是正常的，不代表版本沒用。</p>` : ""}`);
+    const exitBlock = !partial.scaled
+      ? block("分批出場貢獻", "", empty("沒有分批出場的交易。匯入 MT4 EA 紀錄中分多筆平倉的單子後，這裡會拆出每一段貢獻多少 R。"))
+      : block("分批出場貢獻", `${partial.scaled} 筆分批出場、${partial.single} 筆一次出場。看哪一段出場賺走了大部分 R。`, `
+        ${table(["出場順序", "筆數", "平均貢獻 R", "占總貢獻"], partial.legs.filter((row) => row.n).map((row) => [row.label, String(row.n), `<b class="${tone(row.mean)}">${signedR(row.mean)}</b>`, isNum(row.share) ? share(row.share) : "—"]))}
+        ${partial.scaledStats && partial.singleStats ? `<div class="adv-gap">${table(["出場方式", "筆數", "平均 R", "勝率", "Profit Factor"], [
+          ["分批出場", String(partial.scaledStats.n), `<b class="${tone(partial.scaledStats.mean)}">${signedR(partial.scaledStats.mean)}</b>`, pct(partial.scaledStats.winRate, 0), fixed(partial.scaledStats.profitFactor)],
+          ["一次出場", String(partial.singleStats.n), `<b class="${tone(partial.singleStats.mean)}">${signedR(partial.singleStats.mean)}</b>`, pct(partial.singleStats.winRate, 0), fixed(partial.singleStats.profitFactor)],
+        ])}</div>` : ""}
+        ${partial.comparison ? `<div class="adv-verdict ${partial.comparison.p < 0.05 ? (partial.comparison.diff > 0 ? "good" : "bad") : "warn"}"><strong>${partial.comparison.p < 0.05 ? (partial.comparison.diff > 0 ? "分批出場顯著較好" : "分批出場顯著較差") : "分批與一次出場看不出顯著差異"}</strong><p>平均差 ${signedR(partial.comparison.diff)}，p = ${fixed(partial.comparison.p, 3)}。注意兩組可能因進場品質不同而不可比。</p></div>` : ""}`);
+    return versionBlock + exitBlock;
+  }
+
+  const RENDERERS = { risk: renderRisk, sequence: renderSequence, exit: renderExit, hold: renderHold, cost: renderCost, exposure: renderExposure, cross: renderCross, versions: renderVersions };
 
   function draw() {
     tabs.forEach((button) => button.classList.toggle("active", button.dataset.advTab === state.tab));

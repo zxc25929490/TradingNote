@@ -105,3 +105,6 @@
 }
 
 .adv-table th { text-transform: none; letter-spacing: 0; }
+
+.adv-gap { margin-top: 12px; }
+.adv-muted { color: var(--muted); }

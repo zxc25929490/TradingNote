@@ -158,13 +158,42 @@ assert.equal(table.cell("NY", "Tue").enough, false, "thin cells are not tested")
 assert.equal(table.cell("Asia", "Mon").significant, true);
 assert.equal(table.cell("Asia", "Tue"), null);
 
+// Strategy versions: a clearly better version is significant after correction, a thin one is not tested.
+const versionTrades = [];
+for (let i = 0; i < 12; i += 1) versionTrades.push({ v: "V2", r: 1.5 + (i % 3) * 0.1 });
+for (let i = 0; i < 12; i += 1) versionTrades.push({ v: "V1", r: -0.5 + (i % 3) * 0.1 });
+for (let i = 0; i < 3; i += 1) versionTrades.push({ v: "V3", r: 9 });
+const versions = S.versionComparison(versionTrades, (trade) => trade.v);
+assert.equal(versions.rows[0].label, "V3", "rows sorted by mean R");
+assert.equal(versions.rows.find((row) => row.label === "V3").enough, false);
+assert.equal(versions.rows.find((row) => row.label === "V3").vsRest, null);
+assert.equal(versions.pairs.length, 1, "only versions with enough trades are compared");
+assert.equal(versions.pairs[0].significant, true);
+assert.ok(versions.pairs[0].diff !== 0);
+assert.equal(S.versionComparison([{ r: 1 }], () => null).rows.length, 0);
+
+// Partial exits: contribution per leg and scale-out vs single-exit comparison.
+const scaled = (profits, risk = 100) => ({ r: profits.reduce((a, b) => a + b, 0) / risk, initialRiskMoney: risk, partialExits: profits.map((profit, index) => ({ profit, closeTime: `2026.01.01 1${index}:00` })) });
+const partial = S.partialExitAnalysis([
+  scaled([100, 200]), scaled([50, 150]), scaled([100, -50, 250]),
+  { r: 1 }, { r: -1 }, { r: 2 },
+]);
+assert.equal(partial.scaled, 3);
+assert.equal(partial.single, 3);
+assert.equal(partial.legs[0].n, 3);
+assert.equal(partial.legs[0].mean, (1 + 0.5 + 1) / 3);
+assert.equal(partial.legs[2].n, 1);
+assert.ok(Math.abs(partial.legs.reduce((sum, row) => sum + row.share, 0) - 1) < 1e-9, "leg shares add to 100%");
+assert.ok(partial.comparison, "enough trades on both sides to compare");
+assert.equal(S.partialExitAnalysis([{ r: 1 }]).scaledStats, null);
+
 // The dashboard must load the maths module before the panel and hand it the filtered trades.
 import fs from "node:fs";
 const html = fs.readFileSync(new URL("../../web-prototype/index.html", import.meta.url), "utf8");
 const app = fs.readFileSync(new URL("../../web-prototype/app.js", import.meta.url), "utf8");
 assert.ok(html.indexOf("shared/stats.js") > 0 && html.indexOf("shared/stats.js") < html.indexOf("advanced-analytics.js"), "stats.js loads first");
 assert.match(html, /id="advancedAnalytics"/);
-for (const tab of ["risk", "sequence", "exit", "hold", "cost", "exposure", "cross"]) assert.match(html, new RegExp(`data-adv-tab="${tab}"`));
+for (const tab of ["risk", "sequence", "exit", "hold", "cost", "exposure", "cross", "versions"]) assert.match(html, new RegExp(`data-adv-tab="${tab}"`));
 assert.match(app, /TradingNoteAdvancedAnalytics\?\.render\(items/);
 
 console.log("Stats tests passed");
