@@ -108,3 +108,9 @@
 
 .adv-gap { margin-top: 12px; }
 .adv-muted { color: var(--muted); }
+
+.adv-why { margin: 12px 0 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); font-size: .85rem; }
+.adv-why summary { cursor: pointer; font-weight: 700; }
+.adv-why ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); line-height: 1.7; }
+.adv-check { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--muted); font-size: .84rem; }
+.adv-check input { width: 16px; height: 16px; accent-color: var(--accent); }

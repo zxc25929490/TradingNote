@@ -149,24 +149,42 @@
       ${block("虧損之後的下一筆", runsText, table(["情境", "下一筆筆數", "平均 R", "勝率"], after.map((row) => [row.label, String(row.n), `<b class="${tone(row.mean)}">${row.n ? signedR(row.mean) : "—"}</b>`, row.n ? pct(row.winRate, 0) : "—"])))}`;
   }
 
-  // Reuse the TP analysis page's path logic: MFE/MAE may be stored as prices or inside partial-exit legs,
-  // and trades whose price path was not captured reliably are left out instead of skewing the result.
-  function withPathMetrics(items) {
+  // Reuse the TP analysis page's path logic: MFE/MAE may be stored as prices or inside partial-exit legs.
+  // Trades whose price path was not captured reliably are left out unless the viewer opts in.
+  const REASONS = {
+    missing_mfe: "沒有 MFE / MAE 紀錄（交易不是由 EA 匯入，或 EA 沒記到價格路徑）",
+    missing_risk: "缺少初始止損，無法換算成 R",
+    partial_capture: "價格路徑抓取不完整（EA 中途啟動、重啟或只抓到部分）",
+    not_trade: "漏單／錯過的機會（沒有實際進場）",
+  };
+  function withPathMetrics(items, includePartial) {
     const tp = window.TradingNoteTpAnalysis;
-    if (!tp) return items;
-    return items.map((trade) => {
-      if (trade.recordType === "missed_opportunity") return { ...trade, mfeR: null, maeR: null };
-      const reliable = tp.captureIsReliable(trade);
-      const mfe = reliable ? tp.positionMfe(trade) : null;
-      const mae = reliable ? tp.positionMae(trade) : null;
+    const reasons = {};
+    if (!tp) return { items, reasons };
+    const mapped = items.map((trade) => {
+      const reason = tp.eligibilityReason(trade);
+      const usable = reason === "eligible" || (includePartial && reason === "partial_capture");
+      if (!usable) {
+        reasons[reason] = (reasons[reason] || 0) + 1;
+        return { ...trade, mfeR: null, maeR: null };
+      }
+      const mfe = tp.positionMfe(trade);
+      const mae = tp.positionMae(trade);
       return { ...trade, mfeR: Number.isFinite(mfe) ? mfe : null, maeR: Number.isFinite(mae) ? mae : null };
     });
+    return { items: mapped, reasons };
   }
+  const reasonList = (reasons) => Object.entries(reasons).filter(([, count]) => count).map(([key, count]) => `<li>${esc(REASONS[key] || key)}：<b>${count}</b> 筆</li>`).join("");
 
   function renderExit(rawItems) {
-    const items = withPathMetrics(rawItems);
+    const { items, reasons } = withPathMetrics(rawItems, Boolean(state.includePartial));
     const info = S.exitQuality(items);
-    if (!info.covered) return coverage(info, " MFE 紀錄");
+    const partialCount = reasons.partial_capture || 0;
+    const toggle = partialCount || state.includePartial
+      ? `<label class="adv-check"><input type="checkbox" data-adv-input="includePartial" ${state.includePartial ? "checked" : ""}> 納入抓取不完整的交易（僅供參考，MFE 可能偏低）</label>` : "";
+    const why = Object.values(reasons).some(Boolean)
+      ? `<details class="adv-why" ${info.covered ? "" : "open"}><summary>${info.covered ? `有 ${Object.values(reasons).reduce((a, b) => a + b, 0)} 筆未納入，查看原因` : "為什麼沒有資料？"}</summary><ul>${reasonList(reasons)}</ul></details>` : "";
+    if (!info.covered) return `${empty(`目前 0 / ${info.total} 筆交易有可用的 MFE / MAE。`)}${why}${toggle}`;
     const scatter = (() => {
       const points = info.points;
       if (points.length < 3) return empty("需要至少 3 筆同時有 MAE 與 MFE 的交易。");
@@ -181,7 +199,7 @@
         ${points.map((p) => `<circle cx="${sx(p.mae).toFixed(1)}" cy="${sy(p.mfe).toFixed(1)}" r="4.5" class="${p.r > 0 ? "win" : p.r < 0 ? "loss" : "be"}"><title>R ${p.r.toFixed(2)}｜MAE ${p.mae.toFixed(2)}｜MFE ${p.mfe.toFixed(2)}</title></circle>`).join("")}
         <text x="580" y="282" text-anchor="end" class="adv-label">最大不利 MAE（-R）→</text><text x="40" y="16" class="adv-label">↑ 最大有利 MFE（R）</text></svg></div>`;
     })();
-    return `${coverage(info, " MFE 紀錄")}
+    return `${coverage(info, " MFE 紀錄")}${why}${toggle}
       ${block("出場品質", "看你有沒有把行情拿完整、又有沒有把賺到的吐回去。", cards([
         card("贏單平均 MFE", signedR(info.avgMfeWin), "賺的單最多曾走到多遠"),
         card("贏單平均 MAE", signedR(info.avgMaeWin), "賺的單中途最深的浮虧"),
@@ -356,7 +374,7 @@
     const input = event.target.closest("[data-adv-input]");
     if (!input) return;
     const key = input.dataset.advInput;
-    state[key] = input.type === "number" ? Number(input.value) : input.value;
+    state[key] = input.type === "number" ? Number(input.value) : input.type === "checkbox" ? input.checked : input.value;
     persist();
     draw();
   });
