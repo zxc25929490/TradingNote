@@ -847,99 +847,6 @@ function attachRippleFeedback() {
   });
 }
 
-function attachCursorClickEffects() {
-  document.addEventListener("pointerdown", (event) => {
-    if (!motionAllowed || event.pointerType === "touch") return;
-    const burst = document.createElement("span");
-    burst.className = "cursor-click-burst";
-    burst.style.left = `${event.clientX}px`;
-    burst.style.top = `${event.clientY}px`;
-    document.body.appendChild(burst);
-    burst.addEventListener("animationend", () => burst.remove(), { once: true });
-
-    for (let index = 0; index < 6; index += 1) {
-      const spark = document.createElement("span");
-      const angle = (Math.PI * 2 * index) / 6 + Math.random() * 0.35;
-      const distance = 14 + Math.random() * 18;
-      spark.className = "cursor-click-spark";
-      spark.style.left = `${event.clientX}px`;
-      spark.style.top = `${event.clientY}px`;
-      spark.style.setProperty("--tx", `${Math.cos(angle) * distance}px`);
-      spark.style.setProperty("--ty", `${Math.sin(angle) * distance}px`);
-      document.body.appendChild(spark);
-      spark.addEventListener("animationend", () => spark.remove(), { once: true });
-    }
-  });
-}
-
-function attachCustomCursor() {
-  if (!motionAllowed || window.matchMedia("(pointer: coarse)").matches) return;
-  const cursor = document.createElement("span");
-  cursor.className = "custom-cursor-dot";
-  document.body.appendChild(cursor);
-  document.body.classList.add("custom-cursor-enabled");
-
-  const moveCursor = (event) => {
-    if (event.pointerType === "touch") return;
-    cursor.style.left = `${event.clientX}px`;
-    cursor.style.top = `${event.clientY}px`;
-    cursor.classList.add("visible");
-    const interactive = event.target.closest?.("button, a, input, select, textarea, label, [tabindex]");
-    cursor.classList.toggle("interactive", Boolean(interactive));
-  };
-
-  document.addEventListener("pointermove", moveCursor);
-  document.addEventListener("pointerdown", () => cursor.classList.add("dragging"));
-  document.addEventListener("pointerup", () => cursor.classList.remove("dragging"));
-  document.addEventListener("pointercancel", () => cursor.classList.remove("dragging"));
-  document.addEventListener("pointerleave", () => cursor.classList.remove("visible"));
-  document.addEventListener("pointerenter", (event) => {
-    moveCursor(event);
-  });
-}
-
-function attachCursorTrailEffects() {
-  let lastTrailAt = 0;
-  let dragging = false;
-  document.addEventListener("pointerdown", (event) => {
-    if (event.pointerType !== "touch") dragging = true;
-  });
-  document.addEventListener("pointerup", () => {
-    dragging = false;
-  });
-  document.addEventListener("pointercancel", () => {
-    dragging = false;
-  });
-  document.addEventListener("pointermove", (event) => {
-    if (!motionAllowed || event.pointerType === "touch") return;
-    const now = performance.now();
-    if (now - lastTrailAt < (dragging ? 14 : 30)) return;
-    lastTrailAt = now;
-
-    const dot = document.createElement("span");
-    const speed = Math.min(24, Math.abs(event.movementX) + Math.abs(event.movementY));
-    const size = (dragging ? 13 : 8) + speed * (dragging ? 0.62 : 0.32);
-    dot.className = `cursor-trail-dot ${dragging ? "dragging" : ""}`;
-    dot.style.left = `${event.clientX}px`;
-    dot.style.top = `${event.clientY}px`;
-    dot.style.width = `${size}px`;
-    dot.style.height = `${size}px`;
-    document.body.appendChild(dot);
-    dot.addEventListener("animationend", () => dot.remove(), { once: true });
-
-    if (!dragging) return;
-    const streak = document.createElement("span");
-    const angle = Math.atan2(event.movementY || 0, event.movementX || 1) * (180 / Math.PI);
-    streak.className = "cursor-drag-streak";
-    streak.style.left = `${event.clientX}px`;
-    streak.style.top = `${event.clientY}px`;
-    streak.style.width = `${42 + speed * 3}px`;
-    streak.style.rotate = `${angle}deg`;
-    document.body.appendChild(streak);
-    streak.addEventListener("animationend", () => streak.remove(), { once: true });
-  });
-}
-
 function parseTradeDate(trade) {
   if (!trade.date) return null;
   const date = new Date(`${trade.date}T00:00:00`);
@@ -4349,9 +4256,6 @@ renderCalc();
 runReturnSimulation();
 resetTradeForm();
 attachRippleFeedback();
-attachCustomCursor();
-attachCursorClickEffects();
-attachCursorTrailEffects();
 render();
 
 [els.year, els.pair, els.outcome, els.window, els.search].forEach((el) => el.addEventListener("input", render));

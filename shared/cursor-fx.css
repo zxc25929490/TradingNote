@@ -1,0 +1,100 @@
+/* Shared cursor effects (see cursor-fx.js). Colors come from --fx-cursor-primary / --fx-cursor-secondary. */
+.fx-cursor-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  pointer-events: none;
+}
+
+/* Reset the UA popover box model (zero specificity, so each element's own rules still win) */
+:where(.fx-cursor-canvas[popover], .fx-cursor-ring[popover], .fx-cursor-core[popover]) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+}
+
+.fx-cursor-ring,
+.fx-cursor-core {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  z-index: 2147483001;
+  display: block;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform;
+}
+
+.fx-cursor-ring.visible,
+.fx-cursor-core.visible { opacity: 1; }
+
+.fx-cursor-ring {
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 1.5px solid color-mix(in srgb, var(--fx-cursor-primary, #25d7b2) 80%, transparent);
+  background: radial-gradient(circle, color-mix(in srgb, var(--fx-cursor-primary, #25d7b2) 14%, transparent), transparent 70%);
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--fx-cursor-primary, #25d7b2) 45%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--fx-cursor-primary, #25d7b2) 22%, transparent);
+  transition: width 220ms cubic-bezier(0.34, 1.56, 0.64, 1), height 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    margin 220ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 180ms ease, opacity 160ms ease;
+}
+
+/* Rotating dashed halo shown while hovering something clickable */
+.fx-cursor-ring::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 1.5px dashed var(--fx-cursor-secondary, #ffb43a);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 180ms ease, transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fx-cursor-ring.interactive {
+  width: 50px;
+  height: 50px;
+  margin: -25px 0 0 -25px;
+  border-color: var(--fx-cursor-secondary, #ffb43a);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--fx-cursor-secondary, #ffb43a) 55%, transparent);
+}
+
+.fx-cursor-ring.interactive::after {
+  opacity: 0.9;
+  transform: scale(1);
+  animation: fx-cursor-spin 3.2s linear infinite;
+}
+
+.fx-cursor-ring.pressed {
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--fx-cursor-primary, #25d7b2) 50%, transparent), transparent 75%);
+}
+
+.fx-cursor-core {
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  background: #fff;
+  box-shadow:
+    0 0 6px #fff,
+    0 0 14px var(--fx-cursor-primary, #25d7b2),
+    0 0 28px var(--fx-cursor-primary, #25d7b2);
+}
+
+@keyframes fx-cursor-spin { to { rotate: 360deg; } }
+
+@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+  .fx-cursor-canvas, .fx-cursor-ring, .fx-cursor-core { display: none; }
+}
