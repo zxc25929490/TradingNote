@@ -149,7 +149,22 @@
       ${block("虧損之後的下一筆", runsText, table(["情境", "下一筆筆數", "平均 R", "勝率"], after.map((row) => [row.label, String(row.n), `<b class="${tone(row.mean)}">${row.n ? signedR(row.mean) : "—"}</b>`, row.n ? pct(row.winRate, 0) : "—"])))}`;
   }
 
-  function renderExit(items) {
+  // Reuse the TP analysis page's path logic: MFE/MAE may be stored as prices or inside partial-exit legs,
+  // and trades whose price path was not captured reliably are left out instead of skewing the result.
+  function withPathMetrics(items) {
+    const tp = window.TradingNoteTpAnalysis;
+    if (!tp) return items;
+    return items.map((trade) => {
+      if (trade.recordType === "missed_opportunity") return { ...trade, mfeR: null, maeR: null };
+      const reliable = tp.captureIsReliable(trade);
+      const mfe = reliable ? tp.positionMfe(trade) : null;
+      const mae = reliable ? tp.positionMae(trade) : null;
+      return { ...trade, mfeR: Number.isFinite(mfe) ? mfe : null, maeR: Number.isFinite(mae) ? mae : null };
+    });
+  }
+
+  function renderExit(rawItems) {
+    const items = withPathMetrics(rawItems);
     const info = S.exitQuality(items);
     if (!info.covered) return coverage(info, " MFE 紀錄");
     const scatter = (() => {
