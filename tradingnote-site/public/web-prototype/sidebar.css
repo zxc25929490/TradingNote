@@ -1,0 +1,64 @@
+/* Collapsible sidebar (see sidebar.js) */
+.brand { position: relative; }
+.sidebar-rail-toggle {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 1px solid #2b3238;
+  border-radius: 7px;
+  background: transparent;
+  color: #98a3ac;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sidebar-rail-toggle:hover { border-color: var(--accent); color: #fff; }
+
+.nav-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% - 12px);
+  padding: 6px 0 2px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-group-toggle:hover { color: #fff; }
+.nav-group-toggle i { font-style: normal; font-size: 11px; transition: transform 180ms ease; }
+.nav-group-toggle[aria-expanded="false"] i { transform: rotate(-90deg); }
+
+.nav-group { display: grid; gap: 6px; }
+/* A folded group still shows the page you are on, so you never lose your place. */
+.nav-group.collapsed > a:not(.active) { display: none; }
+
+@media (min-width: 981px) {
+  .sidebar, .shell { transition: width 200ms ease, margin-left 200ms ease, padding 200ms ease; }
+
+  body.sidebar-rail .sidebar { width: 76px; padding-inline: 12px; }
+  body.sidebar-rail .shell { margin-left: 76px; }
+  body.sidebar-rail .brand { flex-direction: column; gap: 10px; }
+  body.sidebar-rail .brand > div:not(.brand-mark) { display: none; }
+  body.sidebar-rail .sidebar-rail-toggle { margin: 0; }
+
+  body.sidebar-rail .system-switcher a { grid-template-columns: 1fr; justify-items: center; padding: 7px 0; }
+  body.sidebar-rail .system-switcher a b { display: none; }
+
+  body.sidebar-rail .nav-group-toggle { display: none; }
+  body.sidebar-rail .nav-group.collapsed > a:not(.active) { display: flex; }
+  body.sidebar-rail .nav-group { padding-bottom: 6px; border-bottom: 1px solid #242a30; }
+  body.sidebar-rail nav a { justify-content: center; padding: 11px 0; font-size: 0; gap: 0; }
+  body.sidebar-rail nav a span { font-size: 17px; }
+}
+
+/* Narrow screens keep the horizontal scrolling menu: groups dissolve into it and every link shows. */
+@media (max-width: 980px) {
+  .sidebar-rail-toggle, .nav-group-toggle { display: none; }
+  .nav-group { display: contents; }
+  .nav-group.collapsed > a:not(.active) { display: flex; }
+  nav a { flex: 0 0 auto; white-space: nowrap; }
+}
