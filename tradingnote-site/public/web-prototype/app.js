@@ -932,7 +932,7 @@ function readResearchBreakpoints() {
   for (const trade of researchTrades) {
     const batchId = String(trade.batchId || fallbackBatchId);
     if (!batchMap.has(batchId)) batchMap.set(batchId, { id: batchId, name: batchId, createdAt: "", trades: [] });
-    batchMap.get(batchId).trades.push(trade);
+    batchMap.get(batchId).trades.push(window.TradingNoteBacktestR.normalize(trade));
   }
   return { activeBatch, batches: Array.from(batchMap.values()) };
 }
@@ -943,7 +943,7 @@ function populateResearchBreakpointOptions() {
   els.researchBreakpoint.innerHTML = [
     `<option value="">不比較回測</option>`,
     ...batches.map((batch) => {
-      const rCount = batch.trades.filter((trade) => Number.isFinite(Number(trade.r)) && Number(trade.r) !== 0).length;
+      const rCount = batch.trades.filter((trade) => trade.r !== null).length;
       return `<option value="${batch.id}">${batch.name || batch.id}（${rCount} R）</option>`;
     }),
   ].join("");
@@ -962,7 +962,7 @@ function selectedResearchRValues() {
   if (!selected) return null;
   return {
     label: selected.name || selected.id,
-    values: selected.trades.map((trade) => Number(trade.r)).filter((value) => Number.isFinite(value) && value !== 0),
+    values: selected.trades.map((trade) => trade.r).filter((value) => value !== null),
   };
 }
 

@@ -29,7 +29,8 @@ assert.match(html, /web-prototype\/index\.html#trades/);
 assert.match(html, /review-system\/index\.html#queue/);
 assert.match(app, /r:replayValue/);
 assert.match(app, /maximumToRealized\(trade\.replayR\)/);
-assert.match(app, /maximumR:trade\.r,r:maximumToRealized\(trade\.r\)/);
+// Backtest maximum R is converted to realised R through the shared helper (see shared/backtest-r.js).
+assert.match(app, /TradingNoteBacktestR\.normalize\(trade\)/);
 assert.match(html, /shared\/partial-exit\.js/);
 assert.match(app, /① EXECUTION GAP/);
 assert.match(app, /② BACKTEST QUALITY GAP/);

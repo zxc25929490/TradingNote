@@ -38,7 +38,7 @@ function refreshData(){
 
 function batchLive(){return activeLive==='live-all'?liveTrades:liveTrades.filter(trade=>(trade.batchId||'live-default')===activeLive)}
 function maximumToRealized(value){return window.TradingNotePartialExit?.realizedR(value)??value}
-function batchBacktest(){return backtestTrades.filter(trade=>String(trade.batchId||backtestBatches[0]?.id||'')===String(activeBacktest)).map(trade=>({...trade,maximumR:trade.r,r:maximumToRealized(trade.r)}))}
+function batchBacktest(){return backtestTrades.filter(trade=>String(trade.batchId||backtestBatches[0]?.id||'')===String(activeBacktest)).map(trade=>window.TradingNoteBacktestR.normalize(trade))}
 function filterItems(items){const market=$('#marketSelect').value||'all',strategy=$('#strategySelect').value||'all';return items.filter(trade=>(market==='all'||marketOf(trade)===market)&&(strategy==='all'||strategyOf(trade)===strategy))}
 function selectedData(){
   const live=filterItems(batchLive()),backtest=filterItems(batchBacktest());
