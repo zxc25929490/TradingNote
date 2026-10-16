@@ -6,7 +6,7 @@ const css = read("../sidebar.css");
 const js = read("../sidebar.js");
 
 // Every system loads the same collapsible sidebar.
-for (const system of ["web-prototype", "research-system", "review-system", "analysis-system"]) {
+for (const system of ["live-system", "research-system", "review-system", "analysis-system"]) {
   const html = read(`../../${system}/index.html`);
   assert.match(html, /\.\.\/shared\/sidebar\.css\?v=/, `${system} loads sidebar.css`);
   assert.match(html, /\.\.\/shared\/sidebar\.js\?v=/, `${system} loads sidebar.js`);
@@ -15,7 +15,7 @@ for (const system of ["web-prototype", "research-system", "review-system", "anal
 
 // Every system groups its menu, and every group has at least one page to open.
 const EXPECTED_GROUPS = {
-  "web-prototype": ["每天", "每週檢討", "每月驗證", "目標規劃"],
+  "live-system": ["每天", "每週檢討", "每月驗證", "目標規劃"],
   "research-system": ["總覽與紀錄", "規則與版本", "驗證分析"],
   "review-system": ["每次復盤", "定期檢討"],
   "analysis-system": ["找出問題", "驗證策略"],

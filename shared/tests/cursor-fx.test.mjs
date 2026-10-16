@@ -77,13 +77,13 @@ function createHarness(pathname, { reduced = false, fine = true, popover = true 
 }
 
 // Each system loads the same module and gets its own palette without throwing.
-for (const path of ["/web-prototype/index.html", "/research-system/index.html", "/review-system/index.html", "/analysis-system/index.html"]) {
+for (const path of ["/live-system/index.html", "/research-system/index.html", "/review-system/index.html", "/analysis-system/index.html"]) {
   const h = createHarness(path);
   assert.ok(h.listeners.pointermove?.length, `${path} must register pointer handlers`);
 }
 
 // Movement + click produce visible drawing, then everything settles and the loop stops.
-const h = createHarness("/web-prototype/index.html");
+const h = createHarness("/live-system/index.html");
 for (let i = 0; i < 20; i += 1) h.fire("pointermove", { clientX: 100 + i * 12, clientY: 200 });
 h.fire("pointerdown", { clientX: 340, clientY: 200 });
 assert.ok(h.rafQueue.length > 0, "pointer activity must schedule animation");
@@ -95,7 +95,7 @@ assert.ok(h.draws.fill > 0, "sparkle stars must be drawn");
 assert.ok(frames < 400, "animation loop must stop once particles fade out");
 
 // Overlay lives in the top layer and is re-raised above any dialog that opens later.
-const modal = createHarness("/web-prototype/index.html");
+const modal = createHarness("/live-system/index.html");
 assert.equal(modal.topLayer.length, 3, "canvas, ring and core must be promoted to the top layer");
 const original = [...modal.topLayer];
 modal.topLayer.push({ id: "dialog" }); // a modal <dialog> opened after the overlay
@@ -105,12 +105,12 @@ assert.equal(modal.topLayer.length, 4, "no duplicates after re-raise");
 assert.deepEqual(modal.topLayer.slice(-3), original, "overlay must sit above the newly opened dialog");
 
 // Browsers without the Popover API keep working with the plain fixed overlay.
-const legacy = createHarness("/web-prototype/index.html", { popover: false });
+const legacy = createHarness("/live-system/index.html", { popover: false });
 assert.equal(legacy.observers.length, 0);
 assert.ok(legacy.listeners.pointermove?.length);
 
 // Reduced motion and touch-only devices get no effects at all.
-assert.equal(createHarness("/web-prototype/index.html", { reduced: true }).listeners.pointermove, undefined);
-assert.equal(createHarness("/web-prototype/index.html", { fine: false }).listeners.pointermove, undefined);
+assert.equal(createHarness("/live-system/index.html", { reduced: true }).listeners.pointermove, undefined);
+assert.equal(createHarness("/live-system/index.html", { fine: false }).listeners.pointermove, undefined);
 
 console.log("Cursor FX tests passed");

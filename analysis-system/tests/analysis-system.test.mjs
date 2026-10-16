@@ -8,7 +8,7 @@ const monteCarloCss = fs.readFileSync(new URL("../monte-carlo.css", import.meta.
 const statistical = fs.readFileSync(new URL("../statistical-confidence.js", import.meta.url), "utf8");
 const statisticalCss = fs.readFileSync(new URL("../statistical-confidence.css", import.meta.url), "utf8");
 const siblingPages = [
-  new URL("../../web-prototype/index.html", import.meta.url),
+  new URL("../../live-system/index.html", import.meta.url),
   new URL("../../research-system/index.html", import.meta.url),
   new URL("../../review-system/index.html", import.meta.url),
 ].map(url => fs.readFileSync(url, "utf8"));
@@ -25,7 +25,7 @@ assert.match(html, /行情重建/);
 assert.match(html, /Replay/);
 assert.match(html, /research-system\/index\.html#strategies/);
 assert.match(html, /research-system\/index\.html#journal/);
-assert.match(html, /web-prototype\/index\.html#trades/);
+assert.match(html, /live-system\/index\.html#trades/);
 assert.match(html, /review-system\/index\.html#queue/);
 assert.match(app, /r:replayValue/);
 assert.match(app, /maximumToRealized\(trade\.replayR\)/);

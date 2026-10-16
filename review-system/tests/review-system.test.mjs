@@ -69,7 +69,7 @@ vm.runInContext(`replaySessions=[{key:'live-default::2026-08-26',manualStatus:'d
 assert.equal(sandbox.effectiveReviewClass({batchId:'live-default',date:'2026-08-26',reviewClass:'correct_execution'}),'execution_error');
 vm.runInContext(`replaySessions=[{key:'live-default::2026-08-26',manualStatus:'partial'}]`,sandbox);
 assert.equal(sandbox.effectiveReviewClass({batchId:'live-default',date:'2026-08-26',reviewClass:'correct_execution'}),'correct_execution');
-assert.match(html, /href="\.\.\/web-prototype\/index\.html"/);
+assert.match(html, /href="\.\.\/live-system\/index\.html"/);
 assert.match(html, /href="\.\.\/research-system\/index\.html"/);
 assert.match(html, /id="reviewForm"/);
 assert.match(source, /openReviewView/);

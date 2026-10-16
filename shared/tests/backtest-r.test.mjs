@@ -38,11 +38,11 @@ delete globalThis.TradingNotePartialExit;
 
 // Every system that reads backtest records uses the shared helper instead of raw `trade.r`.
 const read = (path) => fs.readFileSync(new URL(path, import.meta.url), "utf8");
-for (const system of ["web-prototype", "research-system", "analysis-system"]) {
+for (const system of ["live-system", "research-system", "analysis-system"]) {
   assert.match(read(`../../${system}/index.html`), /\.\.\/shared\/backtest-r\.js\?v=/, `${system} loads backtest-r.js`);
 }
 assert.match(read("../../research-system/app.js"), /TradingNoteBacktestR\.normalize/);
 assert.match(read("../../analysis-system/app.js"), /TradingNoteBacktestR\.normalize/);
-assert.match(read("../../web-prototype/app.js"), /TradingNoteBacktestR\.normalize/);
+assert.match(read("../../live-system/app.js"), /TradingNoteBacktestR\.normalize/);
 
 console.log("Backtest R tests passed");

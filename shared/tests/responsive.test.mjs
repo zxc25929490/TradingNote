@@ -7,10 +7,10 @@ const sidebarJs = read("../sidebar.js");
 const sharedCss = read("../responsive.css");
 
 // Every page declares a mobile viewport and loads the shared phone layout.
-for (const system of ["web-prototype", "research-system", "review-system", "analysis-system"]) {
+for (const system of ["live-system", "research-system", "review-system", "analysis-system"]) {
   const html = read(`../../${system}/index.html`);
   assert.match(html, /<meta name="viewport" content="width=device-width, ?initial-scale=1"/, `${system} viewport meta`);
-  if (system === "web-prototype") {
+  if (system === "live-system") {
     assert.match(html, /responsive\.css\?v=/);
     assert.match(html, /responsive\.js\?v=/);
   } else {
@@ -33,6 +33,6 @@ assert.match(sharedCss, /#reviewTableWrap thead \{ display: none; \}/);
 assert.match(sharedCss, /#reviewTableWrap tbody td:last-child \{ grid-column: 1 \/ -1; \}/);
 
 // Charts draw at their real width instead of a 640px minimum squeezed onto a phone.
-assert.doesNotMatch(read("../../web-prototype/app.js"), /Math\.max\(640, canvas\.clientWidth/);
+assert.doesNotMatch(read("../../live-system/app.js"), /Math\.max\(640, canvas\.clientWidth/);
 
 console.log("Responsive tests passed");

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <script>try{if(sessionStorage.getItem('tradingnote.system-switching')==='1')document.documentElement.classList.add('system-transition-pending')}catch(_){}</script>
   <title>TradingNote · 三層差異分析</title>
-  <link rel="icon" href="../web-prototype/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../live-system/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css?v=20260822-1">
   <link rel="stylesheet" href="workflow-guide.css?v=20260823-1">
   <link rel="stylesheet" href="monte-carlo.css?v=20260822-1">
@@ -19,7 +19,7 @@
   <aside class="sidebar">
     <div class="brand"><b>AX</b><span><strong>Gap Analysis</strong><small>Edge Diagnosis</small></span></div>
     <div class="system-switcher" aria-label="切換研究系統">
-      <a href="../web-prototype/index.html"><span>LIVE</span><b>實盤中樞</b></a>
+      <a href="../live-system/index.html"><span>LIVE</span><b>實盤中樞</b></a>
       <a href="../research-system/index.html"><span>BT</span><b>歷史回測</b></a>
       <a href="../review-system/index.html"><span>RV</span><b>實盤復盤</b></a>
       <a class="active" href="index.html"><span>AX</span><b>差異分析</b></a>
@@ -120,7 +120,7 @@
           <a class="workflow-card backtest" href="../research-system/index.html#journal">
             <small>02 · BACKTEST</small><b>歷史回測</b><p>只按照固定規則走歷史行情，驗證策略是否具有可重複的 Edge。</p><strong>前往回測紀錄 <span>→</span></strong>
           </a>
-          <a class="workflow-card live" href="../web-prototype/index.html#trades">
+          <a class="workflow-card live" href="../live-system/index.html#trades">
             <small>03 · LIVE</small><b>實盤執行</b><p>策略訊號加上當下判斷、真實執行，以及滑價與交易成本後的結果。</p><strong>前往實盤紀錄 <span>→</span></strong>
           </a>
           <a class="workflow-card review" href="../review-system/index.html#queue">
@@ -180,7 +180,7 @@
     </section>
   </main>
   <div id="toast" class="toast" hidden></div>
-  <script src="../web-prototype/data/trades.js"></script>
+  <script src="../live-system/data/trades.js"></script>
   <script src="../shared/partial-exit.js?v=20261003-zero-1"></script>
   <script src="../shared/backtest-r.js?v=20261016-1"></script>
   <script src="statistical-confidence.js?v=20260911-1"></script>

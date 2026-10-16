@@ -12,7 +12,7 @@ const check = process.argv.includes("--check");
 
 // source directory -> destination folders under tradingnote-site/public
 const MIRRORS = [
-  ["web-prototype", ["web-prototype", "tradingnote"]],
+  ["live-system", ["live-system", "tradingnote"]],
   ["research-system", ["research-system"]],
   ["review-system", ["review-system"]],
   ["analysis-system", ["analysis-system"]],

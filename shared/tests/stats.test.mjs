@@ -218,8 +218,8 @@ assert.equal(S.meanInterval([1]), null);
 
 // The dashboard must load the maths module before the panel and hand it the filtered trades.
 import fs from "node:fs";
-const html = fs.readFileSync(new URL("../../web-prototype/index.html", import.meta.url), "utf8");
-const app = fs.readFileSync(new URL("../../web-prototype/app.js", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../../live-system/index.html", import.meta.url), "utf8");
+const app = fs.readFileSync(new URL("../../live-system/app.js", import.meta.url), "utf8");
 assert.ok(html.indexOf("shared/stats.js") > 0 && html.indexOf("shared/stats.js") < html.indexOf("advanced-analytics.js"), "stats.js loads first");
 assert.match(html, /id="advancedAnalytics"/);
 for (const tab of ["risk", "sequence", "exit", "hold", "cost", "exposure", "cross", "versions"]) assert.match(html, new RegExp(`data-adv-tab="${tab}"`));
