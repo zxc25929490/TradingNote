@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="loop.css?v=20261004-2">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261004-1">
-  <link rel="stylesheet" href="../shared/sidebar.css?v=20261016-1">
+  <link rel="stylesheet" href="../shared/sidebar.css?v=20261016-3">
   <style>
     .table-sort{display:inline-flex;align-items:center;gap:6px;width:max-content;padding:2px 0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;white-space:nowrap;cursor:pointer}
     .table-sort::after{content:"↕";color:var(--muted);font-size:.78em;opacity:.45}.table-sort.active{color:var(--teal)}.table-sort.active[data-direction="asc"]::after{content:"↑";opacity:1}.table-sort.active[data-direction="desc"]::after{content:"↓";opacity:1}.table-sort:hover{color:var(--teal)}
@@ -29,7 +29,9 @@
       <a href="../analysis-system/index.html"><span>AX</span><b>差異分析</b></a>
     </div>
     <nav>
+      <span class="nav-section-title">每次復盤</span>
       <button class="active" data-view="queue"><span>◫</span>復盤工作台</button>
+      <span class="nav-section-title">定期檢討</span>
       <button data-view="patterns"><span>⌁</span>執行落差</button>
       <button data-view="lessons"><span>✓</span>復盤結論</button>
       <button data-view="loop"><span>↻</span>改善追蹤</button>

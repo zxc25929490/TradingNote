@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="tp-simulator.css?v=20261004-1">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261004-1">
-  <link rel="stylesheet" href="../shared/sidebar.css?v=20261016-1">
+  <link rel="stylesheet" href="../shared/sidebar.css?v=20261016-3">
   <style>
     .table-sort{display:inline-flex;align-items:center;gap:6px;width:max-content;padding:2px 0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;white-space:nowrap;cursor:pointer}
     .table-sort::after{content:"↕";color:var(--muted);font-size:.78em;opacity:.45}.table-sort.active{color:var(--teal)}.table-sort.active[data-direction="asc"]::after{content:"↑";opacity:1}.table-sort.active[data-direction="desc"]::after{content:"↓";opacity:1}.table-sort:hover{color:var(--teal)}
@@ -29,14 +29,17 @@
       <a href="../analysis-system/index.html"><span>AX</span><b>差異分析</b></a>
     </div>
     <nav id="nav">
+      <span class="nav-section-title">總覽與紀錄</span>
       <button class="active" data-view="dashboard">▦ <span>研究總覽</span></button>
       <button data-view="journal">◎ <span>回測紀錄</span></button>
-      <button data-view="tpsimulator">◎ <span>TP 模擬器</span></button>
-      <button data-view="strategies">◇ <span>策略版本</span></button>
       <button data-view="differences">≠ <span>決策差異</span><em id="diffBadge">0</em></button>
+      <span class="nav-section-title">規則與版本</span>
       <button data-view="rules">✓ <span>Rule Book</span></button>
       <button data-view="mistakes">! <span>錯誤資料庫</span></button>
+      <button data-view="strategies">◇ <span>策略版本</span></button>
+      <span class="nav-section-title">驗證分析</span>
       <button data-view="analytics">⌁ <span>深度分析</span></button>
+      <button data-view="tpsimulator">⌖ <span>TP 模擬器</span></button>
       <button data-view="reality">↔ <span>回測 vs 實盤</span></button>
     </nav>
     <div class="cycle">✦ <span><b>研究循環</b><small>觀察 → 驗證 → 規則化</small></span></div>

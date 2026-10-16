@@ -20,20 +20,30 @@
 .sidebar-rail-toggle[hidden] { display: none; }
 
 /* Fold groups (systems that have .nav-section-title) */
-.nav-group-toggle {
+/* :is(#nav, nav) lifts specificity above each system's own "nav button" / "#nav button" rules. */
+:is(#nav, nav) > .nav-group-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: calc(100% - 12px);
-  padding: 6px 0 2px;
+  width: calc(100% - 24px);
+  min-height: 0;
+  margin: 12px 12px 2px;
+  padding: 4px 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
+  box-shadow: none;
+  color: var(--muted, #87a1aa);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
   text-align: left;
   cursor: pointer;
 }
-.nav-group-toggle:hover { color: #fff; }
-.nav-group-toggle i { font-style: normal; font-size: 11px; transition: transform 180ms ease; }
-.nav-group-toggle[aria-expanded="false"] i { transform: rotate(-90deg); }
+:is(#nav, nav) > .nav-group-toggle:first-child { margin-top: 0; }
+:is(#nav, nav) > .nav-group-toggle:hover { background: transparent; color: #fff; }
+:is(#nav, nav) > .nav-group-toggle i { font-style: normal; font-size: 11px; transition: transform 180ms ease; }
+:is(#nav, nav) > .nav-group-toggle[aria-expanded="false"] i { transform: rotate(-90deg); }
 .nav-group { display: grid; gap: 6px; }
 .nav-group.collapsed > :not(.active) { display: none; }
 
@@ -51,7 +61,7 @@ body.sidebar-rail .system-switcher { grid-template-columns: 1fr; }
 body.sidebar-rail .system-switcher a { grid-template-columns: 1fr; justify-items: center; padding: 7px 0; text-align: center; }
 body.sidebar-rail .system-switcher a b { display: none; }
 
-body.sidebar-rail .nav-group-toggle { display: none; }
+body.sidebar-rail :is(#nav, nav) > .nav-group-toggle { display: none; }
 body.sidebar-rail .nav-group.collapsed > :not(.active) { display: flex; }
 body.sidebar-rail .nav-group { padding-bottom: 6px; border-bottom: 1px solid rgba(150, 170, 180, .16); }
 body.sidebar-rail nav > a, body.sidebar-rail nav > button,
@@ -65,10 +75,21 @@ body.sidebar-rail .partial-exit-button b { display: none; }
 body.sidebar-rail .partial-exit-sidebar { margin-inline: 0; }
 body.sidebar-rail .partial-exit-button { justify-content: center; padding-inline: 0; }
 
-/* The live dashboard's narrow layout: groups dissolve back into its single-row horizontal menu. */
+/* Whenever the sidebar is not a fixed column (each system's narrow layout), groups dissolve back into
+   that system's own menu layout and every link shows. */
+body:not(.sidebar-rail-capable) :is(#nav, nav) > .nav-group-toggle { display: none; }
+body:not(.sidebar-rail-capable) .nav-group { display: contents; }
+body:not(.sidebar-rail-capable) .nav-group.collapsed > :not(.active) { display: flex; }
 @media (max-width: 980px) {
-  .nav-group-toggle { display: none; }
-  .nav-group { display: contents; }
-  .nav-group.collapsed > :not(.active) { display: flex; }
   nav > a, .nav-group > a { flex: 0 0 auto; white-space: nowrap; }
 }
+
+/* Section titles for systems that do not style them themselves (the live dashboard has its own rule). */
+:where(.nav-section-title) {
+  margin: 12px 12px 2px;
+  color: var(--muted, #87a1aa);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+:where(nav > .nav-section-title:first-child) { margin-top: 0; }
