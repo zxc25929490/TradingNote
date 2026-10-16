@@ -79,6 +79,9 @@ const els = {
   resetFilters: document.querySelector("#resetFiltersButton"),
   profitFactor: document.querySelector("#profitFactor"),
   expectancy: document.querySelector("#expectancy"),
+  expectancyCi: document.querySelector("#expectancyCi"),
+  strategyFilter: document.querySelector("#strategyFilter"),
+  mixWarning: document.querySelector("#mixWarning"),
   averageWin: document.querySelector("#averageWin"),
   averageLoss: document.querySelector("#averageLoss"),
   bestPair: document.querySelector("#bestPair"),
@@ -950,6 +953,11 @@ function populateStrategySelects() {
     .sort((a, b) => String(b.effectiveFrom || b.createdAt || "").localeCompare(String(a.effectiveFrom || a.createdAt || "")))
     .map((strategy) => `<option value="${escapeHtml(strategy.id)}">${escapeHtml(strategyVersionLabel(strategy.id))}${strategy.locked ? " · 已鎖定" : ""}</option>`)
     .join("");
+  if (els.strategyFilter) {
+    const previous = els.strategyFilter.value || "all";
+    els.strategyFilter.innerHTML = `<option value="all">全部版本</option><option value="unassigned">未綁定策略</option>${options}`;
+    els.strategyFilter.value = [...els.strategyFilter.options].some((option) => option.value === previous) ? previous : "all";
+  }
   const tradeSelect = els.tradeForm?.elements.strategyVersionId;
   if (tradeSelect) {
     const previous = tradeSelect.value;
@@ -1206,9 +1214,11 @@ function baseFilteredTrades() {
     const yearOk = els.year.value === "all" || String(trade.year) === els.year.value;
     const pairOk = els.pair.value === "all" || trade.pair === els.pair.value;
     const outcomeOk = els.outcome.value === "all" || trade.outcome === els.outcome.value;
+    const strategy = els.strategyFilter?.value || "all";
+    const strategyOk = strategy === "all" || (strategy === "unassigned" ? !trade.strategyVersionId : String(trade.strategyVersionId) === strategy);
     const haystack = `${trade.pair} ${trade.source} ${trade.setup || ""} ${trade.review || ""} ${trade.lesson || ""} ${trade.mambaDecision || ""} ${trade.date || ""}`.toLowerCase();
     const queryOk = !query || haystack.includes(query);
-    return yearOk && pairOk && outcomeOk && queryOk;
+    return yearOk && pairOk && outcomeOk && strategyOk && queryOk;
   });
 }
 
@@ -1294,6 +1304,8 @@ function computeStats(items) {
     totalProfit,
     totalR,
     rTradeCount: rItems.length,
+    wins: wins.length,
+    decided,
     winRate: decided ? (wins.length / decided) * 100 : 0,
     maxDd,
     worstLoss,
@@ -1590,7 +1602,18 @@ function renderMetrics(items) {
     ? `Avg ${signed(stats.totalR / stats.rTradeCount, "R")} / R trade`
     : "Avg - / R trade";
   animateMetric(els.winRate, stats.winRate, (value) => `${value.toFixed(1)}%`);
-  els.tradeCount.textContent = `${items.length} trades`;
+  const stats95 = window.TradingNoteStats;
+  const winInterval = stats95?.wilson(stats.wins, stats.decided);
+  els.tradeCount.textContent = winInterval
+    ? `${items.length} 筆 · 95% 區間 ${(winInterval[0] * 100).toFixed(0)}–${(winInterval[1] * 100).toFixed(0)}%`
+    : `${items.length} 筆`;
+  if (els.expectancyCi) {
+    const rList = items.filter((trade) => !trade.riskUnavailable && trade.r != null).map((trade) => Number(trade.r)).filter(Number.isFinite);
+    const meanInterval = stats95?.meanInterval(rList);
+    els.expectancyCi.textContent = meanInterval
+      ? `95% 區間 ${signed(meanInterval[0], "R")} ~ ${signed(meanInterval[1], "R")} · ${rList.length} 筆${meanInterval[0] < 0 && meanInterval[1] > 0 ? " · 尚不能確定為正" : ""}`
+      : "樣本不足";
+  }
   animateMetric(els.maxDd, stats.maxDd, (value) => signed(value, "R"));
   els.lossStreak.textContent = `${stats.worstLoss} max loss streak`;
   if (Number.isFinite(stats.profitFactor)) animateMetric(els.profitFactor, stats.profitFactor, (value) => value.toFixed(2));
@@ -2753,6 +2776,35 @@ function refreshAfterDataChange() {
   render();
 }
 
+// Warn when the numbers on screen blend different strategies or breakpoints.
+function renderMixWarning(items) {
+  if (!els.mixWarning) return;
+  const counts = new Map();
+  for (const trade of items) {
+    const key = trade.strategyVersionId ? String(trade.strategyVersionId) : "unassigned";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const strategyAll = (els.strategyFilter?.value || "all") === "all";
+  const mixedVersions = strategyAll && counts.size > 1;
+  const allBatches = activeLiveBatch === ALL_LIVE_BATCH_ID;
+  if (!mixedVersions && !allBatches) {
+    els.mixWarning.hidden = true;
+    els.mixWarning.innerHTML = "";
+    return;
+  }
+  const parts = [];
+  if (allBatches) parts.push("目前是「完整紀錄（全部斷點）」：不同時期的交易合在一起計算。");
+  if (mixedVersions) parts.push(`目前混合了 ${counts.size} 種策略版本，勝率與期望值是混合後的結果。`);
+  const buttons = mixedVersions
+    ? [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, count]) => `<button type="button" data-mix-version="${escapeHtml(key)}">${escapeHtml(key === "unassigned" ? "未綁定策略" : strategyVersionLabel(key))}（${count}）</button>`)
+      .join("")
+    : "";
+  els.mixWarning.innerHTML = `<span>${parts.join(" ")}</span>${buttons ? `<div>只看：${buttons}</div>` : ""}`;
+  els.mixWarning.hidden = false;
+}
+
 function renderStartHere() {
   const container = document.querySelector("#startHere");
   const startHere = window.TradingNoteStartHere;
@@ -2779,12 +2831,14 @@ function render() {
     els.year.value !== "all",
     els.pair.value !== "all",
     els.outcome.value !== "all",
+    (els.strategyFilter?.value || "all") !== "all",
     els.window.value !== "all",
     Boolean(els.search.value.trim()),
   ].filter(Boolean).length;
   const batchTotal = tradesForActiveView().length;
   els.filterSummary.textContent = `${liveBatchLabel(activeLiveBatch)} · 顯示 ${items.length} / ${batchTotal} 筆交易${activeCount ? ` · ${activeCount} 個條件` : ""}`;
   els.resetFilters.disabled = activeCount === 0;
+  renderMixWarning(items);
   renderMetrics(items);
   renderPeriodAnalysis();
   renderChart(items);
@@ -3929,7 +3983,13 @@ resetTradeForm();
 attachRippleFeedback();
 render();
 
-[els.year, els.pair, els.outcome, els.window, els.search].forEach((el) => el.addEventListener("input", render));
+[els.year, els.pair, els.outcome, els.strategyFilter, els.window, els.search].filter(Boolean).forEach((el) => el.addEventListener("input", render));
+els.mixWarning?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-mix-version]");
+  if (!button || !els.strategyFilter) return;
+  els.strategyFilter.value = button.dataset.mixVersion;
+  render();
+});
 els.liveBatch.addEventListener("change", () => {
   activeLiveBatch = els.liveBatch.value;
   saveLiveBatches();
@@ -4335,6 +4395,7 @@ els.resetFilters.addEventListener("click", () => {
   els.year.value = "all";
   els.pair.value = "all";
   els.outcome.value = "all";
+  if (els.strategyFilter) els.strategyFilter.value = "all";
   els.window.value = "all";
   els.search.value = "";
   render();

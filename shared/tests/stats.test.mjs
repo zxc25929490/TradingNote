@@ -204,6 +204,18 @@ assert.equal(oos.expected[20], oos.actual[19] + 0.25);
 assert.equal(oos.tested, 20);
 assert.equal(S.edgeBand(sampleValues.slice(0, 30), { mean: 0.25, sd: 1.25, start: 20 }).verdict, "few");
 
+// Confidence intervals for KPI cards.
+const [wLow, wHigh] = S.wilson(45, 100);
+close(wLow, 0.3561, 0.001, "Wilson low 45/100");
+close(wHigh, 0.5475, 0.001, "Wilson high 45/100");
+assert.deepEqual(S.wilson(0, 10).map((v) => Number(v.toFixed(4))), [0, 0.2775]);
+assert.equal(S.wilson(0, 0), null);
+close(S.tCritical(10), 2.228, 0.002, "t critical df=10");
+close(S.tCritical(1000), 1.962, 0.002, "t critical large df");
+const ci = S.meanInterval([1, 2, 3, 4, 5]);
+close(ci[0], 3 - 2.776 * Math.sqrt(2.5) / Math.sqrt(5), 0.005, "mean CI low");
+assert.equal(S.meanInterval([1]), null);
+
 // The dashboard must load the maths module before the panel and hand it the filtered trades.
 import fs from "node:fs";
 const html = fs.readFileSync(new URL("../../web-prototype/index.html", import.meta.url), "utf8");

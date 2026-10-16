@@ -64,3 +64,31 @@
   .start-action { justify-self: start; }
   .start-flow { grid-template-columns: 1fr; }
 }
+
+/* Mixed strategy / breakpoint warning under the filters, and KPI confidence intervals */
+.mix-warning {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-2) 45%, var(--line));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent-2) 10%, transparent);
+  font-size: .82rem;
+}
+.mix-warning[hidden] { display: none; }
+.mix-warning div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); }
+.mix-warning button {
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: .78rem;
+  cursor: pointer;
+}
+.mix-warning button:hover { border-color: var(--accent); }
+.kpi-ci { display: block; margin-top: 4px; color: var(--muted); font-size: .74rem; line-height: 1.4; }

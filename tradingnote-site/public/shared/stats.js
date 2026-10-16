@@ -657,9 +657,37 @@
     return { actual, expected, upper, lower, tested, z, verdict, actualMean: tested ? (actual.at(-1) - anchor) / tested : 0 };
   }
 
+  // ---- Confidence intervals for headline KPIs ----
+  // Wilson score interval: well-behaved for small samples and win rates near 0% or 100%.
+  function wilson(successes, n, z = 1.96) {
+    if (!n) return null;
+    const p = successes / n;
+    const denominator = 1 + (z * z) / n;
+    const center = (p + (z * z) / (2 * n)) / denominator;
+    const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / denominator;
+    return [Math.max(0, center - half), Math.min(1, center + half)];
+  }
+  // Two-sided critical t value, found by bisection on the p-value function above.
+  function tCritical(df, alpha = 0.05) {
+    if (df <= 0) return Infinity;
+    let low = 0;
+    let high = 100;
+    for (let i = 0; i < 80; i += 1) {
+      const mid = (low + high) / 2;
+      if (tTwoSidedP(mid, df) > alpha) low = mid; else high = mid;
+    }
+    return (low + high) / 2;
+  }
+  function meanInterval(values, alpha = 0.05) {
+    if (values.length < 2) return null;
+    const m = mean(values);
+    const half = (tCritical(values.length - 1, alpha) * sd(values)) / Math.sqrt(values.length);
+    return [m - half, m + half];
+  }
+
   root.TradingNoteStats = {
     finite, num, mean, sd, median, quantile, mulberry32, tTwoSidedP, welch, basics, edgeSignificance, drawdownProfile,
     dailyR, empiricalKelly, riskAdjusted, breachProbability, rollingMetrics, edgeDecay, afterLosses, runsTest,
-    exitQuality, holdingAnalysis, costAnalysis, exposureAnalysis, crossTab, pearson, versionComparison, partialExitAnalysis, edgeBand,
+    exitQuality, holdingAnalysis, costAnalysis, exposureAnalysis, crossTab, pearson, versionComparison, partialExitAnalysis, edgeBand, wilson, tCritical, meanInterval,
   };
 })(globalThis);
