@@ -1631,7 +1631,7 @@ function renderChart(items) {
   const canvas = els.chart;
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(640, canvas.clientWidth * dpr);
+  canvas.width = Math.max(280, canvas.clientWidth) * dpr;
   canvas.height = 320 * dpr;
   ctx.scale(dpr, dpr);
 
@@ -1733,7 +1733,7 @@ function renderChart(items) {
 function drawLineChart(canvas, series, options = {}) {
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(640, canvas.clientWidth * dpr);
+  canvas.width = Math.max(280, canvas.clientWidth) * dpr;
   canvas.height = (options.height || 320) * dpr;
   ctx.scale(dpr, dpr);
 

@@ -1,0 +1,54 @@
+/* Phone layout fixes shared by the research, review and analysis systems. Loaded last in each page. */
+@media (max-width: 760px) {
+  /* Headline numbers: two per row instead of one tall column. */
+  main .metrics,
+  main .gap-metrics,
+  main .coverage-checks { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  main .metrics article,
+  main .gap-metrics article { min-width: 0; min-height: 0; padding: 13px; }
+  main .metrics b,
+  main .gap-metrics b { font-size: 1.2rem; overflow-wrap: anywhere; }
+
+  /* Page headers: title above the controls, controls full width. */
+  main .topbar { flex-wrap: wrap; gap: 12px; padding: 14px 16px; }
+  main .topbar > div:first-child { flex: 1 1 100%; }
+  main .topbar .actions { flex: 1 1 100%; flex-wrap: wrap; }
+  main .topbar h1 { font-size: 1.3rem; }
+
+  /* Analysis filters: two per row; the tolerance slider spans the row. */
+  main .filter-panel { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; padding: 12px 16px; }
+  main .filter-panel .tolerance { grid-column: 1 / -1; }
+
+  /* Review queue: one card per session/trade so the action button is reachable without sideways scrolling. */
+  #reviewTableWrap { overflow: visible; border: 0; background: transparent; }
+  #reviewTableWrap table { min-width: 0 !important; }
+  #reviewTableWrap thead { display: none; }
+  #reviewTableWrap tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+    margin-bottom: 10px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+  #reviewTableWrap tbody td { display: block; min-width: 0; padding: 0 !important; border: 0 !important; }
+  #reviewTableWrap tbody td::before { display: block; margin-bottom: 3px; color: var(--muted); font-size: .68rem; font-weight: 700; }
+  #reviewTableWrap tbody td:nth-child(1)::before { content: "日期"; }
+  #reviewTableWrap tbody td:nth-child(2)::before { content: "商品／Setup"; }
+  #reviewTableWrap tbody td:nth-child(3)::before { content: "策略版本"; }
+  #reviewTableWrap tbody td:nth-child(4)::before { content: "結果"; }
+  #reviewTableWrap tbody td:nth-child(5)::before { content: "復盤分類"; }
+  #reviewTableWrap tbody td:nth-child(6)::before { content: "R 落差"; }
+  #reviewTableWrap tbody td:last-child { grid-column: 1 / -1; }
+  #reviewTableWrap tbody td:last-child :is(button, select) { width: 100%; min-height: 44px; }
+
+  /* Dense numeric tables keep sideways scrolling, with a visible edge so it is obvious they scroll. */
+  main .table-wrap:not(#reviewTableWrap) { -webkit-overflow-scrolling: touch; box-shadow: inset -14px 0 12px -12px rgba(0, 0, 0, .55); }
+
+  /* Dialogs fill the phone screen. */
+  dialog { width: calc(100vw - 16px) !important; max-height: calc(100dvh - 16px) !important; }
+  dialog .form-grid,
+  dialog fieldset.full { grid-template-columns: 1fr !important; }
+}

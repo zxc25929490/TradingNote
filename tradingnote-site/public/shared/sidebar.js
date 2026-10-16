@@ -69,11 +69,43 @@
   railButton.className = "sidebar-rail-toggle";
   (brand || sidebar).appendChild(railButton);
 
+  // Phones: the sidebar becomes a top bar, and the menu opens as a drawer.
+  const MOBILE_QUERY = window.matchMedia("(max-width: 760px)");
+  const menuButton = document.createElement("button");
+  menuButton.type = "button";
+  menuButton.className = "sidebar-menu-toggle";
+  sidebar.appendChild(menuButton);
+  const backdrop = document.createElement("div");
+  backdrop.className = "sidebar-backdrop";
+  document.body.appendChild(backdrop);
+  const setOpen = (open) => {
+    document.body.classList.toggle("sidebar-open", open);
+    menuButton.textContent = open ? "✕" : "☰";
+    menuButton.setAttribute("aria-label", open ? "關閉選單" : "開啟選單");
+    menuButton.setAttribute("aria-expanded", String(open));
+    if (open) sidebar.scrollTop = 0;
+  };
+  menuButton.addEventListener("click", () => setOpen(!document.body.classList.contains("sidebar-open")));
+  backdrop.addEventListener("click", () => setOpen(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.classList.contains("sidebar-open")) setOpen(false);
+  });
+  // Choosing a page or another system closes the drawer; folding a group does not.
+  sidebar.addEventListener("click", (event) => {
+    if (!document.body.classList.contains("sidebar-open")) return;
+    if (event.target.closest(".nav-group-toggle, .sidebar-menu-toggle")) return;
+    if (event.target.closest("nav a, nav button, .system-switcher a")) setOpen(false);
+  });
+  setOpen(false);
+
   // Only a fixed, full-height sidebar can become a rail; stacked mobile sidebars stay as they are.
   const capable = () => getComputedStyle(sidebar).position === "fixed" && window.innerWidth > 760;
 
   function apply() {
-    const canRail = capable();
+    const mobile = MOBILE_QUERY.matches;
+    document.body.classList.toggle("sidebar-mobile", mobile);
+    if (!mobile) setOpen(false);
+    const canRail = !mobile && capable();
     document.body.classList.toggle("sidebar-rail-capable", canRail);
     document.body.classList.toggle("sidebar-rail", Boolean(state.rail) && canRail);
     railButton.hidden = !canRail;
