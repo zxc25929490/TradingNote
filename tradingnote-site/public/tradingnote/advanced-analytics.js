@@ -380,6 +380,12 @@
   });
 
   window.TradingNoteAdvancedAnalytics = {
+    openTab(tab) {
+      if (!RENDERERS[tab]) return;
+      state.tab = tab;
+      persist();
+      draw();
+    },
     render(items, nextContext = {}) {
       lastItems = Array.isArray(items) ? items : [];
       context = nextContext;

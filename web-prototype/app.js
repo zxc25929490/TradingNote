@@ -21,6 +21,7 @@ const STRUCTURED_BACKUP_KEYS = new Set([
   LEGACY_RESEARCH_BATCH_KEY, LEGACY_RESEARCH_ACTIVE_BATCH_KEY,
 ]);
 const REPLAY_SESSIONS_KEY = "tradingnote.replaySessions.v1";
+const LAST_BACKUP_KEY = "tradingnote.lastBackupAt";
 const DEFAULT_RESEARCH_RULES = [
   { id: "R-001", title: "等待 K 棒收線確認突破", description: "突破只能在 5m 或 15m K 棒收線後成立，避免假突破與追價。", status: "Verified", confidence: 88, linkedTrades: ["BT-002", "BT-003", "BT-011"] },
   { id: "R-002", title: "高週期方向不一致則 No Trade", description: "1H bias 與執行方向相反時，不以短週期訊號覆蓋。", status: "Testing", confidence: 76, linkedTrades: ["BT-006", "BT-014", "BT-016"] },
@@ -260,7 +261,7 @@ const checklist = [
 ];
 
 const pageTitles = {
-  dashboard: "交易績效儀表板",
+  dashboard: "今日總覽",
   objectives: "挑戰目標與風險",
   "income-goals": "收入目標",
   analytics: "深度數據分析",
@@ -3101,7 +3102,26 @@ function refreshAfterDataChange() {
   render();
 }
 
+function renderStartHere() {
+  const container = document.querySelector("#startHere");
+  const startHere = window.TradingNoteStartHere;
+  if (!container || !startHere?.render) return;
+  const items = sortByDate(tradesForActiveView());
+  const stats = window.TradingNoteStats;
+  const rValues = items.map((trade) => Number(trade.r)).filter(Number.isFinite);
+  const profile = stats?.drawdownProfile(rValues);
+  const tp = window.TradingNoteTpAnalysis;
+  startHere.render(container, {
+    trades: items,
+    lastBackupAt: localStorage.getItem(LAST_BACKUP_KEY),
+    edgeDecay: stats?.edgeDecay(rValues, 30) || null,
+    drawdown: profile ? { current: profile.currentDrawdown, max: profile.maxDrawdown } : null,
+    mfeCoverage: tp ? items.filter((trade) => tp.eligibilityReason(trade) === "eligible").length : null,
+  });
+}
+
 function render() {
+  renderStartHere();
   window.renderIncomeGoals?.(tradesForActiveView(), activeLiveBatch, accountRules.initialBalance, liveBatchLabel(activeLiveBatch));
   const items = filteredTrades();
   const activeCount = [
@@ -3450,6 +3470,8 @@ function exportFullBackup() {
   };
   const researchCount = (backup.research.trades?.length || 0) + (backup.research.legacyTrades?.length || 0);
   downloadFile(`backups_tradingnote-all-${isoDate(new Date())}.json`, JSON.stringify(backup, null, 2), "application/json");
+  localStorage.setItem(LAST_BACKUP_KEY, backup.exportedAt);
+  renderStartHere();
   const ruleCount = (backup.research.rules?.length || 0) + (backup.research.legacyRules?.length || 0);
   showToast(`已建立完整快照：${liveBatches.length} 個實盤斷點、${visibleSnapshot.length} 筆斷點交易、回測 ${researchCount} 筆、Rule Book ${ruleCount} 條、${Object.keys(backup.storage).length} 項本機資料與設定。`);
 }
