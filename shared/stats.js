@@ -630,9 +630,36 @@
     };
   }
 
+  // ---- Luck vs skill: project an expectation band from an INDEPENDENT baseline ----
+  // Projecting the sample's own mean onto itself always ends exactly on the line, so the baseline must
+  // come from elsewhere: a backtest distribution, or the first part of the history (out-of-sample test).
+  function edgeBand(values, { mean: baseMean, sd: baseSd, start = 0, minTested = 20 } = {}) {
+    const actual = [];
+    let running = 0;
+    for (const value of values) { running += value; actual.push(running); }
+    const from = Math.max(0, Math.min(start, values.length));
+    const anchor = from > 0 ? actual[from - 1] : 0;
+    const expected = [];
+    const upper = [];
+    const lower = [];
+    actual.forEach((_, index) => {
+      if (index < from) { expected.push(null); upper.push(null); lower.push(null); return; }
+      const steps = index - from + 1;
+      const center = anchor + baseMean * steps;
+      const spread = 2 * baseSd * Math.sqrt(steps);
+      expected.push(center);
+      upper.push(center + spread);
+      lower.push(center - spread);
+    });
+    const tested = values.length - from;
+    const z = tested && baseSd ? (actual.at(-1) - expected.at(-1)) / (baseSd * Math.sqrt(tested)) : 0;
+    const verdict = tested < minTested ? "few" : z > 2 ? "above" : z < -2 ? "below" : "normal";
+    return { actual, expected, upper, lower, tested, z, verdict, actualMean: tested ? (actual.at(-1) - anchor) / tested : 0 };
+  }
+
   root.TradingNoteStats = {
     finite, num, mean, sd, median, quantile, mulberry32, tTwoSidedP, welch, basics, edgeSignificance, drawdownProfile,
     dailyR, empiricalKelly, riskAdjusted, breachProbability, rollingMetrics, edgeDecay, afterLosses, runsTest,
-    exitQuality, holdingAnalysis, costAnalysis, exposureAnalysis, crossTab, pearson, versionComparison, partialExitAnalysis,
+    exitQuality, holdingAnalysis, costAnalysis, exposureAnalysis, crossTab, pearson, versionComparison, partialExitAnalysis, edgeBand,
   };
 })(globalThis);

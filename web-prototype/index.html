@@ -382,12 +382,13 @@
           <div class="panel-heading">
             <div>
               <h2>運氣 vs 實力</h2>
-              <p>實際 R 曲線 vs 期望值與 ±2σ 運氣帶。</p>
+              <p>拿實盤和「另一批資料」的期望值比較：落在 ±2σ 內代表差距可用運氣解釋。</p>
             </div>
+            <label class="edge-baseline">比較基準<select id="edgeBaseline" aria-label="運氣 vs 實力的比較基準"></select></label>
           </div>
           <div id="edgeSummary" class="edge-summary"></div>
           <canvas id="edgeChart" width="1280" height="420"></canvas>
-          <p class="chart-note">以目前篩選後的勝率與平均贏/輸 R 估算，這是自我複盤工具，不是投資建議。</p>
+          <p class="chart-note">虛線是依基準的平均 R 與波動推估的期望與 ±2σ 範圍；用前半段當基準時，期望線從後半段開始畫。這是自我複盤工具，不是投資建議。</p>
         </section>
 
         <section class="behavior-grid">
@@ -933,12 +934,12 @@
     <script src="data/trades.js"></script>
     <script src="../shared/partial-exit.js?v=20261003-zero-1"></script>
     <script src="../shared/backtest-r.js?v=20261016-1"></script>
-    <script src="../shared/stats.js?v=20261004-1"></script>
+    <script src="../shared/stats.js?v=20261016-1"></script>
     <script src="advanced-analytics.js?v=20261016-1"></script>
     <script src="start-here.js?v=20261016-1"></script>
     <script src="tp-analysis.js?v=20260828-9"></script>
     <script src="income-goals.js?v=20260919-1"></script>
-    <script src="app.js?v=20261016-2"></script>
+    <script src="app.js?v=20261016-4"></script>
     <script src="effects.js?v=20261004-1"></script>
     <script src="../shared/sidebar.js?v=20261016-1"></script>
     <script src="../shared/cursor-fx.js?v=20261004-1"></script>

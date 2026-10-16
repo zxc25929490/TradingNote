@@ -187,6 +187,23 @@ assert.ok(Math.abs(partial.legs.reduce((sum, row) => sum + row.share, 0) - 1) < 
 assert.ok(partial.comparison, "enough trades on both sides to compare");
 assert.equal(S.partialExitAnalysis([{ r: 1 }]).scaledStats, null);
 
+// Luck vs skill: the old chart projected the sample's own mean, so the end point always sat on the line.
+const sampleValues = Array.from({ length: 40 }, (_, i) => (i % 2 ? 1.5 : -1));
+const selfMean = S.mean(sampleValues);
+const selfBand = S.edgeBand(sampleValues, { mean: selfMean, sd: S.sd(sampleValues) });
+assert.ok(Math.abs(selfBand.z) < 1e-9, "self-projection always gives z = 0 (why it must not be used)");
+// Against a weaker independent baseline the same trades stand out.
+const vsBacktest = S.edgeBand(sampleValues, { mean: -0.5, sd: 1 });
+assert.equal(vsBacktest.verdict, "above");
+assert.equal(vsBacktest.expected[0], -0.5);
+assert.ok(S.edgeBand(sampleValues, { mean: 2, sd: 1 }).verdict === "below");
+// Out-of-sample: expectation starts where the in-sample part ends.
+const oos = S.edgeBand(sampleValues, { mean: 0.25, sd: 1.25, start: 20 });
+assert.equal(oos.expected[19], null);
+assert.equal(oos.expected[20], oos.actual[19] + 0.25);
+assert.equal(oos.tested, 20);
+assert.equal(S.edgeBand(sampleValues.slice(0, 30), { mean: 0.25, sd: 1.25, start: 20 }).verdict, "few");
+
 // The dashboard must load the maths module before the panel and hand it the filtered trades.
 import fs from "node:fs";
 const html = fs.readFileSync(new URL("../../web-prototype/index.html", import.meta.url), "utf8");

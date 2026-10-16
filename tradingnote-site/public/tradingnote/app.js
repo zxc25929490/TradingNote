@@ -88,6 +88,7 @@ const els = {
   analyticsMetrics: document.querySelector("#analyticsMetrics"),
   edgeSummary: document.querySelector("#edgeSummary"),
   edgeChart: document.querySelector("#edgeChart"),
+  edgeBaseline: document.querySelector("#edgeBaseline"),
   accountRulesForm: document.querySelector("#accountRulesForm"),
   accountNameInput: document.querySelector("#accountNameInput"),
   accountPhaseInput: document.querySelector("#accountPhaseInput"),
@@ -1718,7 +1719,7 @@ function drawLineChart(canvas, series, options = {}) {
   const pad = 38;
   ctx.clearRect(0, 0, width, height);
 
-  const allValues = series.flatMap((line) => line.values);
+  const allValues = series.flatMap((line) => line.values).filter(Number.isFinite);
   if (!allValues.length) return;
 
   const minY = Math.min(0, ...allValues);
@@ -1743,11 +1744,14 @@ function drawLineChart(canvas, series, options = {}) {
     ctx.lineWidth = line.width || 2;
     ctx.setLineDash(line.dash || []);
     ctx.beginPath();
+    let drawing = false;
     line.values.forEach((value, index) => {
+      if (!Number.isFinite(value)) { drawing = false; return; }
       const x = px(index);
       const y = py(value);
-      if (index === 0) ctx.moveTo(x, y);
+      if (!drawing) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
+      drawing = true;
     });
     ctx.stroke();
   }
@@ -1796,52 +1800,63 @@ function renderProfitAnalytics(items) {
     .join("");
 }
 
+const EDGE_BASELINE_KEY = "tradingnote.edgeBaseline";
+
+// Baselines must be independent of the trades being judged: a backtest breakpoint, or the first half
+// of the live history (out-of-sample test of the second half).
+function edgeBaselineOptions(rValues) {
+  const options = [];
+  for (const batch of readResearchBreakpoints().batches) {
+    const values = batch.trades.map((trade) => trade.r).filter((value) => value !== null);
+    if (values.length >= 10) options.push({ id: `bt:${batch.id}`, label: `回測：${batch.name || batch.id}（${values.length} 筆）`, values });
+  }
+  if (rValues.length >= 40) options.push({ id: "half", label: "前半段實盤（樣本外檢驗後半段）", half: true });
+  return options;
+}
+
 function renderEdgeAnalytics(items) {
   const rValues = items.map((trade) => trade.r).filter((value) => Number.isFinite(value));
-  if (!rValues.length) {
-    els.edgeSummary.innerHTML = "<strong>樣本太少</strong><span>目前沒有可分析的 R 值資料。</span>";
+  const stats = window.TradingNoteStats;
+  const options = edgeBaselineOptions(rValues);
+  const select = els.edgeBaseline;
+  let chosen = null;
+  try { chosen = localStorage.getItem(EDGE_BASELINE_KEY); } catch (_) { chosen = null; }
+  const activeResearch = readResearchBreakpoints().activeBatch;
+  const option = options.find((item) => item.id === chosen)
+    || options.find((item) => item.id === `bt:${activeResearch}`)
+    || options[0];
+  if (select) {
+    select.innerHTML = options.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`).join("");
+    select.disabled = !options.length;
+    if (option) select.value = option.id;
+  }
+
+  if (!stats || !option || rValues.length < 2) {
+    els.edgeSummary.innerHTML = `<strong>沒有獨立的比較基準</strong><span>需要一個至少 10 筆的回測斷點，或至少 40 筆實盤交易（用前半段檢驗後半段）。用同一批交易自己當基準，結果永遠會落在期望線上，沒有判斷意義。</span>`;
     drawLineChart(els.edgeChart, []);
     return;
   }
 
-  let actual = 0;
-  const actualSeries = [];
-  for (const value of rValues) {
-    actual += value;
-    actualSeries.push(actual);
-  }
-
-  const mean = rValues.reduce((sum, value) => sum + value, 0) / rValues.length;
-  const variance = rValues.reduce((sum, value) => sum + (value - mean) ** 2, 0) / rValues.length;
-  const sigma = Math.sqrt(variance);
-  const expected = rValues.map((_, index) => mean * (index + 1));
-  const upper = rValues.map((_, index) => mean * (index + 1) + 2 * sigma * Math.sqrt(index + 1));
-  const lower = rValues.map((_, index) => mean * (index + 1) - 2 * sigma * Math.sqrt(index + 1));
-  const finalActual = actualSeries.at(-1);
-  const finalUpper = upper.at(-1);
-  const finalLower = lower.at(-1);
-  const distance = sigma ? (finalActual - expected.at(-1)) / (sigma * Math.sqrt(rValues.length)) : 0;
-
-  let title = "落在正常波動內";
-  let body = "目前實際曲線仍在 ±2σ 運氣帶內，先累積樣本並檢查是否有重複錯誤。";
-  if (rValues.length < 30) {
-    title = "樣本仍偏少";
-    body = "少於 30 筆時判讀很容易失真，先把紀律欄位與 Lesson 記完整。";
-  } else if (finalActual > finalUpper) {
-    title = "結果明顯偏高";
-    body = "績效高於目前模型的正常波動區，保守看待，不要把短期好運當成策略升級。";
-  } else if (finalActual < finalLower) {
-    title = "結果明顯偏低";
-    body = "績效低於目前模型的正常波動區，優先檢查執行、風控與是否破壞交易規則。";
-  }
+  const baseValues = option.half ? rValues.slice(0, Math.floor(rValues.length / 2)) : option.values;
+  const start = option.half ? baseValues.length : 0;
+  const baseMean = stats.mean(baseValues);
+  const baseSd = stats.sd(baseValues);
+  const band = stats.edgeBand(rValues, { mean: baseMean, sd: baseSd, start });
+  const signedR = (value) => signed(value, "R");
+  const copy = {
+    few: ["檢驗樣本仍偏少", `只有 ${band.tested} 筆可以檢驗（建議至少 20 筆），先累積樣本再下結論。`],
+    above: ["明顯優於基準", "實盤超過基準的 +2σ。若基準是回測，可能是運氣或市場剛好有利，先別因此加大風險。"],
+    below: ["明顯低於基準", "實盤低於基準的 -2σ，這不太可能只是運氣差。優先檢查執行、規則是否變了，或市場狀態是否和基準期間不同。"],
+    normal: ["落在正常波動內", "實盤和基準的差距可以用運氣解釋，目前沒有證據顯示優勢改變。"],
+  }[band.verdict];
 
   els.edgeSummary.innerHTML = `
-    <strong>${title}</strong>
-    <span>${body}</span>
+    <strong>${copy[0]}</strong>
+    <span>${copy[1]}${baseValues.length < 30 ? `　注意：基準只有 ${baseValues.length} 筆，基準本身的誤差也很大，結論要保守看待。` : ""}</span>
     <div>
-      <b>實際 ${signed(finalActual, "R")}</b>
-      <b>期望 ${signed(expected.at(-1), "R")}</b>
-      <b>離均線 ${distance.toFixed(2)}σ</b>
+      <b>基準 ${signedR(baseMean)}／筆（${baseValues.length} 筆）</b>
+      <b>實盤 ${signedR(band.actualMean)}／筆（${band.tested} 筆）</b>
+      <b>偏離 ${band.z.toFixed(2)}σ</b>
     </div>
   `;
 
@@ -1849,10 +1864,10 @@ function renderEdgeAnalytics(items) {
   drawLineChart(
     els.edgeChart,
     [
-      { values: upper, color: styles.getPropertyValue("--line").trim(), width: 1, dash: [7, 7] },
-      { values: lower, color: styles.getPropertyValue("--line").trim(), width: 1, dash: [7, 7] },
-      { values: expected, color: styles.getPropertyValue("--muted").trim(), width: 2, dash: [4, 6] },
-      { values: actualSeries, color: styles.getPropertyValue("--accent").trim(), width: 3 },
+      { values: band.upper, color: styles.getPropertyValue("--line").trim(), width: 1, dash: [7, 7] },
+      { values: band.lower, color: styles.getPropertyValue("--line").trim(), width: 1, dash: [7, 7] },
+      { values: band.expected, color: styles.getPropertyValue("--muted").trim(), width: 2, dash: [4, 6] },
+      { values: band.actual, color: styles.getPropertyValue("--accent").trim(), width: 3 },
     ],
     { height: 360 },
   );
@@ -3972,6 +3987,10 @@ els.returnSimulatorForm.addEventListener("submit", (event) => {
   runReturnSimulation();
 });
 els.useJournalStats.addEventListener("click", useJournalSimulationStats);
+els.edgeBaseline?.addEventListener("change", () => {
+  try { localStorage.setItem(EDGE_BASELINE_KEY, els.edgeBaseline.value); } catch (_) { /* storage unavailable */ }
+  renderEdgeAnalytics(filteredTrades());
+});
 window.addEventListener("resize", () => {
   render();
   renderReturnSimulation();
