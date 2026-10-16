@@ -183,3 +183,5 @@ $('#monteCarloForm').onsubmit=event=>{event.preventDefault();runMonteCarlo()};
 window.addEventListener('tradingnote:partial-exit-change',reload);
 $$('nav button').forEach(button=>button.onclick=()=>{$$('nav button').forEach(item=>item.classList.toggle('active',item===button));$$('.page').forEach(page=>page.classList.toggle('active',page.id===button.dataset.view));$('#pageTitle').textContent={diagnosis:'三層績效診斷',execution:'Execution Gap 分析',strategy:'策略與 Edge 診斷',montecarlo:'三層 Monte Carlo'}[button.dataset.view];if(button.dataset.view==='montecarlo')requestAnimationFrame(()=>{if(!monteCarloResults)runMonteCarlo();else ['Live','Review','Backtest'].forEach(name=>drawMonteCarlo($(`#mc${name}Chart`),monteCarloResults[name]))})});
 reload();
+// Open the view named in the URL hash (e.g. #execution) so other systems can link straight to it.
+{const view=decodeURIComponent(location.hash.slice(1));const button=view&&[...document.querySelectorAll('nav button[data-view]')].find(item=>item.dataset.view===view);if(button)button.click()}

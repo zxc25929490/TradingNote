@@ -53,7 +53,6 @@ let selectedPeriodWeekStart = null;
 let reviewsExpanded = false;
 let tradeTableSort = { key: "date", direction: "desc" };
 let currentTradeImage = "";
-let monteCarloResult = null;
 let moveTradeCandidates = new Map();
 let editingTradeContext = null;
 
@@ -162,31 +161,10 @@ const els = {
   simWinRate: document.querySelector("#simWinRateInput"),
   simTrades: document.querySelector("#simTradesInput"),
   simRuns: document.querySelector("#simRunsInput"),
-  researchBreakpoint: document.querySelector("#researchBreakpointInput"),
   useJournalStats: document.querySelector("#useJournalStatsButton"),
   simulationMetrics: document.querySelector("#simulationMetrics"),
   simulationChart: document.querySelector("#simulationChart"),
   simulationFormula: document.querySelector("#simulationFormula"),
-  monteCarloMetrics: document.querySelector("#monteCarloMetrics"),
-  monteCarloChart: document.querySelector("#monteCarloChart"),
-  monteCarloFormula: document.querySelector("#monteCarloFormula"),
-  monteCarloStress: document.querySelector("#monteCarloStress"),
-  researchMonteCarloMetrics: document.querySelector("#researchMonteCarloMetrics"),
-  researchMonteCarloChart: document.querySelector("#researchMonteCarloChart"),
-  researchMonteCarloFormula: document.querySelector("#researchMonteCarloFormula"),
-  researchMonteCarloStress: document.querySelector("#researchMonteCarloStress"),
-  monteCarloCompare: document.querySelector("#monteCarloCompare"),
-  researchLabBreakpoint: document.querySelector("#researchLabBreakpoint"),
-  researchLabMarket: document.querySelector("#researchLabMarket"),
-  researchLabStrategy: document.querySelector("#researchLabStrategy"),
-  researchLabEmpty: document.querySelector("#researchLabEmpty"),
-  researchLabContent: document.querySelector("#researchLabContent"),
-  researchLabMetrics: document.querySelector("#researchLabMetrics"),
-  researchMarketRows: document.querySelector("#researchMarketRows"),
-  researchDateRows: document.querySelector("#researchDateRows"),
-  researchLabInsight: document.querySelector("#researchLabInsight"),
-  researchAttribution: document.querySelector("#researchAttribution"),
-  researchStrategyComparison: document.querySelector("#researchStrategyComparison"),
   strategyVersionGrid: document.querySelector("#strategyVersionGrid"),
   strategyVersionEmpty: document.querySelector("#strategyVersionEmpty"),
   addStrategyVersion: document.querySelector("#addStrategyVersionButton"),
@@ -270,7 +248,6 @@ const pageTitles = {
   period: "週/月績效分析",
   trades: "交易紀錄",
   strategy: "策略版本庫",
-  "research-lab": "回測 vs 實盤研究室",
   checklist: "交易前檢查表",
   "tp-analysis": "TP 統計分析",
   calculator: "風控手數計算",
@@ -937,35 +914,6 @@ function readResearchBreakpoints() {
   return { activeBatch, batches: Array.from(batchMap.values()) };
 }
 
-function populateResearchBreakpointOptions() {
-  const { activeBatch, batches } = readResearchBreakpoints();
-  const currentValue = els.researchBreakpoint.dataset.ready ? els.researchBreakpoint.value : activeBatch;
-  els.researchBreakpoint.innerHTML = [
-    `<option value="">不比較回測</option>`,
-    ...batches.map((batch) => {
-      const rCount = batch.trades.filter((trade) => trade.r !== null).length;
-      return `<option value="${batch.id}">${batch.name || batch.id}（${rCount} R）</option>`;
-    }),
-  ].join("");
-  if (batches.some((batch) => String(batch.id) === String(currentValue))) {
-    els.researchBreakpoint.value = currentValue;
-  } else {
-    els.researchBreakpoint.value = "";
-  }
-  els.researchBreakpoint.dataset.ready = "true";
-}
-
-function selectedResearchRValues() {
-  const selectedId = els.researchBreakpoint.value;
-  if (!selectedId) return null;
-  const selected = readResearchBreakpoints().batches.find((batch) => String(batch.id) === String(selectedId));
-  if (!selected) return null;
-  return {
-    label: selected.name || selected.id,
-    values: selected.trades.map((trade) => trade.r).filter((value) => value !== null),
-  };
-}
-
 function researchTradeMarket(trade) {
   return String(trade.pair || trade.market || "未設定").trim().toUpperCase();
 }
@@ -995,17 +943,6 @@ function researchSummary(items) {
   };
 }
 
-function researchMetricCard(label, liveValue, backtestValue, formatter, better = "higher") {
-  const gap = liveValue - backtestValue;
-  const favorable = better === "higher" ? gap >= 0 : gap <= 0;
-  return `<article class="research-metric-card">
-    <span>${label}</span>
-    <div><strong>${formatter(liveValue)}</strong><small>實盤</small></div>
-    <div><strong>${formatter(backtestValue)}</strong><small>回測</small></div>
-    <em class="${favorable ? "profit-pos" : "profit-neg"}">${signed(gap, label.includes("勝率") ? "%" : label.includes("樣本") ? " 筆" : "R")} 差距</em>
-  </article>`;
-}
-
 function populateStrategySelects() {
   const options = strategyVersions
     .slice()
@@ -1017,11 +954,6 @@ function populateStrategySelects() {
     const previous = tradeSelect.value;
     tradeSelect.innerHTML = `<option value="">未綁定策略</option>${options}`;
     if ([...tradeSelect.options].some((option) => option.value === previous)) tradeSelect.value = previous;
-  }
-  if (els.researchLabStrategy) {
-    const previous = els.researchLabStrategy.value || "all";
-    els.researchLabStrategy.innerHTML = `<option value="all">全部版本</option><option value="unassigned">未綁定策略</option>${options}`;
-    els.researchLabStrategy.value = [...els.researchLabStrategy.options].some((option) => option.value === previous) ? previous : "all";
   }
 }
 
@@ -1152,112 +1084,6 @@ function handleStrategyAction(event) {
     saveStrategyVersions();
     renderStrategyVersions();
   }
-}
-
-function populateResearchLabControls() {
-  if (!els.researchLabBreakpoint || !els.researchLabMarket) return;
-  const { activeBatch, batches } = readResearchBreakpoints();
-  const previous = els.researchLabBreakpoint.value || activeBatch;
-  els.researchLabBreakpoint.innerHTML = [
-    `<option value="">請選擇回測斷點</option>`,
-    ...batches.map((batch) => `<option value="${batch.id}">${batch.name || batch.id}（${batch.trades.length} 筆）</option>`),
-  ].join("");
-  els.researchLabBreakpoint.value = batches.some((batch) => String(batch.id) === String(previous)) ? previous : "";
-  if (els.researchBreakpoint && [...els.researchBreakpoint.options].some((option) => option.value === els.researchLabBreakpoint.value)) {
-    els.researchBreakpoint.value = els.researchLabBreakpoint.value;
-  }
-  const selected = batches.find((batch) => String(batch.id) === String(els.researchLabBreakpoint.value));
-  const previousMarket = els.researchLabMarket.value || "all";
-  const markets = [...new Set([
-    ...tradesForActiveView().map(researchTradeMarket),
-    ...(selected?.trades || []).map(researchTradeMarket),
-  ])].filter(Boolean).sort();
-  els.researchLabMarket.innerHTML = [`<option value="all">全部商品</option>`, ...markets.map((market) => `<option value="${market}">${market}</option>`)].join("");
-  els.researchLabMarket.value = markets.includes(previousMarket) ? previousMarket : "all";
-  populateStrategySelects();
-}
-
-function renderResearchLab() {
-  if (!els.researchLabBreakpoint) return;
-  const selected = readResearchBreakpoints().batches.find((batch) => String(batch.id) === String(els.researchLabBreakpoint.value));
-  const hasSelection = Boolean(selected);
-  els.researchLabEmpty.hidden = hasSelection;
-  els.researchLabContent.hidden = !hasSelection;
-  if (!selected) return;
-  const market = els.researchLabMarket.value;
-  const matchesMarket = (trade) => market === "all" || researchTradeMarket(trade) === market;
-  const strategyId = els.researchLabStrategy?.value || "all";
-  const matchesStrategy = (trade) => strategyId === "all"
-    || (strategyId === "unassigned" ? !trade.strategyVersionId : String(trade.strategyVersionId || "") === strategyId);
-  const live = sortByDate(tradesForActiveView().filter(matchesMarket).filter(matchesStrategy));
-  const backtest = sortByDate(selected.trades.filter(matchesMarket).filter(matchesStrategy));
-  const liveStats = researchSummary(live);
-  const backtestStats = researchSummary(backtest);
-  els.researchLabMetrics.innerHTML = [
-    researchMetricCard("樣本數", liveStats.count, backtestStats.count, (value) => String(value)),
-    researchMetricCard("平均 R", liveStats.avgR, backtestStats.avgR, (value) => signed(value, "R")),
-    researchMetricCard("勝率", liveStats.winRate, backtestStats.winRate, (value) => `${value.toFixed(1)}%`),
-    researchMetricCard("最大回撤", liveStats.maxDrawdown, backtestStats.maxDrawdown, (value) => signed(value, "R"), "higher"),
-  ].join("");
-
-  const markets = [...new Set([...live.map(researchTradeMarket), ...backtest.map(researchTradeMarket)])].sort();
-  const marketComparisons = markets.map((name) => {
-    const liveMarket = researchSummary(live.filter((trade) => researchTradeMarket(trade) === name));
-    const backtestMarket = researchSummary(backtest.filter((trade) => researchTradeMarket(trade) === name));
-    return { name, live: liveMarket, backtest: backtestMarket, gap: liveMarket.avgR - backtestMarket.avgR };
-  });
-  els.researchMarketRows.innerHTML = marketComparisons.length
-    ? marketComparisons.map((item) => `<tr><td><strong>${item.name}</strong></td><td>${item.live.count}</td><td>${signed(item.live.avgR, "R")}</td><td>${item.backtest.count}</td><td>${signed(item.backtest.avgR, "R")}</td><td class="${item.gap >= 0 ? "profit-pos" : "profit-neg"}">${signed(item.gap, "R")}</td></tr>`).join("")
-    : `<tr><td colspan="6">目前沒有可比較的商品資料。</td></tr>`;
-
-  const groupDates = (items) => items.reduce((map, trade) => {
-    const date = normalizeDateValue(trade.date);
-    if (!date) return map;
-    const current = map.get(date) || { count: 0, r: 0 };
-    current.count += 1;
-    if (!trade.riskUnavailable && Number.isFinite(Number(trade.r))) current.r += Number(trade.r);
-    map.set(date, current);
-    return map;
-  }, new Map());
-  const liveDates = groupDates(live);
-  const backtestDates = groupDates(backtest);
-  const pairedDates = [...liveDates.keys()].filter((date) => backtestDates.has(date)).sort().reverse();
-  els.researchDateRows.innerHTML = pairedDates.length
-    ? pairedDates.map((date) => {
-      const liveDay = liveDates.get(date);
-      const backtestDay = backtestDates.get(date);
-      const gap = liveDay.r - backtestDay.r;
-      return `<tr><td><strong>${date}</strong></td><td>${liveDay.count}</td><td>${signed(liveDay.r, "R")}</td><td>${backtestDay.count}</td><td>${signed(backtestDay.r, "R")}</td><td class="${gap >= 0 ? "profit-pos" : "profit-neg"}">${signed(gap, "R")}</td></tr>`;
-    }).join("")
-    : `<tr><td colspan="6">目前沒有同日期資料；仍可使用上方整體與商品比較。</td></tr>`;
-
-  const weakest = marketComparisons.filter((item) => item.live.count && item.backtest.count).sort((a, b) => a.gap - b.gap)[0];
-  const expectancyGap = liveStats.avgR - backtestStats.avgR;
-  els.researchLabInsight.innerHTML = `
-    <div class="research-verdict ${expectancyGap >= 0 ? "positive" : "negative"}"><span>整體執行落差</span><strong>${signed(expectancyGap, "R / trade")}</strong><p>${expectancyGap >= 0 ? "實盤目前守住或超過回測期望值。" : "實盤期望值低於回測，優先檢查進場、出場與漏單。"}</p></div>
-    <div class="research-focus"><span>優先研究商品</span><strong>${weakest?.name || "樣本不足"}</strong><p>${weakest ? `實盤比回測低 ${Math.abs(weakest.gap).toFixed(2)}R / trade。` : "至少需要一個兩邊都有紀錄的商品。"}</p></div>
-    <div class="research-focus"><span>同日期配對</span><strong>${pairedDates.length} 天</strong><p>用相同市場環境檢查策略與實際執行差異。</p></div>`;
-
-  const attribution = ATTRIBUTION_FIELDS.map(([field, label]) => ({
-    field,
-    label,
-    value: live.reduce((sum, trade) => sum + Math.max(0, Number(trade[field]) || 0), 0),
-  }));
-  const attributionTotal = attribution.reduce((sum, item) => sum + item.value, 0);
-  const attributionMax = Math.max(...attribution.map((item) => item.value), 0.01);
-  els.researchAttribution.innerHTML = attributionTotal
-    ? `<div class="attribution-total"><span>已歸因執行損失</span><strong>-${attributionTotal.toFixed(2)}R</strong></div>${attribution.map((item) => `<div class="attribution-row"><span>${item.label}</span><i><b style="width:${item.value / attributionMax * 100}%"></b></i><strong>${item.value ? `-${item.value.toFixed(2)}R` : "—"}</strong></div>`).join("")}`
-    : `<div class="empty-state compact-empty">尚未在實盤復盤填寫 R 落差原因。</div>`;
-
-  const versionIds = [...new Set([...live, ...backtest].map((trade) => trade.strategyVersionId || "unassigned"))];
-  els.researchStrategyComparison.innerHTML = versionIds.length
-    ? versionIds.map((id) => {
-      const liveVersion = researchSummary(live.filter((trade) => String(trade.strategyVersionId || "unassigned") === String(id)));
-      const backtestVersion = researchSummary(backtest.filter((trade) => String(trade.strategyVersionId || "unassigned") === String(id)));
-      const gap = liveVersion.avgR - backtestVersion.avgR;
-      return `<div class="strategy-compare-row"><div><strong>${escapeHtml(id === "unassigned" ? "未綁定策略" : strategyVersionLabel(id))}</strong><small>實盤 ${liveVersion.count} 筆 · 回測 ${backtestVersion.count} 筆</small></div><span>${signed(liveVersion.avgR, "R")}</span><span>${signed(backtestVersion.avgR, "R")}</span><b class="${gap >= 0 ? "profit-pos" : "profit-neg"}">${signed(gap, "R")}</b></div>`;
-    }).join("")
-    : `<div class="empty-state compact-empty">目前篩選條件沒有策略版本資料。</div>`;
 }
 
 function renderHomeComparisons() {
@@ -2494,7 +2320,6 @@ function runReturnSimulation() {
     returns,
   };
   renderReturnSimulation();
-  runMonteCarloSimulation();
 }
 
 function percentile(values, ratio) {
@@ -2515,111 +2340,6 @@ function maxDrawdownFromBalances(balances) {
     maxDrawdown = Math.min(maxDrawdown, peak ? ((balance - peak) / peak) * 100 : 0);
   }
   return maxDrawdown;
-}
-
-function simulateMonteCarloFromRValues(rValues, { startingBalance, riskPercent, tradeCount, runCount }) {
-  const finalReturns = [];
-  const finalRValues = [];
-  const drawdowns = [];
-  const rDrawdowns = [];
-  const lossStreaks = [];
-  const lossStreakRValues = [];
-  const minEquityRValues = [];
-  let worstRun = null;
-  const checkpoints = Array.from({ length: tradeCount + 1 }, () => []);
-
-  for (let run = 0; run < runCount; run += 1) {
-    let balance = startingBalance;
-    let equityR = 0;
-    let peakR = 0;
-    let maxRDrawdown = 0;
-    let currentLossStreak = 0;
-    let maxLossStreak = 0;
-    let currentLossStreakR = 0;
-    let maxLossStreakR = 0;
-    let minEquityR = 0;
-    const balances = [balance];
-    checkpoints[0].push(0);
-    for (let tradeIndex = 1; tradeIndex <= tradeCount; tradeIndex += 1) {
-      const sampledR = rValues[Math.floor(Math.random() * rValues.length)];
-      balance += balance * (riskPercent / 100) * sampledR;
-      equityR += sampledR;
-      peakR = Math.max(peakR, equityR);
-      maxRDrawdown = Math.min(maxRDrawdown, equityR - peakR);
-      minEquityR = Math.min(minEquityR, equityR);
-      if (sampledR < 0) {
-        currentLossStreak += 1;
-        currentLossStreakR += sampledR;
-      } else {
-        currentLossStreak = 0;
-        currentLossStreakR = 0;
-      }
-      maxLossStreak = Math.max(maxLossStreak, currentLossStreak);
-      maxLossStreakR = Math.min(maxLossStreakR, currentLossStreakR);
-      balances.push(balance);
-      checkpoints[tradeIndex].push(((balance - startingBalance) / startingBalance) * 100);
-    }
-    const finalReturn = ((balance - startingBalance) / startingBalance) * 100;
-    const maxDrawdown = maxDrawdownFromBalances(balances);
-    finalReturns.push(finalReturn);
-    finalRValues.push(equityR);
-    drawdowns.push(maxDrawdown);
-    rDrawdowns.push(maxRDrawdown);
-    lossStreaks.push(maxLossStreak);
-    lossStreakRValues.push(maxLossStreakR);
-    minEquityRValues.push(minEquityR);
-    if (!worstRun || equityR < worstRun.finalR) {
-      worstRun = { finalR: equityR, finalReturn, maxRDrawdown, maxDrawdown, maxLossStreak, maxLossStreakR, minEquityR };
-    }
-  }
-
-  const p10 = checkpoints.map((values) => percentile(values, 0.1));
-  const p50 = checkpoints.map((values) => percentile(values, 0.5));
-  const p90 = checkpoints.map((values) => percentile(values, 0.9));
-  const losingRuns = finalReturns.filter((value) => value < 0).length;
-  return {
-    runCount,
-    tradeCount,
-    sampleSize: rValues.length,
-    riskPercent,
-    p10Final: percentile(finalReturns, 0.1),
-    p50Final: percentile(finalReturns, 0.5),
-    p90Final: percentile(finalReturns, 0.9),
-    medianDrawdown: percentile(drawdowns, 0.5),
-    worstDrawdown: percentile(drawdowns, 0.1),
-    losingRunRate: (losingRuns / runCount) * 100,
-    p95LossStreak: percentile(lossStreaks, 0.95),
-    p99LossStreak: percentile(lossStreaks, 0.99),
-    p95LossStreakR: percentile(lossStreakRValues, 0.05),
-    p99LossStreakR: percentile(lossStreakRValues, 0.01),
-    p95RDrawdown: percentile(rDrawdowns, 0.05),
-    p99RDrawdown: percentile(rDrawdowns, 0.01),
-    p5FinalR: percentile(finalRValues, 0.05),
-    p1FinalR: percentile(finalRValues, 0.01),
-    p5MinEquityR: percentile(minEquityRValues, 0.05),
-    p1MinEquityR: percentile(minEquityRValues, 0.01),
-    worstRun,
-    p10,
-    p50,
-    p90,
-  };
-}
-
-function runMonteCarloSimulation() {
-  const items = filteredTrades().filter((trade) => Number.isFinite(trade.r) && trade.r !== 0);
-  const rValues = items.map((trade) => trade.r);
-  const startingBalance = Math.max(1, Number(els.simBalance.value) || 100000);
-  const riskPercent = Math.max(0.01, Math.min(100, Number(els.simRisk.value) || 1));
-  const tradeCount = Math.max(10, Math.min(1000, Math.round(Number(els.simTrades.value) || 100)));
-  const runCount = Math.max(100, Math.min(5000, Math.round(Number(els.simRuns.value) || 1000)));
-  const research = selectedResearchRValues();
-  monteCarloResult = rValues.length >= 5
-    ? simulateMonteCarloFromRValues(rValues, { startingBalance, riskPercent, tradeCount, runCount })
-    : { sampleSize: rValues.length, runCount, tradeCount, riskPercent };
-  monteCarloResult.research = research?.values.length >= 5
-    ? { label: research.label, ...simulateMonteCarloFromRValues(research.values, { startingBalance, riskPercent, tradeCount, runCount }) }
-    : research ? { label: research.label, sampleSize: research.values.length } : null;
-  renderMonteCarloSimulation(monteCarloResult, rValues.length);
 }
 
 function renderReturnSimulation() {
@@ -2695,90 +2415,6 @@ function drawMonteCarloChart(canvas, result) {
     { values: result.p50, color: styles.getPropertyValue("--accent").trim(), width: 3 },
     { values: result.p10, color: styles.getPropertyValue("--loss").trim(), width: 2, dash: [6, 6] },
   ], { height: 300 });
-}
-
-function renderMonteCarloPanel({ result, sampleSize = 0, metricsEl, formulaEl, chartEl, stressEl, emptyLabel, stressLabel }) {
-  if (!result || result.sampleSize < 5 || !result.worstRun) {
-    metricsEl.innerHTML = `
-      <div><span>Monte Carlo</span><strong>資料不足</strong></div>
-      <div><span>可用 R 樣本</span><strong>${sampleSize || result?.sampleSize || 0}</strong></div>
-    `;
-    stressEl.innerHTML = "";
-    formulaEl.textContent = emptyLabel;
-    drawLineChart(chartEl, [{ values: [0], color: getComputedStyle(document.body).getPropertyValue("--muted").trim(), width: 2 }], { height: 300 });
-    return;
-  }
-
-  metricsEl.innerHTML = monteCarloMetricCards(result);
-  formulaEl.textContent = `${result.runCount} runs · ${result.tradeCount} trades · ${result.sampleSize} R samples · ${result.riskPercent}% risk`;
-  stressEl.innerHTML = monteCarloStressBlock(result, stressLabel);
-  colorMonteCarloStress(stressEl);
-  drawMonteCarloChart(chartEl, result);
-}
-
-function renderMonteCarloSimulation(result, sampleSize = 0) {
-  renderMonteCarloPanel({
-    result,
-    sampleSize,
-    metricsEl: els.monteCarloMetrics,
-    formulaEl: els.monteCarloFormula,
-    chartEl: els.monteCarloChart,
-    stressEl: els.monteCarloStress,
-    emptyLabel: "至少需要 5 筆非 0R 實盤交易",
-    stressLabel: "使用目前交易紀錄 R 分布重抽樣",
-  });
-
-  renderMonteCarloPanel({
-    result: result?.research,
-    sampleSize: result?.research?.sampleSize || 0,
-    metricsEl: els.researchMonteCarloMetrics,
-    formulaEl: els.researchMonteCarloFormula,
-    chartEl: els.researchMonteCarloChart,
-    stressEl: els.researchMonteCarloStress,
-    emptyLabel: result?.research ? "回測斷點至少需要 5 筆非 0R 樣本" : "請選擇回測斷點",
-    stressLabel: result?.research?.label ? `使用回測斷點「${result.research.label}」R 分布重抽樣` : "使用回測斷點 R 分布重抽樣",
-  });
-
-  els.monteCarloCompare.innerHTML = renderResearchMonteCarloComparison(result);
-}
-
-function renderResearchMonteCarloComparison(result) {
-  if (!result?.research) {
-    return `<div class="research-compare-empty"><strong>尚未選擇回測斷點</strong><span>先在上方選擇斷點，再按重新模擬。</span></div>`;
-  }
-  if (!result.worstRun) {
-    return `<div class="research-compare-empty"><strong>實盤資料不足</strong><span>實盤至少需要 5 筆非 0R 交易，才能和回測比較。</span></div>`;
-  }
-  if (result.research.sampleSize < 5 || !result.research.worstRun) {
-    return `<div class="research-compare-empty"><strong>${result.research.label}</strong><span>回測斷點只有 ${result.research.sampleSize} 筆非 0R 樣本，至少需要 5 筆才能比較。</span></div>`;
-  }
-
-  const research = result.research;
-  const rows = [
-    ["P50 期末 R", result.p50[result.p50.length - 1], research.p50[research.p50.length - 1], "higher"],
-    ["P10 期末 R", result.p10[result.p10.length - 1], research.p10[research.p10.length - 1], "higher"],
-    ["99% 最大 R 回撤", result.p99RDrawdown, research.p99RDrawdown, "higher"],
-    ["99% 連敗壓力", result.p99LossStreak, research.p99LossStreak, "lower"],
-    ["99% 連敗段 R", result.p99LossStreakR, research.p99LossStreakR, "higher"],
-    ["虧損機率", result.losingRunRate, research.losingRunRate, "lower"],
-  ];
-  return `
-    <div class="research-compare-grid">
-      ${rows.map(([label, live, backtest, direction]) => {
-        const delta = live - backtest;
-        const improved = direction === "lower" ? delta <= 0 : delta >= 0;
-        const className = delta === 0 ? "" : improved ? "profit-pos" : "profit-neg";
-        const formatter = label.includes("機率") ? (value) => `${value.toFixed(1)}%` : label.includes("連敗壓力") ? (value) => `${Math.ceil(value)} 連敗` : (value) => signed(value, "R");
-        return `
-          <div>
-            <span>${label}</span>
-            <strong class="${className}">${formatter(live)}</strong>
-            <small>回測 ${formatter(backtest)} · 差 ${label.includes("機率") ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}pp` : label.includes("連敗壓力") ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)} 次` : signed(delta, "R")}</small>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
 }
 
 function useJournalSimulationStats() {
@@ -3145,8 +2781,6 @@ function render() {
   renderRows(items);
   renderStrategyVersions();
   renderHomeComparisons();
-  populateResearchLabControls();
-  renderResearchLab();
   window.renderTpAnalysis?.();
   els.tradeEmpty.hidden = items.length !== 0;
   document.querySelector(".table-wrap").hidden = items.length === 0;
@@ -3160,8 +2794,7 @@ function setPage(pageName) {
   if (window.location.hash !== `#${nextPage}`) {
     history.replaceState(null, "", `#${nextPage}`);
   }
-  if (nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "strategy" || nextPage === "research-lab") render();
-  if (nextPage === "research-lab") window.requestAnimationFrame(() => renderMonteCarloSimulation(monteCarloResult));
+  if (nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "strategy") render();
   if (nextPage === "tp-analysis") window.requestAnimationFrame(() => window.renderTpAnalysis?.());
   if (nextPage === "income-goals") window.renderIncomeGoals?.(tradesForActiveView(), activeLiveBatch, accountRules.initialBalance, liveBatchLabel(activeLiveBatch));
   if (nextPage === "calculator") renderReturnSimulation();
@@ -4273,7 +3906,6 @@ async function importDataFile(file, mode = "merge") {
 
 populateFilters();
 populateLiveBatchOptions();
-populateResearchBreakpointOptions();
 populateAccountRulesForm();
 renderChecklist();
 renderCalc();
@@ -4288,7 +3920,6 @@ els.liveBatch.addEventListener("change", () => {
   saveLiveBatches();
   populateFilters();
   render();
-  runMonteCarloSimulation();
   animateBatchControl();
 });
 document.querySelector("#inheritLiveBatchButton").addEventListener("click", inheritLiveBreakpoint);
@@ -4338,15 +3969,12 @@ document.addEventListener("click", (event) => {
 [els.account, els.risk, els.sl, els.pip].forEach((el) => el.addEventListener("input", renderCalc));
 els.returnSimulatorForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  populateResearchBreakpointOptions();
   runReturnSimulation();
 });
 els.useJournalStats.addEventListener("click", useJournalSimulationStats);
-els.researchBreakpoint.addEventListener("change", runMonteCarloSimulation);
 window.addEventListener("resize", () => {
   render();
   renderReturnSimulation();
-  renderMonteCarloSimulation(monteCarloResult);
 });
 
 els.theme.addEventListener("click", () => {
@@ -4354,7 +3982,6 @@ els.theme.addEventListener("click", () => {
   localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
   render();
   renderReturnSimulation();
-  renderMonteCarloSimulation(monteCarloResult);
 });
 
 els.accountRulesForm.addEventListener("submit", (event) => {
@@ -4411,7 +4038,6 @@ els.strategyVersionForm?.addEventListener("submit", (event) => {
   saveStrategyVersions();
   els.strategyVersionDialog.close();
   renderStrategyVersions();
-  renderResearchLab();
   showToast(existing ? "策略版本已更新。" : "策略版本已建立。完成驗證後可鎖定版本。");
 });
 
@@ -4725,14 +4351,6 @@ els.profitModes.forEach((button) => {
     renderAnalytics(filteredTrades());
   });
 });
-
-els.researchLabBreakpoint?.addEventListener("change", () => {
-  populateResearchLabControls();
-  renderResearchLab();
-  runMonteCarloSimulation();
-});
-els.researchLabMarket?.addEventListener("change", renderResearchLab);
-els.researchLabStrategy?.addEventListener("change", renderResearchLab);
 
 els.calendarHeatmap.addEventListener("click", (event) => {
   const cell = event.target.closest("[data-date]");

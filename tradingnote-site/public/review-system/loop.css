@@ -36,3 +36,9 @@
   .loop-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .loop-card strong { font-size: 1.2rem; }
 }
+
+/* 執行落差 page: totals stay here, the breakdown lives in 改善追蹤 and 差異分析 */
+.gap-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.gap-links a { display: grid; gap: 4px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface2); color: var(--ink); text-decoration: none; }
+.gap-links a:hover { border-color: var(--teal); }
+.gap-links span { color: var(--teal); font-size: .82rem; }
