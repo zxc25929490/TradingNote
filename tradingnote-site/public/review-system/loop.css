@@ -20,7 +20,7 @@
 .loop-table.actions { min-width: 900px; }
 .loop-action { max-width: 320px; line-height: 1.5; white-space: pre-wrap; }
 
-.loop-bar { display: inline-block; width: 90px; height: 7px; margin-right: 8px; border-radius: 999px; background: #203139; vertical-align: middle; overflow: hidden; }
+.loop-bar { display: inline-block; width: 90px; height: 7px; margin-right: 8px; border-radius: 999px; background: var(--tn-surface-2); vertical-align: middle; overflow: hidden; }
 .loop-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--amber), var(--red)); }
 .loop-bar i.amber { background: var(--amber); }
 
@@ -28,9 +28,9 @@
 .loop-bad { color: var(--red); }
 .loop-flat { color: var(--muted); }
 .loop-chip { display: inline-flex; padding: 5px 9px; border-radius: 999px; background: var(--surface2); color: var(--muted); font-size: .72rem; font-weight: 800; white-space: nowrap; }
-.loop-chip.good { background: rgba(39, 211, 180, .12); color: var(--teal); }
-.loop-chip.warn { background: rgba(242, 184, 75, .12); color: var(--amber); }
-.loop-chip.bad { background: rgba(255, 100, 124, .12); color: var(--red); }
+.loop-chip.good { background: color-mix(in srgb, var(--tn-pos) 12%, transparent); color: var(--teal); }
+.loop-chip.warn { background: color-mix(in srgb, var(--tn-warn) 12%, transparent); color: var(--amber); }
+.loop-chip.bad { background: color-mix(in srgb, var(--tn-neg) 12%, transparent); color: var(--red); }
 
 @media (max-width: 640px) {
   .loop-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -26,7 +26,7 @@
     padding: 0 6px;
     border-radius: 999px;
     background: var(--accent);
-    color: #fff;
+    color: var(--tn-on-accent);
     font-size: .72rem;
   }
   .filters:not(.open) > label { display: none; }

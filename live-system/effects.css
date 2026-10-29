@@ -16,7 +16,7 @@
   .panel::after {
     background:
       radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--accent) 22%, transparent), transparent 62%),
-      linear-gradient(120deg, transparent 12%, color-mix(in srgb, #fff 6%, transparent) 46%, transparent 72%);
+      linear-gradient(120deg, transparent 12%, color-mix(in srgb, var(--tn-surface) 6%, transparent) 46%, transparent 72%);
   }
 
   /* Subtle 3D tilt on KPI cards */

@@ -1,0 +1,244 @@
+/* TradingNote theme — one restrained, prop-firm style palette for all four systems.
+   html[data-theme] is set before first paint by each page's head script and switched from the sidebar
+   (see sidebar.js). Colour is reserved for profit / loss, status and the single blue accent.
+   Loaded after every system stylesheet: it also re-points each system's own legacy tokens. */
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --tn-bg: #f4f6f9;
+  --tn-surface: #ffffff;
+  --tn-surface-2: #f7f8fa;
+  --tn-surface-3: #eef1f5;
+  --tn-border: #e3e7ed;
+  --tn-border-strong: #cfd6df;
+  --tn-ink: #101828;
+  --tn-ink-2: #344054;
+  --tn-muted: #667085;
+  --tn-accent: #1f6feb;
+  --tn-accent-hover: #1a5fd0;
+  --tn-accent-fill: #1f6feb;
+  --tn-on-accent: #ffffff;
+  --tn-pos: #12805c;
+  --tn-neg: #c8372d;
+  --tn-warn: #b54708;
+  --tn-info: #0e7490;
+  --tn-violet: #6e56cf;
+  --tn-sidebar: #ffffff;
+  --tn-shadow: 0 1px 2px rgba(16, 24, 40, .06);
+  --tn-shadow-lg: 0 16px 40px rgba(16, 24, 40, .14);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --tn-bg: #0b0f14;
+  --tn-surface: #121821;
+  --tn-surface-2: #161e29;
+  --tn-surface-3: #1b2431;
+  --tn-border: #222d3b;
+  --tn-border-strong: #2e3b4d;
+  --tn-ink: #e6edf3;
+  --tn-ink-2: #c3ccd7;
+  --tn-muted: #8b98a8;
+  --tn-accent: #5b9cff;
+  --tn-accent-hover: #7cb0ff;
+  --tn-accent-fill: #2563eb; /* filled buttons: white text needs a deeper blue than the text accent */
+  --tn-on-accent: #ffffff;
+  --tn-pos: #3ccf91;
+  --tn-neg: #f0616d;
+  --tn-warn: #f5a623;
+  --tn-info: #38bdf8;
+  --tn-violet: #a78bfa;
+  --tn-sidebar: #0e131a;
+  --tn-shadow: none;
+  --tn-shadow-lg: 0 18px 48px rgba(0, 0, 0, .45);
+}
+
+/* Every system's own token names, re-pointed at the shared palette (body too: live-system sets its
+   tokens on body.dark, and its canvases read them from body). */
+html[data-theme],
+html[data-theme] body {
+  --bg: var(--tn-bg);
+  --surface: var(--tn-surface);
+  --surface-2: var(--tn-surface-2);
+  --surface2: var(--tn-surface-2);
+  --panel: var(--tn-surface);
+  --panel2: var(--tn-surface-2);
+  --line: var(--tn-border);
+  --ink: var(--tn-ink);
+  --muted: var(--tn-muted);
+  --accent: var(--tn-accent);
+  --accent-2: var(--tn-warn);
+  --teal: var(--tn-accent);
+  --win: var(--tn-pos);
+  --loss: var(--tn-neg);
+  --red: var(--tn-neg);
+  --amber: var(--tn-warn);
+  --blue: var(--tn-info);
+  --violet: var(--tn-violet);
+  --shadow: var(--tn-shadow);
+  --shadow-soft: var(--tn-shadow);
+  --focus: 0 0 0 3px color-mix(in srgb, var(--tn-accent) 28%, transparent);
+}
+
+/* ---- Base ---- */
+html[data-theme],
+html[data-theme] body {
+  background: var(--tn-bg);
+  color: var(--tn-ink);
+  font-family: Inter, "Segoe UI", "Noto Sans TC", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+html[data-theme] body::before,
+html[data-theme] body::after { content: none; }
+html[data-theme] :is(h1, h2, h3, h4) { letter-spacing: -.01em; }
+html[data-theme] ::selection { background: color-mix(in srgb, var(--tn-accent) 24%, transparent); }
+html[data-theme] a { color: var(--tn-accent); }
+
+/* ---- Sidebar ---- */
+html[data-theme] .sidebar {
+  background: var(--tn-sidebar);
+  border-right: 1px solid var(--tn-border);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+html[data-theme] .brand > b {
+  border: 0;
+  border-radius: 8px;
+  background: var(--tn-accent-fill);
+  color: var(--tn-on-accent);
+  box-shadow: none;
+}
+html[data-theme] .brand strong { color: var(--tn-ink); }
+html[data-theme] .brand small { color: var(--tn-muted); }
+html[data-theme] .system-switcher a {
+  border-color: var(--tn-border);
+  background: transparent;
+  color: var(--tn-muted);
+  box-shadow: none;
+}
+html[data-theme] .system-switcher a:hover { background: var(--tn-surface-3); color: var(--tn-ink); }
+html[data-theme] .system-switcher a.active {
+  border-color: color-mix(in srgb, var(--tn-accent) 45%, var(--tn-border));
+  background: color-mix(in srgb, var(--tn-accent) 10%, transparent);
+  color: var(--tn-ink);
+}
+html[data-theme] .system-switcher a span { color: var(--tn-accent); }
+html[data-theme] :is(#nav, .sidebar nav) :is(a, button):not(.nav-group-toggle) {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--tn-ink-2);
+  font-weight: 500;
+}
+html[data-theme] :is(#nav, .sidebar nav) :is(a, button):not(.nav-group-toggle):hover {
+  background: var(--tn-surface-3);
+  color: var(--tn-ink);
+  transform: none;
+}
+html[data-theme] :is(#nav, .sidebar nav) :is(a, button):not(.nav-group-toggle).active {
+  background: color-mix(in srgb, var(--tn-accent) 12%, transparent);
+  color: var(--tn-accent);
+  font-weight: 600;
+  box-shadow: none;
+}
+html[data-theme] :is(#nav, .sidebar nav) :is(a, button).active::before,
+html[data-theme] :is(#nav, .sidebar nav) :is(a, button).active::after { display: none; }
+html[data-theme] :is(#nav, nav) > .nav-group-toggle { color: var(--tn-muted); letter-spacing: .08em; }
+html[data-theme] :is(#nav, nav) > .nav-group-toggle:hover { color: var(--tn-ink); }
+html[data-theme] :is(.cycle, .partial-exit-sidebar) {
+  border-color: var(--tn-border);
+  background: var(--tn-surface-2);
+  box-shadow: none;
+}
+
+/* ---- Surfaces: cards, panels, dialogs ---- */
+html[data-theme] :is(
+  .card, .panel, .metric, .metrics > article, .metrics > div, .hero, .chart-card, .stat-card, .kpi,
+  .layer-card, .mc-panel, .strategy-card, .rule-item, .lesson-cards article, .workflow-card,
+  .review-context, .loop-card, .gap-card, .tp-card, .tp-panel, .start-card, .analytics-card,
+  .income-goal-card, .detail-block, .section-card
+) {
+  border-color: var(--tn-border);
+  background: var(--tn-surface);
+  box-shadow: var(--tn-shadow);
+  backdrop-filter: none;
+}
+html[data-theme] dialog {
+  border: 1px solid var(--tn-border);
+  border-radius: 12px;
+  background: var(--tn-surface);
+  color: var(--tn-ink);
+  box-shadow: var(--tn-shadow-lg);
+}
+html[data-theme] dialog::backdrop { background: rgba(8, 12, 18, .55); backdrop-filter: blur(2px); }
+
+/* ---- Controls ---- */
+html[data-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea) {
+  border: 1px solid var(--tn-border-strong);
+  border-radius: 8px;
+  background-color: var(--tn-surface);
+  color: var(--tn-ink);
+  box-shadow: none;
+}
+html[data-theme] :is(input, select, textarea):focus {
+  border-color: var(--tn-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tn-accent) 22%, transparent);
+}
+html[data-theme] :is(input, textarea)::placeholder { color: var(--tn-muted); opacity: .8; }
+html[data-theme] select option { background: var(--tn-surface); color: var(--tn-ink); }
+html[data-theme] :is(input[type="checkbox"], input[type="radio"], input[type="range"]) { accent-color: var(--tn-accent); }
+
+html[data-theme] :is(.primary, .primary-button, button.primary, .btn-primary, .actions > button:not(.secondary)) {
+  border: 1px solid var(--tn-accent-fill);
+  border-radius: 8px;
+  background: var(--tn-accent-fill);
+  color: var(--tn-on-accent);
+  box-shadow: none;
+  font-weight: 600;
+}
+html[data-theme] :is(.primary, .primary-button, button.primary, .btn-primary, .actions > button:not(.secondary)):hover {
+  border-color: color-mix(in srgb, var(--tn-accent-fill) 86%, #000);
+  background: color-mix(in srgb, var(--tn-accent-fill) 86%, #000);
+  transform: none;
+}
+
+/* ---- Tables ---- */
+html[data-theme] table { border-color: var(--tn-border); }
+html[data-theme] th {
+  background: var(--tn-surface-2);
+  color: var(--tn-muted);
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+html[data-theme] :is(th, td) { border-color: var(--tn-border); }
+html[data-theme] tbody tr:hover td { background: var(--tn-surface-2); }
+
+/* ---- Profit / loss keep their meaning everywhere ---- */
+html[data-theme] :is(.pos, .metrics .pos b) { color: var(--tn-pos); }
+html[data-theme] :is(.neg, .metrics .neg b) { color: var(--tn-neg); }
+
+/* ---- Scrollbars ---- */
+html[data-theme] { scrollbar-color: var(--tn-border-strong) transparent; }
+
+/* ---- Theme switch (sidebar, next to the effects switch) ---- */
+.theme-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 12px 0;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--tn-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-switch:hover { color: var(--tn-ink); }
+.theme-switch-icon { display: grid; place-items: center; width: 30px; height: 17px; font-size: 13px; line-height: 1; }
+body.sidebar-rail .theme-switch { justify-content: center; margin-inline: 0; }
+body.sidebar-mobile:not(.sidebar-open) .theme-switch { display: none !important; }

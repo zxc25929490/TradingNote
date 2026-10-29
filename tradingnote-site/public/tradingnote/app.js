@@ -4110,9 +4110,11 @@ window.addEventListener("resize", () => {
   renderReturnSimulation();
 });
 
+// The shared sidebar owns the theme (html[data-theme] + body.dark); this button just flips it.
 els.theme.addEventListener("click", () => {
-  const isDark = document.body.classList.toggle("dark");
-  localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+  window.TradingNoteSetTheme?.(document.body.classList.contains("dark") ? "light" : "dark");
+});
+window.addEventListener("tradingnote:themechange", () => {
   render();
   renderReturnSimulation();
 });

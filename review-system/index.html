@@ -5,17 +5,22 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <script>try{if(sessionStorage.getItem('tradingnote.system-switching')==='1')document.documentElement.classList.add('system-transition-pending')}catch(_){}</script>
   <script>try{if(localStorage.getItem('tradingnote.effects')==='on')document.documentElement.classList.add('fx-on')}catch(_){}</script>
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('tradingnote.theme')==='light'?'light':'dark'}catch(_){document.documentElement.dataset.theme='dark'}</script>
   <title>TradingNote · 實盤復盤系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="icon" href="../live-system/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20260821-1">
+  <link rel="stylesheet" href="styles.css?v=20261029-7">
   <link rel="stylesheet" href="typography.css?v=20260821-1">
   <link rel="stylesheet" href="analysis-switcher.css?v=20260822-1">
-  <link rel="stylesheet" href="review-form.css?v=20260823-1">
-  <link rel="stylesheet" href="loop.css?v=20261016-1">
-  <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2">
+  <link rel="stylesheet" href="review-form.css?v=20261029-7">
+  <link rel="stylesheet" href="loop.css?v=20261029-7">
+  <link rel="stylesheet" href="../shared/system-transition.css?v=20261029-7">
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261029-1">
-  <link rel="stylesheet" href="../shared/sidebar.css?v=20261029-1">
-  <link rel="stylesheet" href="../shared/responsive.css?v=20261017-2">
+  <link rel="stylesheet" href="../shared/sidebar.css?v=20261029-7">
+  <link rel="stylesheet" href="../shared/responsive.css?v=20261029-7">
+  <link rel="stylesheet" href="../shared/theme.css?v=20261029-8">
   <style>
     .table-sort{display:inline-flex;align-items:center;gap:6px;width:max-content;padding:2px 0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;white-space:nowrap;cursor:pointer}
     .table-sort::after{content:"↕";color:var(--muted);font-size:.78em;opacity:.45}.table-sort.active{color:var(--teal)}.table-sort.active[data-direction="asc"]::after{content:"↑";opacity:1}.table-sort.active[data-direction="desc"]::after{content:"↓";opacity:1}.table-sort:hover{color:var(--teal)}
@@ -135,11 +140,11 @@
   </dialog>
   <div id="toast" class="toast" hidden></div>
   <script src="../live-system/data/trades.js"></script>
-  <script src="../shared/partial-exit.js?v=20261003-zero-1"></script>
+  <script src="../shared/partial-exit.js?v=20261029-7"></script>
   <script src="../shared/review-loop.js?v=20261004-2"></script>
   <script src="loop.js?v=20261004-2"></script>
   <script src="app.js?v=20261016-1"></script>
-  <script src="../shared/sidebar.js?v=20261029-1"></script>
+  <script src="../shared/sidebar.js?v=20261029-7"></script>
   <script src="../shared/cursor-fx.js?v=20261029-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
 </body>

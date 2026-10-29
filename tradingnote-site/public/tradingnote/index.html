@@ -5,22 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script>try{if(sessionStorage.getItem('tradingnote.system-switching')==='1')document.documentElement.classList.add('system-transition-pending')}catch(_){}</script>
     <script>try{if(localStorage.getItem('tradingnote.effects')==='on')document.documentElement.classList.add('fx-on')}catch(_){}</script>
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('tradingnote.theme')==='light'?'light':'dark'}catch(_){document.documentElement.dataset.theme='dark'}</script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <title>TradingNote Analytics</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260901-best-day-track-1" />
-    <link rel="stylesheet" href="income-goals.css?v=20260918-2" />
+    <link rel="stylesheet" href="styles.css?v=20261029-7" />
+    <link rel="stylesheet" href="income-goals.css?v=20261029-7" />
     <link rel="stylesheet" href="advanced-analytics.css?v=20261004-4" />
     <link rel="stylesheet" href="start-here.css?v=20261016-2" />
     <link rel="stylesheet" href="account-overview.css?v=20261029-6" />
-    <link rel="stylesheet" href="tp-analysis.css?v=20260828-9" />
-    <link rel="stylesheet" href="effects.css?v=20261029-1" />
-    <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2" />
+    <link rel="stylesheet" href="tp-analysis.css?v=20261029-7" />
+    <link rel="stylesheet" href="effects.css?v=20261029-7" />
+    <link rel="stylesheet" href="../shared/system-transition.css?v=20261029-7" />
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261029-1">
-  <link rel="stylesheet" href="../shared/sidebar.css?v=20261029-1">
-  <link rel="stylesheet" href="responsive.css?v=20261017-3">
+  <link rel="stylesheet" href="../shared/sidebar.css?v=20261029-7">
+  <link rel="stylesheet" href="responsive.css?v=20261029-7">
+  <link rel="stylesheet" href="../shared/theme.css?v=20261029-8">
   </head>
   <body>
     <aside class="sidebar">
@@ -950,7 +952,7 @@
 
     <script src="xlsx.full.min.js"></script>
     <script src="data/trades.js"></script>
-    <script src="../shared/partial-exit.js?v=20261003-zero-1"></script>
+    <script src="../shared/partial-exit.js?v=20261029-7"></script>
     <script src="../shared/backtest-r.js?v=20261016-1"></script>
     <script src="../shared/stats.js?v=20261016-1"></script>
     <script src="advanced-analytics.js?v=20261016-1"></script>
@@ -958,9 +960,9 @@
     <script src="account-overview.js?v=20261029-5"></script>
     <script src="tp-analysis.js?v=20260828-9"></script>
     <script src="income-goals.js?v=20260919-1"></script>
-    <script src="app.js?v=20261029-4"></script>
+    <script src="app.js?v=20261029-7"></script>
     <script src="effects.js?v=20261029-1"></script>
-    <script src="../shared/sidebar.js?v=20261029-1"></script>
+    <script src="../shared/sidebar.js?v=20261029-7"></script>
     <script src="responsive.js?v=20261017-1"></script>
     <script src="../shared/cursor-fx.js?v=20261029-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>

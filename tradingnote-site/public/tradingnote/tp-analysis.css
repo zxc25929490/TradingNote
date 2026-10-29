@@ -9,8 +9,8 @@
   border: 1px solid var(--line);
   border-radius: 16px;
   background:
-    radial-gradient(circle at 88% 20%, rgba(29, 211, 176, 0.14), transparent 28%),
-    linear-gradient(120deg, rgba(29, 211, 176, 0.07), var(--surface));
+    radial-gradient(circle at 88% 20%, color-mix(in srgb, var(--tn-accent) 14%, transparent), transparent 28%),
+    var(--surface);
 }
 
 .tp-hero::after {
@@ -18,7 +18,7 @@
   position: absolute;
   right: 160px;
   bottom: -34px;
-  color: rgba(29, 211, 176, 0.035);
+  color: color-mix(in srgb, var(--tn-accent) 4%, transparent);
   font-size: 8rem;
   font-weight: 900;
   line-height: 1;
@@ -43,9 +43,9 @@
   display: grid;
   min-width: 150px;
   padding: 15px 18px;
-  border: 1px solid rgba(29, 211, 176, 0.22);
+  border: 1px solid color-mix(in srgb, var(--tn-accent) 22%, transparent);
   border-radius: 12px;
-  background: rgba(8, 19, 23, 0.72);
+  background: color-mix(in srgb, var(--tn-surface-3) 72%, transparent);
   text-align: right;
 }
 
@@ -170,9 +170,9 @@
   align-items: center;
   margin-bottom: 16px;
   padding: 20px;
-  border: 1px solid rgba(29, 211, 176, 0.24);
+  border: 1px solid color-mix(in srgb, var(--tn-accent) 24%, transparent);
   border-radius: 14px;
-  background: linear-gradient(120deg, rgba(29, 211, 176, 0.08), var(--surface) 60%);
+  background: var(--surface);
 }
 
 .tp-recommendation .tp-verdict {
@@ -209,7 +209,7 @@
   padding: 9px 11px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: rgba(8, 19, 23, 0.55);
+  background: color-mix(in srgb, var(--tn-surface-3) 55%, transparent);
   color: var(--muted);
   font-size: 0.68rem;
 }
@@ -220,8 +220,8 @@
 }
 
 .tp-recommendation.insufficient {
-  border-color: rgba(241, 185, 75, 0.25);
-  background: linear-gradient(120deg, rgba(241, 185, 75, 0.07), var(--surface) 60%);
+  border-color: color-mix(in srgb, var(--tn-warn) 25%, transparent);
+  background: var(--surface);
 }
 
 .tp-recommendation.insufficient .tp-verdict span,
@@ -242,7 +242,7 @@
   min-height: 270px;
   padding: 18px 8px 0;
   border-bottom: 1px solid var(--line);
-  background: repeating-linear-gradient(0deg, transparent 0 62px, rgba(88, 113, 122, 0.12) 63px);
+  background: repeating-linear-gradient(0deg, transparent 0 62px, color-mix(in srgb, var(--tn-info) 12%, transparent) 63px);
   overflow-x: auto;
 }
 
@@ -266,13 +266,13 @@
   width: 100%;
   min-height: 3px;
   border-radius: 6px 6px 2px 2px;
-  background: linear-gradient(180deg, #4fe4c6, rgba(29, 211, 176, 0.26));
-  box-shadow: 0 0 18px rgba(29, 211, 176, 0.12);
+  background: linear-gradient(180deg, var(--tn-accent), color-mix(in srgb, var(--tn-accent) 26%, transparent));
+  box-shadow:none;
 }
 
 .tp-reach-column.best i {
-  background: linear-gradient(180deg, #f1b94b, rgba(241, 185, 75, 0.35));
-  box-shadow: 0 0 20px rgba(241, 185, 75, 0.2);
+  background: linear-gradient(180deg, var(--tn-warn), color-mix(in srgb, var(--tn-warn) 35%, transparent));
+  box-shadow:none;
 }
 
 .tp-reach-column small { color: var(--muted); font-size: 0.66rem; }
@@ -293,14 +293,14 @@
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(88, 113, 122, 0.18);
+  background: color-mix(in srgb, var(--tn-info) 18%, transparent);
 }
 
 .tp-distribution-row i b {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), #7594ff);
+  background: linear-gradient(90deg, var(--accent), var(--tn-info));
 }
 
 .tp-distribution-row strong { text-align: right; }
@@ -308,7 +308,7 @@
   padding: 13px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(8, 19, 23, 0.45);
+  background: color-mix(in srgb, var(--tn-surface-3) 45%, transparent);
   color: var(--muted);
   font-size: 0.76rem;
   line-height: 1.55;
@@ -316,7 +316,7 @@
 
 .tp-table-panel { margin-bottom: 16px; }
 .tp-result-table { min-width: 900px; }
-.tp-result-table tr.best-row { background: rgba(29, 211, 176, 0.055); }
+.tp-result-table tr.best-row { background: color-mix(in srgb, var(--tn-accent) 6%, transparent); }
 .tp-result-table tr.validation-row td:first-child { box-shadow: inset 3px 0 #f1b94b; }
 .tp-result-table .tp-positive { color: var(--accent); }
 .tp-result-table .tp-negative { color: var(--loss); }
@@ -324,13 +324,13 @@
   display: inline-flex;
   padding: 5px 8px;
   border-radius: 999px;
-  background: rgba(88, 113, 122, 0.12);
+  background: color-mix(in srgb, var(--tn-info) 12%, transparent);
   color: var(--muted);
   font-size: 0.68rem;
 }
 
-.tp-result-table .tp-status.best { background: rgba(29, 211, 176, 0.1); color: var(--accent); }
-.tp-result-table .tp-status.validation { background: rgba(241, 185, 75, 0.1); color: var(--accent-2); }
+.tp-result-table .tp-status.best { background: color-mix(in srgb, var(--tn-accent) 10%, transparent); color: var(--accent); }
+.tp-result-table .tp-status.validation { background: color-mix(in srgb, var(--tn-warn) 10%, transparent); color: var(--accent-2); }
 
 .tp-method-note {
   display: flex;

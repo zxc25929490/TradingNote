@@ -92,6 +92,36 @@
   });
   window.addEventListener("storage", (event) => { if (event.key === FX_KEY) applyFx(event.newValue === "on"); });
 
+  // Light / dark theme, shared by all systems (html[data-theme], see theme.css). live-system also keys
+  // its own styles off body.dark, and redraws its canvases on "tradingnote:themechange".
+  const THEME_KEY = "tradingnote.theme";
+  const themeButton = document.createElement("button");
+  themeButton.type = "button";
+  themeButton.className = "theme-switch";
+  sidebar.insertBefore(themeButton, fxButton);
+  const applyTheme = (theme) => {
+    document.documentElement.dataset.theme = theme;
+    document.body.classList.toggle("dark", theme === "dark");
+    const label = theme === "dark" ? "淺色模式" : "深色模式";
+    themeButton.innerHTML = `<span class="theme-switch-icon" aria-hidden="true">${theme === "dark" ? "☀" : "☾"}</span><span class="nav-label">${label}</span>`;
+    themeButton.title = `切換為${label}`;
+  };
+  window.TradingNoteSetTheme = (theme) => {
+    const next = theme === "light" ? "light" : "dark";
+    try { localStorage.setItem(THEME_KEY, next); } catch (_) { /* storage unavailable */ }
+    applyTheme(next);
+    window.dispatchEvent(new CustomEvent("tradingnote:themechange", { detail: { theme: next } }));
+  };
+  applyTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
+  themeButton.addEventListener("click", () => {
+    window.TradingNoteSetTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  });
+  window.addEventListener("storage", (event) => {
+    if (event.key !== THEME_KEY) return;
+    applyTheme(event.newValue === "light" ? "light" : "dark");
+    window.dispatchEvent(new CustomEvent("tradingnote:themechange", { detail: { theme: event.newValue } }));
+  });
+
   // Phones: the sidebar becomes a top bar, and the menu opens as a drawer.
   const MOBILE_QUERY = window.matchMedia("(max-width: 760px)");
   const menuButton = document.createElement("button");
