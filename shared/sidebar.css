@@ -54,10 +54,17 @@ body.sidebar-rail-capable main { transition: width 200ms ease, margin-left 200ms
 body.sidebar-rail.sidebar-rail-capable .sidebar { width: 76px; padding-inline: 12px; overflow-x: hidden; }
 body.sidebar-rail.sidebar-rail-capable main { margin-left: 76px; }
 body.sidebar-rail .brand { flex-direction: column; align-items: center; gap: 10px; }
-body.sidebar-rail .sidebar-brand-text { display: none; }
+html body.sidebar-rail .sidebar .brand > .sidebar-brand-text { display: none; }
+html[data-theme] body.sidebar-rail .sidebar .brand { flex-direction: column; gap: 10px; }
 body.sidebar-rail .sidebar-rail-toggle { margin: 0; }
 
 body.sidebar-rail .system-switcher { grid-template-columns: 1fr; }
+html[data-theme] body.sidebar-rail .sidebar .system-current { justify-content: center; padding: 0; }
+html[data-theme] body.sidebar-rail .sidebar .system-current :is(.nav-label, i) { display: none; }
+html[data-theme] body.sidebar-rail .sidebar .system-switcher a { justify-content: center; padding: 0; }
+html[data-theme] body.sidebar-rail :is(#nav, .sidebar nav) :is(a, button):not(.nav-group-toggle) { justify-content: center; gap: 0; padding: 0; }
+html[data-theme] body.sidebar-rail .sidebar-footer :is(.theme-switch, .fx-switch, .partial-exit-button) { justify-content: center; padding: 0; }
+body.sidebar-rail .sidebar-footer .fx-switch-track { display: none; }
 body.sidebar-rail .system-switcher a { grid-template-columns: 1fr; justify-items: center; padding: 7px 0; text-align: center; }
 body.sidebar-rail .system-switcher a b { display: none; }
 
@@ -155,8 +162,8 @@ body.sidebar-mobile.sidebar-open .sidebar {
 body.sidebar-mobile.sidebar-open .sidebar-menu-toggle { position: absolute; top: 9px; right: 12px; }
 body.sidebar-mobile.sidebar-open .brand { min-height: 38px !important; padding-right: 52px !important; }
 body.sidebar-mobile.sidebar-open .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 59; background: rgba(0, 0, 0, .55); }
-body.sidebar-mobile.sidebar-open .system-switcher { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 6px; margin: 12px 0 0 !important; }
-body.sidebar-mobile.sidebar-open .system-switcher a { grid-template-columns: 34px 1fr !important; text-align: left !important; padding: 8px 9px !important; }
+body.sidebar-mobile.sidebar-open .sidebar.systems-open .system-switcher { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 6px; margin: 12px 0 0 !important; }
+body.sidebar-mobile.sidebar-open .system-switcher a { padding: 8px 9px !important; }
 body.sidebar-mobile.sidebar-open .system-switcher a b { display: block !important; font-size: 12px; }
 body.sidebar-mobile.sidebar-open nav {
   display: grid !important;
@@ -182,25 +189,18 @@ body.sidebar-mobile.sidebar-open .nav-icon { display: inline-grid !important; }
 body.sidebar-mobile.sidebar-open :is(.cycle, .partial-exit-sidebar) { display: none !important; }
 body.sidebar-mobile.sidebar-open .nav-group-toggle > span { display: inline !important; }
 
-/* Effects switch at the bottom of every sidebar */
+/* Effects switch (sits in .sidebar-footer; row layout in theme.css) */
 .fx-switch {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 18px 12px 0;
-  padding: 6px 0;
   border: 0;
   background: transparent;
-  color: var(--muted, var(--tn-info));
+  color: var(--tn-muted);
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
   cursor: pointer;
 }
-.fx-switch:hover { color: var(--tn-ink); }
 .fx-switch-track { position: relative; width: 30px; height: 17px; border-radius: 999px; background: color-mix(in srgb, var(--tn-info) 30%, transparent); transition: background 150ms ease; }
 .fx-switch-track i { position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--tn-ink); transition: transform 150ms ease; }
 .fx-switch[aria-pressed="true"] .fx-switch-track { background: var(--tn-accent); }
 .fx-switch[aria-pressed="true"] .fx-switch-track i { transform: translateX(13px); }
-body.sidebar-rail .fx-switch { justify-content: center; margin-inline: 0; }
-body.sidebar-mobile:not(.sidebar-open) .fx-switch { display: none !important; }

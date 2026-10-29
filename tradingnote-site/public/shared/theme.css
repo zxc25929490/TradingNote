@@ -102,35 +102,139 @@ html[data-theme] .sidebar {
   box-shadow: none;
   backdrop-filter: none;
 }
-html[data-theme] .brand > b {
+/* Brand: the same mark and name in every system. */
+html[data-theme] .sidebar .brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+}
+html[data-theme] .sidebar .brand > b {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  margin: 0;
   border: 0;
   border-radius: 8px;
   background: var(--tn-accent-fill);
   color: var(--tn-on-accent);
   box-shadow: none;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .02em;
 }
-html[data-theme] .brand strong { color: var(--tn-ink); }
-html[data-theme] .brand small { color: var(--tn-muted); }
-html[data-theme] .system-switcher a {
-  border-color: var(--tn-border);
-  background: transparent;
-  color: var(--tn-muted);
-  box-shadow: none;
-}
-html[data-theme] .system-switcher a:hover { background: var(--tn-surface-3); color: var(--tn-ink); }
-html[data-theme] .system-switcher a.active {
-  border-color: color-mix(in srgb, var(--tn-accent) 45%, var(--tn-border));
-  background: color-mix(in srgb, var(--tn-accent) 10%, transparent);
+html[data-theme] .sidebar .brand > span { display: block; margin: 0; color: var(--tn-ink); }
+html[data-theme] .sidebar .brand strong { color: var(--tn-ink); font-size: 15px; font-weight: 700; }
+
+/* System switch: one row for the current system; the list unfolds beneath it. */
+html[data-theme] .sidebar .system-current {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  margin: 16px 0 0;
+  padding: 0 10px;
+  border: 1px solid var(--tn-border);
+  border-radius: 8px;
+  background: var(--tn-surface);
   color: var(--tn-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
-html[data-theme] .system-switcher a span { color: var(--tn-accent); }
+html[data-theme] .sidebar .system-current:hover { border-color: var(--tn-border-strong); }
+html[data-theme] .sidebar .system-current i { display: grid; margin-left: auto; color: var(--tn-muted); transition: transform 150ms ease; }
+html[data-theme] .sidebar .system-current i svg { width: 16px; height: 16px; }
+html[data-theme] .sidebar.systems-open .system-current i { transform: rotate(180deg); }
+html[data-theme] .sidebar :is(.system-current, .system-switcher a) span {
+  min-width: 30px;
+  color: var(--tn-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+html[data-theme] .sidebar .system-switcher {
+  display: none;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding: 4px;
+  border: 1px solid var(--tn-border);
+  border-radius: 8px;
+  background: var(--tn-surface);
+  box-shadow: var(--tn-shadow-lg);
+}
+html[data-theme] .sidebar.systems-open .system-switcher { display: grid; }
+html[data-theme] .sidebar .system-switcher a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tn-ink-2);
+  box-shadow: none;
+  text-align: left;
+}
+html[data-theme] .sidebar .system-switcher a b { font-size: 13px; font-weight: 500; }
+html[data-theme] .sidebar .system-switcher a:hover { background: var(--tn-surface-3); color: var(--tn-ink); }
+html[data-theme] .sidebar .system-switcher a.active { background: color-mix(in srgb, var(--tn-accent) 10%, transparent); color: var(--tn-ink); }
+html[data-theme] .sidebar .system-switcher a.active b { font-weight: 600; }
+
+/* Menu */
+html[data-theme] .sidebar nav { gap: 2px; margin-top: 18px; }
+html[data-theme] .sidebar .nav-group { gap: 2px; }
 html[data-theme] :is(#nav, .sidebar nav) :is(a, button):not(.nav-group-toggle) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   box-shadow: none;
   color: var(--tn-ink-2);
+  font-size: 14px;
   font-weight: 500;
+  line-height: 1.3;
+}
+html[data-theme] .sidebar .nav-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--tn-muted);
+  font-size: 14px;
+  line-height: 1;
+}
+html[data-theme] .sidebar .nav-icon svg { width: 18px; height: 18px; }
+html[data-theme] .sidebar :is(a, button).active .nav-icon { color: var(--tn-accent); }
+html[data-theme] .sidebar .nav-badge {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--tn-surface-3);
+  color: var(--tn-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
 }
 html[data-theme] :is(#nav, .sidebar nav) :is(a, button):not(.nav-group-toggle):hover {
   background: var(--tn-surface-3);
@@ -145,13 +249,59 @@ html[data-theme] :is(#nav, .sidebar nav) :is(a, button):not(.nav-group-toggle).a
 }
 html[data-theme] :is(#nav, .sidebar nav) :is(a, button).active::before,
 html[data-theme] :is(#nav, .sidebar nav) :is(a, button).active::after { display: none; }
-html[data-theme] :is(#nav, nav) > .nav-group-toggle { color: var(--tn-muted); letter-spacing: .08em; }
-html[data-theme] :is(#nav, nav) > .nav-group-toggle:hover { color: var(--tn-ink); }
-html[data-theme] :is(.cycle, .partial-exit-sidebar) {
-  border-color: var(--tn-border);
-  background: var(--tn-surface-2);
-  box-shadow: none;
+html[data-theme] :is(#nav, nav) > .nav-group-toggle {
+  margin: 18px 10px 4px;
+  color: var(--tn-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
 }
+html[data-theme] :is(#nav, nav) > .nav-group-toggle:first-child { margin-top: 0; }
+html[data-theme] :is(#nav, nav) > .nav-group-toggle:hover { color: var(--tn-ink); }
+/* Some systems colour every "nav button span" (their old icon slot); a group title is not an icon. */
+html[data-theme] .sidebar .nav-group-toggle > :is(span, i) { margin: 0; padding: 0; background: none; color: inherit; font: inherit; }
+/* The fold arrow only shows on hover, or while a group is folded. */
+html[data-theme] :is(#nav, nav) > .nav-group-toggle i { opacity: 0; transition: opacity 150ms ease, transform 180ms ease; }
+html[data-theme] :is(#nav, nav) > .nav-group-toggle:is(:hover, :focus-visible, [aria-expanded="false"]) i { opacity: 1; }
+
+/* Footer: settings grouped under one divider, styled like quiet menu rows. */
+html[data-theme] .sidebar-footer {
+  display: grid;
+  gap: 2px;
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tn-border);
+}
+html[data-theme] .sidebar-footer :is(.theme-switch, .fx-switch, .partial-exit-button) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--tn-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+html[data-theme] .sidebar-footer :is(.theme-switch, .fx-switch, .partial-exit-button):hover { background: var(--tn-surface-3); color: var(--tn-ink); }
+html[data-theme] .sidebar-footer .fx-switch .fx-switch-track { order: 2; margin-left: auto; width: 28px; height: 16px; background: var(--tn-border-strong); }
+html[data-theme] .sidebar-footer .fx-switch .fx-switch-track i { width: 12px; height: 12px; background: #fff; }
+html[data-theme] .sidebar-footer .fx-switch[aria-pressed="true"] .fx-switch-track { background: var(--tn-accent-fill); }
+html[data-theme] .sidebar-footer .fx-switch[aria-pressed="true"] .fx-switch-track i { transform: translateX(12px); }
+html[data-theme] .sidebar-footer .fx-switch[aria-pressed="true"] .nav-icon { color: var(--tn-accent); }
+html[data-theme] .sidebar-footer .partial-exit-sidebar { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+html[data-theme] .sidebar-footer .partial-exit-sidebar > small { display: none; }
+html[data-theme] .sidebar-footer .partial-exit-button span { width: 18px; color: var(--tn-muted); font-size: 10px; font-weight: 700; text-align: center; }
+html[data-theme] .sidebar-footer .partial-exit-button b { font-weight: 500; }
+html[data-theme] .sidebar .cycle { display: none; }
 
 /* ---- Surfaces: cards, panels, dialogs ---- */
 html[data-theme] :is(
@@ -223,22 +373,5 @@ html[data-theme] :is(.neg, .metrics .neg b) { color: var(--tn-neg); }
 /* ---- Scrollbars ---- */
 html[data-theme] { scrollbar-color: var(--tn-border-strong) transparent; }
 
-/* ---- Theme switch (sidebar, next to the effects switch) ---- */
-.theme-switch {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 14px 12px 0;
-  padding: 6px 0;
-  border: 0;
-  background: transparent;
-  color: var(--tn-muted);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.theme-switch:hover { color: var(--tn-ink); }
-.theme-switch-icon { display: grid; place-items: center; width: 30px; height: 17px; font-size: 13px; line-height: 1; }
-body.sidebar-rail .theme-switch { justify-content: center; margin-inline: 0; }
-body.sidebar-mobile:not(.sidebar-open) .theme-switch { display: none !important; }
+/* ---- Theme switch (sidebar footer; layout above) ---- */
+.theme-switch-icon { display: grid; place-items: center; line-height: 1; }

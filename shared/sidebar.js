@@ -60,7 +60,67 @@
     toggle.after(group);
   });
 
-  for (const link of sidebar.querySelectorAll(".system-switcher a")) link.title = link.querySelector("b")?.textContent || "";
+  // One consistent line-icon set, keyed by label; anything unmapped keeps its text glyph.
+  const ICON_PATHS = {
+    grid: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+    today: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M9 15.5l2 2 4-4"/>',
+    check: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M9 12.5l2 2 4-4"/>',
+    calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 7h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/>',
+    list: '<path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+    bars: '<path d="M3 21h18M7 17v-6M12 17V6M17 17v-9"/>',
+    chart: '<path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 6-7"/>',
+    sigma: '<path d="M18 5H6l6 7-6 7h12"/>',
+    target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r=".6"/>',
+    flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>',
+    trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M10 17h4"/>',
+    diff: '<path d="M4 7h13l-3-3M20 17H7l3 3"/>',
+    book: '<path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zM5 20a2 2 0 0 0 2 1h12v-3"/>',
+    alert: '<path d="M12 3 2 20h20zM12 10v4M12 17h.01"/>',
+    layers: '<path d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5"/>',
+    gap: '<path d="m3 7 6 6 4-4 8 8M21 11v6h-6"/>',
+    loop: '<path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4"/>',
+    inbox: '<path d="M3 13h5l2 3h4l2-3h5M5.5 5h13L21 13v6H3v-6z"/>',
+    edge: '<path d="M12 3 21 12 12 21 3 12z"/>',
+    dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01M12 12h.01"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+    sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5"/>',
+  };
+  const NAV_ICONS = {
+    帳戶總覽: "grid", 今日待辦: "today", 交易檢查: "check", 風控計算: "calc", 交易紀錄: "list",
+    週月績效: "bars", 深度分析: "chart", 進階統計: "sigma", "TP 統計": "target", 收入目標: "flag", 挑戰目標: "trophy",
+    研究總覽: "grid", 回測紀錄: "list", 決策差異: "diff", "Rule Book": "book", 錯誤資料庫: "alert",
+    策略版本: "layers", "TP 模擬器": "target", "回測 vs 實盤": "diff",
+    復盤工作台: "inbox", 執行落差: "gap", 復盤結論: "book", 改善追蹤: "loop",
+    三層診斷: "layers", "策略與 Edge": "edge", "Monte Carlo": "dice",
+  };
+  const svgIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
+  for (const icon of nav.querySelectorAll(".nav-icon")) {
+    const name = NAV_ICONS[icon.closest("a, button")?.title];
+    if (name) icon.innerHTML = svgIcon(name);
+  }
+
+  // The four systems collapse into one row showing the current system; clicking it unfolds the others.
+  const switcher = sidebar.querySelector(".system-switcher");
+  for (const link of switcher?.querySelectorAll("a") || []) link.title = link.querySelector("b")?.textContent || "";
+  if (switcher) {
+    const current = switcher.querySelector("a.active") || switcher.querySelector("a");
+    const systemButton = document.createElement("button");
+    systemButton.type = "button";
+    systemButton.className = "system-current";
+    systemButton.setAttribute("aria-expanded", "false");
+    systemButton.title = "切換系統";
+    systemButton.innerHTML = `<span class="system-code">${current.querySelector("span")?.textContent || ""}</span><b class="nav-label">${current.querySelector("b")?.textContent || ""}</b><i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></i>`;
+    switcher.before(systemButton);
+    const setSystemsOpen = (open) => {
+      sidebar.classList.toggle("systems-open", open);
+      systemButton.setAttribute("aria-expanded", String(open));
+    };
+    systemButton.addEventListener("click", () => setSystemsOpen(!sidebar.classList.contains("systems-open")));
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest(".system-current, .system-switcher")) setSystemsOpen(false);
+    });
+  }
 
   const brand = sidebar.querySelector(".brand");
   [...(brand?.children || [])].slice(1).forEach((child) => child.classList.add("sidebar-brand-text"));
@@ -72,14 +132,20 @@
 
   // Visual effects switch (cursor trail, card tilt, glow). Off by default; shared by all systems.
   const FX_KEY = "tradingnote.effects";
+  // Settings live together in one footer: partial-exit setup (shared/partial-exit.js), theme, effects.
+  const footer = document.createElement("div");
+  footer.className = "sidebar-footer";
+  sidebar.appendChild(footer);
+  const partialExit = sidebar.querySelector(".partial-exit-sidebar");
+  if (partialExit) footer.appendChild(partialExit);
   const fxButton = document.createElement("button");
   fxButton.type = "button";
   fxButton.className = "fx-switch";
-  sidebar.appendChild(fxButton);
+  footer.appendChild(fxButton);
   const applyFx = (on) => {
     document.documentElement.classList.toggle("fx-on", on);
     fxButton.setAttribute("aria-pressed", String(on));
-    fxButton.innerHTML = `<span class="fx-switch-track" aria-hidden="true"><i></i></span><span class="nav-label">動態特效</span>`;
+    fxButton.innerHTML = `<span class="nav-icon">${svgIcon("sparkle")}</span><span class="fx-switch-track" aria-hidden="true"><i></i></span><span class="nav-label">動態特效</span>`;
     fxButton.title = on ? "關閉動態特效" : "開啟動態特效";
   };
   let fxOn = false;
@@ -98,12 +164,12 @@
   const themeButton = document.createElement("button");
   themeButton.type = "button";
   themeButton.className = "theme-switch";
-  sidebar.insertBefore(themeButton, fxButton);
+  footer.insertBefore(themeButton, fxButton);
   const applyTheme = (theme) => {
     document.documentElement.dataset.theme = theme;
     document.body.classList.toggle("dark", theme === "dark");
     const label = theme === "dark" ? "淺色模式" : "深色模式";
-    themeButton.innerHTML = `<span class="theme-switch-icon" aria-hidden="true">${theme === "dark" ? "☀" : "☾"}</span><span class="nav-label">${label}</span>`;
+    themeButton.innerHTML = `<span class="nav-icon theme-switch-icon">${svgIcon(theme === "dark" ? "sun" : "moon")}</span><span class="nav-label">${label}</span>`;
     themeButton.title = `切換為${label}`;
   };
   window.TradingNoteSetTheme = (theme) => {

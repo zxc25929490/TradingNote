@@ -11,6 +11,9 @@ for (const system of ["live-system", "research-system", "review-system", "analys
   assert.match(html, /\.\.\/shared\/sidebar\.css\?v=/, `${system} loads sidebar.css`);
   assert.match(html, /\.\.\/shared\/sidebar\.js\?v=/, `${system} loads sidebar.js`);
   assert.match(html, /<aside class="sidebar">[\s\S]*<nav[\s>]/, `${system} has a sidebar nav`);
+  // One brand everywhere, and no decorative cards under the menu.
+  assert.match(html, /<div class="brand"><b class="brand-mark">TN<\/b><span><strong>TradingNote<\/strong><\/span><\/div>/, `${system} uses the shared brand`);
+  assert.doesNotMatch(html, /class="cycle"/, `${system} has no cycle card`);
 }
 
 // Every system groups its menu, and every group has at least one page to open.
@@ -37,6 +40,21 @@ assert.match(css, /body\.sidebar-rail\.sidebar-rail-capable \.sidebar \{ width: 
 assert.match(js, /position === "fixed"/, "rail only for a fixed sidebar column");
 assert.match(js, /group\.appendChild\(current\)/, "links are moved, not recreated");
 assert.doesNotMatch(js, /cloneNode/);
+// The four systems fold into one "current system" row; settings share one footer.
+assert.match(js, /systemButton\.className = "system-current"/);
+assert.match(js, /sidebar\.classList\.toggle\("systems-open", open\)/);
+assert.match(js, /footer\.className = "sidebar-footer"/);
+assert.match(read("../partial-exit.js"), /document\.querySelector\('\.sidebar-footer'\)/, "partial-exit setup mounts in the footer");
+// Every nav label in every system has a line icon.
+const iconMap = js.slice(js.indexOf("const NAV_ICONS"), js.indexOf("};", js.indexOf("const NAV_ICONS")));
+for (const system of Object.keys(EXPECTED_GROUPS)) {
+  const html = read(`../../${system}/index.html`);
+  const nav = html.slice(html.indexOf("<nav"), html.indexOf("</nav>"));
+  for (const [, label] of nav.matchAll(/<(?:a|button)[^>]*>[\s\S]*?([^<>]+?)\s*(?:<\/span>)?\s*(?:<em[^>]*>[^<]*<\/em>)?\s*<\/(?:a|button)>/g)) {
+    const key = label.trim();
+    assert.ok(iconMap.includes(`${key}:`) || iconMap.includes(`"${key}":`), `${system}: no icon for ${key}`);
+  }
+}
 assert.match(js, /createElement\(glyph \? "nav-icon" : "nav-label"\)/, "labels use custom elements so per-system span rules do not restyle them");
 
 console.log("Sidebar tests passed");
