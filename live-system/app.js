@@ -243,7 +243,8 @@ const checklist = [
 ];
 
 const pageTitles = {
-  dashboard: "今日總覽",
+  account: "帳戶總覽",
+  dashboard: "今日待辦與快照",
   objectives: "挑戰目標與風險",
   "income-goals": "收入目標",
   analytics: "深度數據分析",
@@ -345,7 +346,7 @@ function requireWritableLiveBatch() {
 
 function loadAccountRules() {
   const defaults = {
-    name: "FTMO Challenge",
+    name: "挑戰帳戶",
     phase: "challenge",
     initialBalance: 100000,
     profitTargetPercent: 10,
@@ -816,7 +817,7 @@ function animateMetric(element, target, formatter) {
 function attachRippleFeedback() {
   document.addEventListener("pointerdown", (event) => {
     const target = event.target.closest("button, .file-button");
-    if (!target || target.disabled || !motionAllowed) return;
+    if (!target || target.disabled || !motionAllowed || !document.documentElement.classList.contains("fx-on")) return;
     const rect = target.getBoundingClientRect();
     const ripple = document.createElement("span");
     const size = Math.max(rect.width, rect.height) * 1.35;
@@ -1415,7 +1416,8 @@ function computeDailySummaries(items) {
     });
 }
 
-function renderObjectives(items) {
+// One evaluation of the challenge rules, shared by the objectives page and the account overview.
+function evaluateObjectives(items) {
   const days = computeDailySummaries(items);
   const stats = computeStats(items);
   const initial = accountRules.initialBalance;
@@ -1442,6 +1444,46 @@ function renderObjectives(items) {
   const bestDayPassed = bestDayPercent <= 50 || !bestDay;
   const passed = targetPassed && daysPassed && bestDayPassed && !dailyBreach && !maxLossBreach;
   const warning = !passed && !dailyBreach && !maxLossBreach;
+  return {
+    days, stats, initial, currentBalance, targetAmount, dailyLimit, maxLossAmount, highestClose, maxLossFloor,
+    maxLossRemaining, maxLossUsed, profitableDays, positiveProfit, bestDay, bestDayPercent, extraNeeded,
+    absoluteDayTotal, largestAbsoluteDay, discipline, dailyBreach, maxLossBreach, targetPassed, daysPassed,
+    bestDayPassed, passed, warning,
+  };
+}
+
+// Everything the account overview page needs, computed with the same rules as the objectives page.
+function buildAccountOverview(items) {
+  const sorted = sortByDate(items);
+  const evaluation = evaluateObjectives(sorted);
+  const balancePoints = [{ date: sorted[0]?.date || "", balance: evaluation.initial }];
+  let running = evaluation.initial;
+  for (const trade of sorted) {
+    running += Number(trade.profit || 0);
+    balancePoints.push({ date: trade.date || "", balance: running, r: Number(trade.r) });
+  }
+  return {
+    rules: { ...accountRules },
+    batchLabel: liveBatchLabel(activeLiveBatch),
+    trades: sorted,
+    balancePoints,
+    ...evaluation,
+  };
+}
+
+function renderAccountOverview(items) {
+  const container = document.querySelector("#accountOverview");
+  if (!container || !window.TradingNoteAccountOverview) return;
+  window.TradingNoteAccountOverview.render(container, buildAccountOverview(items));
+}
+
+function renderObjectives(items) {
+  const {
+    days, stats, initial, currentBalance, targetAmount, dailyLimit, maxLossAmount, maxLossFloor, maxLossRemaining,
+    maxLossUsed, highestClose, profitableDays, positiveProfit, bestDay, bestDayPercent, extraNeeded,
+    absoluteDayTotal, largestAbsoluteDay, discipline, dailyBreach, maxLossBreach, targetPassed,
+    daysPassed, bestDayPassed, passed, warning,
+  } = evaluateObjectives(items);
 
   els.challengeStatus.textContent = passed ? "PASS" : warning ? "IN PROGRESS" : "BREACH";
   els.challengeStatus.className = `challenge-status ${passed ? "pass" : warning ? "warning" : "breach"}`;
@@ -2286,7 +2328,7 @@ function updateChecklistGate() {
 }
 
 function emitCelebration(source) {
-  if (!motionAllowed) return;
+  if (!motionAllowed || !document.documentElement.classList.contains("fx-on")) return;
   const rect = source.getBoundingClientRect();
   const colors = ["#0f9f8c", "#f2a63b", "#65d6c5", "#ffffff"];
   for (let index = 0; index < 24; index += 1) {
@@ -2839,6 +2881,7 @@ function render() {
   els.filterSummary.textContent = `${liveBatchLabel(activeLiveBatch)} · 顯示 ${items.length} / ${batchTotal} 筆交易${activeCount ? ` · ${activeCount} 個條件` : ""}`;
   els.resetFilters.disabled = activeCount === 0;
   renderMixWarning(items);
+  renderAccountOverview(items);
   renderMetrics(items);
   renderPeriodAnalysis();
   renderChart(items);
@@ -2856,14 +2899,14 @@ function render() {
 }
 
 function setPage(pageName) {
-  const nextPage = pageTitles[pageName] ? pageName : "dashboard";
+  const nextPage = pageTitles[pageName] ? pageName : "account";
   els.pages.forEach((page) => page.classList.toggle("active", page.dataset.page === nextPage));
   els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.pageLink === nextPage));
   els.pageTitle.textContent = pageTitles[nextPage];
   if (window.location.hash !== `#${nextPage}`) {
     history.replaceState(null, "", `#${nextPage}`);
   }
-  if (nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "strategy") render();
+  if (nextPage === "account" || nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "strategy") render();
   if (nextPage === "tp-analysis") window.requestAnimationFrame(() => window.renderTpAnalysis?.());
   if (nextPage === "income-goals") window.renderIncomeGoals?.(tradesForActiveView(), activeLiveBatch, accountRules.initialBalance, liveBatchLabel(activeLiveBatch));
   if (nextPage === "calculator") renderReturnSimulation();
@@ -4290,6 +4333,11 @@ els.toggleReviews?.addEventListener("click", () => {
   renderRows(filteredTrades());
 });
 
+window.TradingNoteOpenTrade = (id) => {
+  const trade = trades.find((item) => String(item.id) === String(id));
+  if (trade) openTradeDetail(trade);
+};
+
 els.rows.addEventListener("click", (event) => {
   const row = event.target.closest("tr[data-id]");
   if (!row) return;
@@ -4455,4 +4503,4 @@ document.querySelector("[data-page='trades'] thead")?.addEventListener("click", 
   tradeTableSort = { key, direction: tradeTableSort.key === key && tradeTableSort.direction === "desc" ? "asc" : "desc" };
   renderRows(filteredTrades());
 });
-setPage(window.location.hash.slice(1) || "dashboard");
+setPage(window.location.hash.slice(1) || "account");

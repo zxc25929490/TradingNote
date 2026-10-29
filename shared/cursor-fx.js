@@ -225,7 +225,7 @@
 
   const INTERACTIVE = "button, a, summary, select, input, textarea, label, [role='button'], [tabindex]:not([tabindex='-1']), [data-id], .card, tbody tr";
   document.addEventListener("pointermove", (event) => {
-    if (event.pointerType === "touch") return;
+    if (event.pointerType === "touch" || !document.documentElement.classList.contains("fx-on")) return;
     pointerX = event.clientX;
     pointerY = event.clientY;
     if (ringX < 0) { ringX = pointerX; ringY = pointerY; }
@@ -238,7 +238,7 @@
   }, { passive: true });
 
   document.addEventListener("pointerdown", (event) => {
-    if (event.pointerType === "touch" || event.button !== 0) return;
+    if (event.pointerType === "touch" || event.button !== 0 || !document.documentElement.classList.contains("fx-on")) return;
     dragging = true;
     ring.classList.add("pressed");
     emitBurst(event.clientX, event.clientY);

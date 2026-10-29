@@ -4,7 +4,7 @@ import vm from "node:vm";
 
 const source = fs.readFileSync(new URL("../cursor-fx.js", import.meta.url), "utf8");
 
-function createHarness(pathname, { reduced = false, fine = true, popover = true } = {}) {
+function createHarness(pathname, { reduced = false, fine = true, popover = true, effectsOn = true } = {}) {
   const topLayer = [];
   const observers = [];
   const draws = { drawImage: 0, arc: 0, fill: 0, stroke: 0 };
@@ -43,7 +43,7 @@ function createHarness(pathname, { reduced = false, fine = true, popover = true 
   const rafQueue = [];
   const document = {
     hidden: false,
-    documentElement: { style: { setProperty() {} }, addEventListener() {} },
+    documentElement: { style: { setProperty() {} }, addEventListener() {}, classList: { contains: (name) => name === "fx-on" && effectsOn } },
     body: { append() {} },
     createElement: makeElement,
     addEventListener: (type, fn) => { (listeners[type] ||= []).push(fn); },
@@ -108,6 +108,13 @@ assert.deepEqual(modal.topLayer.slice(-3), original, "overlay must sit above the
 const legacy = createHarness("/live-system/index.html", { popover: false });
 assert.equal(legacy.observers.length, 0);
 assert.ok(legacy.listeners.pointermove?.length);
+
+// Effects are opt-in: with the sidebar switch off (no html.fx-on) nothing is emitted or drawn.
+const off = createHarness("/live-system/index.html", { effectsOn: false });
+for (let i = 0; i < 20; i += 1) off.fire("pointermove", { clientX: 100 + i * 12, clientY: 200 });
+off.fire("pointerdown", { clientX: 340, clientY: 200 });
+while (off.step()) { /* drain */ }
+assert.equal(off.draws.drawImage + off.draws.arc + off.draws.fill, 0, "no drawing while effects are switched off");
 
 // Reduced motion and touch-only devices get no effects at all.
 assert.equal(createHarness("/live-system/index.html", { reduced: true }).listeners.pointermove, undefined);

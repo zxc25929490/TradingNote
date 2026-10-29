@@ -4,17 +4,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script>try{if(sessionStorage.getItem('tradingnote.system-switching')==='1')document.documentElement.classList.add('system-transition-pending')}catch(_){}</script>
+    <script>try{if(localStorage.getItem('tradingnote.effects')==='on')document.documentElement.classList.add('fx-on')}catch(_){}</script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <title>TradingNote Analytics</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=20260901-best-day-track-1" />
     <link rel="stylesheet" href="income-goals.css?v=20260918-2" />
     <link rel="stylesheet" href="advanced-analytics.css?v=20261004-4" />
     <link rel="stylesheet" href="start-here.css?v=20261016-2" />
+    <link rel="stylesheet" href="account-overview.css?v=20261029-3" />
     <link rel="stylesheet" href="tp-analysis.css?v=20260828-9" />
-    <link rel="stylesheet" href="effects.css?v=20261004-1" />
+    <link rel="stylesheet" href="effects.css?v=20261029-1" />
     <link rel="stylesheet" href="../shared/system-transition.css?v=20260821-2" />
-  <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261004-1">
-  <link rel="stylesheet" href="../shared/sidebar.css?v=20261017-3">
+  <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261029-1">
+  <link rel="stylesheet" href="../shared/sidebar.css?v=20261029-1">
   <link rel="stylesheet" href="responsive.css?v=20261017-3">
   </head>
   <body>
@@ -34,7 +39,8 @@
       </div>
       <nav aria-label="主要導覽">
         <span class="nav-section-title">每天</span>
-        <a class="active" href="#dashboard" data-page-link="dashboard"><span aria-hidden="true">⌂</span>今日總覽</a>
+        <a class="active" href="#account" data-page-link="account"><span aria-hidden="true">▣</span>帳戶總覽</a>
+        <a href="#dashboard" data-page-link="dashboard"><span aria-hidden="true">⌂</span>今日待辦</a>
         <a href="#checklist" data-page-link="checklist"><span aria-hidden="true">✓</span>交易檢查</a>
         <a href="#calculator" data-page-link="calculator"><span aria-hidden="true">％</span>風控計算</a>
         <a href="#trades" data-page-link="trades"><span aria-hidden="true">≡</span>交易紀錄</a>
@@ -159,7 +165,11 @@
         <div id="mixWarning" class="mix-warning" role="status" hidden></div>
       </section>
 
-      <section id="dashboard" class="page active" data-page="dashboard">
+      <section id="account" class="page active" data-page="account">
+        <div id="accountOverview"></div>
+      </section>
+
+      <section id="dashboard" class="page" data-page="dashboard">
         <section id="startHere" class="panel start-here" aria-label="今天從這裡開始"></section>
         <section class="metric-grid" aria-label="Key metrics">
           <article class="metric">
@@ -944,13 +954,14 @@
     <script src="../shared/stats.js?v=20261016-1"></script>
     <script src="advanced-analytics.js?v=20261016-1"></script>
     <script src="start-here.js?v=20261016-1"></script>
+    <script src="account-overview.js?v=20261029-3"></script>
     <script src="tp-analysis.js?v=20260828-9"></script>
     <script src="income-goals.js?v=20260919-1"></script>
-    <script src="app.js?v=20261017-1"></script>
-    <script src="effects.js?v=20261004-1"></script>
-    <script src="../shared/sidebar.js?v=20261017-1"></script>
+    <script src="app.js?v=20261029-3"></script>
+    <script src="effects.js?v=20261029-1"></script>
+    <script src="../shared/sidebar.js?v=20261029-1"></script>
     <script src="responsive.js?v=20261017-1"></script>
-    <script src="../shared/cursor-fx.js?v=20261004-1"></script>
+    <script src="../shared/cursor-fx.js?v=20261029-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
   </body>
 </html>

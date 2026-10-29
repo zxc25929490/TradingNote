@@ -1,5 +1,6 @@
 /* Visual polish layer. Purely additive: delete this file and effects.js to revert. */
 @media (prefers-reduced-motion: no-preference) {
+  html.fx-on {
   /* Staggered entrance when a page opens */
   .page.active .metric,
   .page.active .panel,
@@ -87,6 +88,7 @@
     outline: none;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
     transition: box-shadow 200ms ease;
+  }
   }
 }
 

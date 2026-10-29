@@ -98,3 +98,6 @@
 @media (prefers-reduced-motion: reduce), (pointer: coarse) {
   .fx-cursor-canvas, .fx-cursor-ring, .fx-cursor-core { display: none; }
 }
+
+/* Effects are opt-in (sidebar switch → html.fx-on). */
+html:not(.fx-on) :is(.fx-cursor-canvas, .fx-cursor-ring, .fx-cursor-core) { display: none !important; }

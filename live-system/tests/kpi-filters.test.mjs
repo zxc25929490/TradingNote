@@ -13,7 +13,7 @@ assert.match(app, /if \(els\.strategyFilter\) els\.strategyFilter\.value = "all"
 // Mixed strategies / all breakpoints are flagged above the numbers.
 assert.match(html, /id="mixWarning"/);
 assert.match(app, /function renderMixWarning\(items\)/);
-assert.match(app, /renderMixWarning\(items\);\n  renderMetrics\(items\);/);
+assert.match(app, /renderMixWarning\(items\);[\s\S]{0,80}renderMetrics\(items\);/);
 
 // Headline KPIs carry sample size and 95% intervals.
 assert.match(html, /id="expectancyCi"/);

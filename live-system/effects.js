@@ -36,7 +36,7 @@
 
   // Cursor spotlight on cards, plus a small tilt on KPI cards.
   document.addEventListener("pointermove", (event) => {
-    if (event.pointerType === "touch") return;
+    if (event.pointerType === "touch" || !document.documentElement.classList.contains("fx-on")) return;
     const card = event.target.closest?.(".metric, .panel");
     if (!card) return;
     const rect = card.getBoundingClientRect();

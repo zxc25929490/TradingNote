@@ -181,3 +181,26 @@ body.sidebar-mobile.sidebar-open .nav-label { display: inline !important; }
 body.sidebar-mobile.sidebar-open .nav-icon { display: inline-grid !important; }
 body.sidebar-mobile.sidebar-open :is(.cycle, .partial-exit-sidebar) { display: none !important; }
 body.sidebar-mobile.sidebar-open .nav-group-toggle > span { display: inline !important; }
+
+/* Effects switch at the bottom of every sidebar */
+.fx-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 12px 0;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted, #87a1aa);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fx-switch:hover { color: #fff; }
+.fx-switch-track { position: relative; width: 30px; height: 17px; border-radius: 999px; background: rgba(150, 170, 180, .3); transition: background 150ms ease; }
+.fx-switch-track i { position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: transform 150ms ease; }
+.fx-switch[aria-pressed="true"] .fx-switch-track { background: #2f9e7c; }
+.fx-switch[aria-pressed="true"] .fx-switch-track i { transform: translateX(13px); }
+body.sidebar-rail .fx-switch { justify-content: center; margin-inline: 0; }
+body.sidebar-mobile:not(.sidebar-open) .fx-switch { display: none !important; }

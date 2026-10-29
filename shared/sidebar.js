@@ -69,6 +69,29 @@
   railButton.className = "sidebar-rail-toggle";
   (brand || sidebar).appendChild(railButton);
 
+
+  // Visual effects switch (cursor trail, card tilt, glow). Off by default; shared by all systems.
+  const FX_KEY = "tradingnote.effects";
+  const fxButton = document.createElement("button");
+  fxButton.type = "button";
+  fxButton.className = "fx-switch";
+  sidebar.appendChild(fxButton);
+  const applyFx = (on) => {
+    document.documentElement.classList.toggle("fx-on", on);
+    fxButton.setAttribute("aria-pressed", String(on));
+    fxButton.innerHTML = `<span class="fx-switch-track" aria-hidden="true"><i></i></span><span class="nav-label">動態特效</span>`;
+    fxButton.title = on ? "關閉動態特效" : "開啟動態特效";
+  };
+  let fxOn = false;
+  try { fxOn = localStorage.getItem(FX_KEY) === "on"; } catch (_) { fxOn = false; }
+  applyFx(fxOn);
+  fxButton.addEventListener("click", () => {
+    fxOn = !document.documentElement.classList.contains("fx-on");
+    try { localStorage.setItem(FX_KEY, fxOn ? "on" : "off"); } catch (_) { /* storage unavailable */ }
+    applyFx(fxOn);
+  });
+  window.addEventListener("storage", (event) => { if (event.key === FX_KEY) applyFx(event.newValue === "on"); });
+
   // Phones: the sidebar becomes a top bar, and the menu opens as a drawer.
   const MOBILE_QUERY = window.matchMedia("(max-width: 760px)");
   const menuButton = document.createElement("button");

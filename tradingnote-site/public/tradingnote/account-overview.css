@@ -1,0 +1,181 @@
+/* 帳戶總覽 — prop-firm style account dashboard (see account-overview.js).
+   Two restrained palettes; colour is reserved for profit / loss and status. */
+.acct {
+  --acct-bg: #f4f6f9;
+  --acct-surface: #ffffff;
+  --acct-surface-2: #f7f8fa;
+  --acct-border: #e3e7ed;
+  --acct-grid: #eef1f5;
+  --acct-ink: #101828;
+  --acct-muted: #667085;
+  --acct-pos: #12805c;
+  --acct-neg: #c8372d;
+  --acct-warn: #b54708;
+  --acct-line: #1f6feb;
+  --acct-area: rgba(31, 111, 235, .16);
+  --acct-accent: #1f6feb;
+  --acct-shadow: 0 1px 2px rgba(16, 24, 40, .06);
+
+  display: grid;
+  gap: 16px;
+  color: var(--acct-ink);
+  font-family: Inter, "Segoe UI", "Noto Sans TC", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+body.dark .acct {
+  --acct-bg: #0b0f14;
+  --acct-surface: #121821;
+  --acct-surface-2: #161e29;
+  --acct-border: #222d3b;
+  --acct-grid: #1a2330;
+  --acct-ink: #e6edf3;
+  --acct-muted: #8b98a8;
+  --acct-pos: #3ccf91;
+  --acct-neg: #f0616d;
+  --acct-warn: #f5a623;
+  --acct-line: #5b9cff;
+  --acct-area: rgba(91, 156, 255, .18);
+  --acct-accent: #5b9cff;
+  --acct-shadow: none;
+}
+
+/* Calm the page chrome while the overview is open. */
+#account .acct * { box-sizing: border-box; }
+.acct .pos { color: var(--acct-pos); }
+.acct .neg { color: var(--acct-neg); }
+.acct-muted { color: var(--acct-muted); font-size: .8rem; }
+.acct-link { color: var(--acct-accent); font-size: .84rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.acct-link:hover { text-decoration: underline; }
+.acct-empty { margin: 0; padding: 22px 0; color: var(--acct-muted); text-align: center; }
+
+/* Header */
+.acct-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.acct-eyebrow { margin: 0 0 4px; color: var(--acct-muted); font-size: .76rem; font-weight: 600; letter-spacing: .02em; }
+.acct-head h2 { margin: 0 0 10px; font-size: 1.6rem; font-weight: 700; letter-spacing: -.01em; }
+.acct-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.acct-chip,
+.acct-status { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border: 1px solid var(--acct-border); border-radius: 6px; background: var(--acct-surface); color: var(--acct-muted); font-size: .78rem; font-weight: 600; }
+.acct-status { border-color: transparent; }
+.acct-status::before { content: ""; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: currentColor; }
+.acct-status.pass { background: color-mix(in srgb, var(--acct-pos) 14%, transparent); color: var(--acct-pos); }
+.acct-status.progress { background: color-mix(in srgb, var(--acct-accent) 14%, transparent); color: var(--acct-accent); }
+.acct-status.breach { background: color-mix(in srgb, var(--acct-neg) 14%, transparent); color: var(--acct-neg); }
+
+/* KPI strip */
+.acct-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--acct-border); border-radius: 10px; background: var(--acct-surface); box-shadow: var(--acct-shadow); overflow: hidden; }
+.acct-kpi { display: grid; gap: 4px; padding: 16px 18px; border-left: 1px solid var(--acct-border); min-width: 0; }
+.acct-kpi:first-child { border-left: 0; }
+.acct-kpi span { color: var(--acct-muted); font-size: .78rem; font-weight: 600; }
+.acct-kpi strong { font-size: 1.4rem; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-kpi small { color: var(--acct-muted); font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Cards */
+.acct-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.acct-grid.main { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); }
+.acct-card { min-width: 0; padding: 18px 20px; border: 1px solid var(--acct-border); border-radius: 10px; background: var(--acct-surface); box-shadow: var(--acct-shadow); }
+.acct-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.acct-card-head h3 { margin: 0; font-size: 1rem; font-weight: 700; }
+
+/* Chart */
+.acct-seg { display: inline-flex; padding: 3px; border: 1px solid var(--acct-border); border-radius: 7px; background: var(--acct-surface-2); }
+.acct-seg button { height: 28px; padding: 0 12px; border: 0; border-radius: 5px; background: transparent; color: var(--acct-muted); font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.acct-seg button.on { background: var(--acct-surface); color: var(--acct-ink); box-shadow: var(--acct-shadow), 0 0 0 1px var(--acct-border); }
+.acct-chart { position: relative; }
+.acct-chart canvas { display: block; width: 100%; height: 320px; }
+.acct-tooltip { position: absolute; z-index: 2; display: grid; gap: 2px; min-width: 120px; padding: 8px 10px; border: 1px solid var(--acct-border); border-radius: 8px; background: var(--acct-surface); box-shadow: 0 8px 24px rgba(16, 24, 40, .14); font-size: .78rem; pointer-events: none; }
+.acct-tooltip span { color: var(--acct-muted); }
+.acct-tooltip span.pos { color: var(--acct-pos); }
+.acct-tooltip span.neg { color: var(--acct-neg); }
+
+/* Objectives */
+.acct-objectives { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.acct-objective { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--acct-grid); }
+.acct-objective:first-child { border-top: 0; padding-top: 2px; }
+.acct-objective b { display: block; font-size: .88rem; }
+.acct-objective small { display: block; margin-top: 2px; color: var(--acct-muted); font-size: .76rem; }
+.acct-objective strong { font-size: .86rem; white-space: nowrap; }
+.acct-mark { display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; font-size: .72rem; font-weight: 800; }
+.acct-objective.ok .acct-mark { background: color-mix(in srgb, var(--acct-pos) 16%, transparent); color: var(--acct-pos); }
+.acct-objective.pending .acct-mark { background: var(--acct-surface-2); color: var(--acct-muted); box-shadow: inset 0 0 0 1px var(--acct-border); }
+.acct-objective.fail .acct-mark { background: color-mix(in srgb, var(--acct-neg) 16%, transparent); color: var(--acct-neg); }
+.acct-objective.ok strong { color: var(--acct-pos); }
+.acct-objective.fail strong { color: var(--acct-neg); }
+.acct-bar { display: block; height: 5px; margin-top: 8px; border-radius: 3px; background: var(--acct-grid); overflow: hidden; }
+.acct-bar i { display: block; height: 100%; border-radius: inherit; background: var(--acct-muted); }
+.acct-bar.pos i { background: var(--acct-pos); }
+.acct-bar.warn i { background: var(--acct-warn); }
+
+/* Statistics */
+.acct-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; margin: 0; }
+.acct-stats div { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--acct-grid); font-size: .86rem; }
+.acct-stats dt { color: var(--acct-muted); }
+.acct-stats dd { margin: 0; font-weight: 600; text-align: right; white-space: nowrap; }
+
+/* The dashboard styles every table globally (min-width 1100px, per-column alignment, sticky uppercase
+   headers, phone card layout). Reset all of that inside the overview; the rules below re-style it. */
+#account .acct table { min-width: 0; }
+#account .acct thead { display: table-header-group; }
+#account .acct tbody tr { display: table-row; cursor: default; background: none; }
+#account .acct :is(th, td) { display: table-cell; position: static; font-size: inherit; text-transform: none; text-align: left; background: none; }
+#account .acct td::before { content: none; }
+
+/* Tables */
+#account .acct-table-wrap { overflow-x: auto; margin: 0 -4px; }
+#account .acct-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+#account .acct-table th { padding: 8px 8px; border-bottom: 1px solid var(--acct-border); color: var(--acct-muted); font-size: .74rem; font-weight: 600; text-align: left; white-space: nowrap; }
+#account .acct-table td { padding: 10px 8px; border-bottom: 1px solid var(--acct-grid); white-space: nowrap; }
+#account .acct-table tbody tr:last-child td { border-bottom: 0; }
+#account .acct-table .num { text-align: right; }
+#account .acct-table td small { margin-left: 6px; color: var(--acct-muted); }
+#account .acct-table.journal tbody tr { cursor: pointer; }
+#account .acct-table.journal tbody tr:hover,
+#account .acct-table.journal tbody tr:focus-visible { background: var(--acct-surface-2); outline: none; }
+.acct-side { display: inline-block; min-width: 40px; padding: 2px 7px; border-radius: 4px; background: var(--acct-surface-2); color: var(--acct-muted); font-size: .74rem; font-weight: 700; text-align: center; }
+.acct-side.buy { background: color-mix(in srgb, var(--acct-line) 14%, transparent); color: var(--acct-line); }
+.acct-side.sell { background: color-mix(in srgb, var(--acct-neg) 14%, transparent); color: var(--acct-neg); }
+.acct-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--acct-pos); vertical-align: middle; }
+.acct-dot.warning { background: var(--acct-warn); }
+.acct-dot.breach { background: var(--acct-neg); }
+
+/* Calendar */
+.acct-cal-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.acct-cal-nav button { width: 30px; height: 30px; border: 1px solid var(--acct-border); border-radius: 6px; background: var(--acct-surface); color: var(--acct-ink); font-size: 1rem; cursor: pointer; }
+.acct-cal-nav button:hover { border-color: var(--acct-accent); }
+#account .acct-calendar { width: 100%; min-width: 640px; border-collapse: separate; border-spacing: 4px; table-layout: fixed; font-size: .78rem; }
+#account .acct-calendar th { padding: 4px; color: var(--acct-muted); font-weight: 600; }
+#account .acct-calendar td { height: 70px; padding: 6px 7px; border-radius: 6px; background: var(--acct-surface-2); vertical-align: top; }
+#account .acct-calendar td.empty { background: transparent; }
+#account .acct-calendar td span { color: var(--acct-muted); font-size: .72rem; }
+#account .acct-calendar td b { display: block; margin-top: 8px; font-size: .8rem; }
+#account .acct-calendar td small { color: var(--acct-muted); font-size: .7rem; }
+#account .acct-calendar td.pos { background: color-mix(in srgb, var(--acct-pos) calc(var(--s) * 100%), var(--acct-surface-2)); }
+#account .acct-calendar td.neg { background: color-mix(in srgb, var(--acct-neg) calc(var(--s) * 100%), var(--acct-surface-2)); }
+#account .acct-calendar td.week { background: transparent; border-left: 1px solid var(--acct-border); border-radius: 0; font-weight: 700; vertical-align: middle; text-align: right; }
+
+/* Responsive */
+@media (max-width: 1180px) {
+  .acct-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .acct-kpi:nth-child(4) { border-left: 0; }
+  .acct-kpi:nth-child(n + 4) { border-top: 1px solid var(--acct-border); }
+  .acct-grid.main { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .acct-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .acct { gap: 12px; }
+  .acct-head h2 { font-size: 1.3rem; }
+  .acct-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .acct-kpi { padding: 12px 14px; border-left: 0; border-top: 1px solid var(--acct-border); }
+  .acct-kpi:nth-child(-n + 2) { border-top: 0; }
+  .acct-kpi:nth-child(even) { border-left: 1px solid var(--acct-border); }
+  .acct-kpi:first-child { grid-column: 1 / -1; }
+  .acct-kpi:first-child + .acct-kpi { border-top: 1px solid var(--acct-border); border-left: 0; }
+  .acct-kpi:nth-child(3) { border-top: 1px solid var(--acct-border); border-left: 1px solid var(--acct-border); }
+  .acct-kpi:nth-child(4) { border-left: 0; }
+  .acct-kpi:nth-child(5) { border-left: 1px solid var(--acct-border); }
+  .acct-kpi strong { font-size: 1.15rem; }
+  .acct-card { padding: 14px; }
+  .acct-chart canvas { height: 240px; }
+  .acct-stats { grid-template-columns: minmax(0, 1fr); }
+}
