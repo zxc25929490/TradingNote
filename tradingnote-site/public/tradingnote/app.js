@@ -346,8 +346,8 @@ function requireWritableLiveBatch() {
 
 function loadAccountRules() {
   const defaults = {
-    name: "挑戰帳戶",
-    phase: "challenge",
+    name: "我的交易帳戶",
+    phase: "personal",
     initialBalance: 100000,
     profitTargetPercent: 10,
     dailyLossPercent: 5,
@@ -1470,6 +1470,17 @@ function buildAccountOverview(items) {
     ...evaluation,
   };
 }
+
+// The overview's 一般帳戶 / 挑戰帳戶 switch: changes the account type saved in 帳戶規則.
+window.TradingNoteSetAccountMode = (mode) => {
+  const challenge = ["challenge", "verification", "funded"].includes(accountRules.phase);
+  if (mode === "personal" && challenge) accountRules.phase = "personal";
+  else if (mode === "challenge" && !challenge) accountRules.phase = "challenge";
+  else return;
+  saveAccountRules();
+  populateAccountRulesForm();
+  render();
+};
 
 function renderAccountOverview(items) {
   const container = document.querySelector("#accountOverview");

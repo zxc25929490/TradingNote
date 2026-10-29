@@ -45,6 +45,21 @@ for (const name of ["positiveProfit", "bestDay", "bestDayPercent", "extraNeeded"
   assert.ok(block.includes(name), `renderObjectives destructures ${name}`);
 }
 
+// Accounts are not assumed to be in a challenge: the default is a normal account, challenge rules
+// (objectives card, target / max-loss lines, pass status) only apply to challenge-type phases.
+const overviewSource = fs.readFileSync(new URL("../account-overview.js", import.meta.url), "utf8");
+assert.match(app, /phase: "personal",/);
+assert.match(html, /<option value="personal">一般帳戶/);
+assert.match(overviewSource, /const isChallenge = \(model\) => \["challenge", "verification", "funded"\]\.includes\(model\.rules\.phase\);/);
+assert.match(overviewSource, /\$\{isChallenge\(model\) \? objectives\(model\) : accountHealth\(model\)\}/);
+assert.match(app, /window\.TradingNoteSetAccountMode = \(mode\) =>/);
+
+// Calendar days and daily-summary rows open the day's detail; its trades open the trade drawer.
+assert.match(overviewSource, /data-day="\$\{esc\(info\.date\)\}" tabindex="0" role="button"/);
+assert.match(overviewSource, /<tr data-day="\$\{esc\(day\.date\)\}" tabindex="0" class="acct-clickable">/);
+assert.match(overviewSource, /function dayDetail\(model\)/);
+assert.match(overviewSource, /function selectDay\(container, date\)/);
+
 // Visual effects are opt-in in every system (no html.fx-on unless the user switched them on).
 for (const system of ["live-system", "research-system", "review-system", "analysis-system"]) {
   const page = fs.readFileSync(new URL(`../../${system}/index.html`, import.meta.url), "utf8");

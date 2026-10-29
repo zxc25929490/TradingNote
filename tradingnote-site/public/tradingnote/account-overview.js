@@ -51,24 +51,34 @@
   }
 
   // ---------------------------------------------------------------- sections
+  // Only challenge-type accounts are judged against prop-firm rules; a normal account just tracks itself.
+  const isChallenge = (model) => ["challenge", "verification", "funded"].includes(model.rules.phase);
+
   function header(model) {
+    const challenge = isChallenge(model);
     const status = model.passed ? ["pass", "已達成目標"] : model.warning ? ["progress", "進行中"] : ["breach", "已違反規則"];
     const first = model.trades[0]?.date;
     const last = model.trades.at(-1)?.date;
-    const phase = { challenge: "挑戰階段", verification: "驗證階段", funded: "資金帳戶" }[model.rules.phase] || model.rules.phase || "";
+    const phase = { challenge: "挑戰階段", verification: "驗證階段", funded: "資金帳戶" }[model.rules.phase] || "";
     return `
       <header class="acct-head">
         <div>
           <p class="acct-eyebrow">帳戶總覽 · ${esc(model.batchLabel)}</p>
-          <h2>${esc(model.rules.name || "交易帳戶")}</h2>
+          <h2>${esc(model.rules.name || "我的交易帳戶")}</h2>
           <div class="acct-chips">
-            <span class="acct-status ${status[0]}">${status[1]}</span>
-            ${phase ? `<span class="acct-chip">${esc(phase)}</span>` : ""}
+            ${challenge ? `<span class="acct-status ${status[0]}">${status[1]}</span>` : ""}
+            ${challenge && phase ? `<span class="acct-chip">${esc(phase)}</span>` : ""}
             <span class="acct-chip">初始資金 ${money(model.initial, 0)}</span>
             <span class="acct-chip">${first ? `${esc(first)} – ${esc(last)}` : "尚無交易"}</span>
           </div>
         </div>
-        <a class="acct-link" href="#objectives">帳戶規則設定 →</a>
+        <div class="acct-head-actions">
+          <div class="acct-seg" role="group" aria-label="帳戶類型">
+            <button type="button" data-account-mode="personal" class="${challenge ? "" : "on"}">一般帳戶</button>
+            <button type="button" data-account-mode="challenge" class="${challenge ? "on" : ""}">挑戰帳戶</button>
+          </div>
+          <a class="acct-link" href="#objectives">${challenge ? "挑戰規則設定" : "帳戶設定"} →</a>
+        </div>
       </header>`;
   }
 
@@ -110,6 +120,34 @@
     </article>`;
   }
 
+  // Normal (non-challenge) accounts: how the account itself is doing, no external rules.
+  function accountHealth(model) {
+    const days = model.days;
+    const peak = Math.max(model.initial, ...model.balancePoints.map((point) => point.balance));
+    const fromPeak = model.currentBalance - peak;
+    const lastDate = days.at(-1)?.date;
+    const dayNumber = (date) => Date.parse(`${date}T00:00:00Z`) / 86400000;
+    const sumSince = (span) => (lastDate ? days.filter((day) => dayNumber(lastDate) - dayNumber(day.date) < span).reduce((sum, day) => sum + day.profit, 0) : null);
+    const month = lastDate ? lastDate.slice(0, 7) : null;
+    const monthProfit = month ? days.filter((day) => day.date.startsWith(month)).reduce((sum, day) => sum + day.profit, 0) : null;
+    const greenDays = days.filter((day) => day.profit > 0).length;
+    const worstDay = days.reduce((worst, day) => (!worst || day.profit < worst.profit ? day : worst), null);
+    const bestDay = days.reduce((best, day) => (!best || day.profit > best.profit ? day : best), null);
+    const row = (title, detail, value, cls = "") => `<li class="acct-objective plain"><div><b>${title}</b><small>${detail}</small></div><strong class="${cls}">${value}</strong></li>`;
+    return `<article class="acct-card">
+      <div class="acct-card-head"><h3>帳戶概況</h3><span class="acct-muted">${days.length} 個交易日</span></div>
+      <ul class="acct-objectives">
+        ${row("距離歷史高點", `高點 ${money(peak)}`, fromPeak < 0 ? `${money(fromPeak)}（${((fromPeak / peak) * 100).toFixed(2)}%）` : "位於高點", fromPeak < 0 ? "neg" : "pos")}
+        ${row("本月損益", month ? `${esc(month)}` : "尚無交易", signedMoney(monthProfit), tone(monthProfit))}
+        ${row("近 30 天損益", lastDate ? `至 ${esc(lastDate)}` : "尚無交易", signedMoney(sumSince(30)), tone(sumSince(30)))}
+        ${row("獲利日比例", `${greenDays} / ${days.length} 天收紅`, days.length ? `${((greenDays / days.length) * 100).toFixed(0)}%` : "—")}
+        ${row("平均每日損益", "依有交易的日子計", days.length ? signedMoney(model.stats.totalProfit / days.length) : "—", tone(model.stats.totalProfit))}
+        ${row("最佳單日", bestDay ? esc(bestDay.date) : "—", bestDay ? signedMoney(bestDay.profit) : "—", "pos")}
+        ${row("最差單日", worstDay ? esc(worstDay.date) : "—", worstDay ? signedMoney(worstDay.profit) : "—", "neg")}
+      </ul>
+    </article>`;
+  }
+
   function statistics(model, extra) {
     const s = model.stats;
     const row = (label, value, cls = "") => `<div><dt>${label}</dt><dd class="${cls}">${value}</dd></div>`;
@@ -144,7 +182,7 @@
       <div class="acct-card-head"><h3>每日摘要</h3><a class="acct-link" href="#period">週月績效 →</a></div>
       ${days.length ? `<div class="acct-table-wrap"><table class="acct-table">
         <thead><tr><th>日期</th><th class="num">筆數</th><th class="num">手數</th><th class="num">損益</th><th class="num">R</th><th class="num">結算餘額</th><th>狀態</th></tr></thead>
-        <tbody>${days.map((day) => `<tr>
+        <tbody>${days.map((day) => `<tr data-day="${esc(day.date)}" tabindex="0" class="acct-clickable">
           <td>${esc(day.date)}</td><td class="num">${day.count}</td><td class="num">${day.lots.toFixed(2)}</td>
           <td class="num ${tone(day.profit)}">${signedMoney(day.profit)}</td><td class="num ${tone(day.totalR)}">${rText(day.totalR)}</td>
           <td class="num">${money(day.closingBalance)}</td>
@@ -181,7 +219,50 @@
   }
 
   // ---------------------------------------------------------------- calendar
-  const calendarState = { offset: 0 };
+  const calendarState = { offset: 0, selected: null };
+  // Expanded view of one calendar day: totals plus every trade, each opening the full trade drawer.
+  function dayDetail(model) {
+    const day = model.days.find((item) => item.date === calendarState.selected);
+    if (!day) return "";
+    const trades = day.trades;
+    const profits = trades.map((trade) => num(trade.profit) || 0);
+    const wins = profits.filter((value) => value > 0).length;
+    const losses = profits.filter((value) => value < 0).length;
+    const weekday = ["日", "一", "二", "三", "四", "五", "六"][new Date(`${day.date}T00:00:00`).getDay()];
+    const sideOf = (trade) => {
+      const value = String(trade.direction || "").toLowerCase();
+      const entry = num(trade.entry);
+      const stop = num(trade.stopLoss);
+      const side = value || (entry && stop && entry !== stop ? (stop < entry ? "long" : "short") : "");
+      return /long|buy|多/.test(side) ? '<span class="acct-side buy">買入</span>' : /short|sell|空/.test(side) ? '<span class="acct-side sell">賣出</span>' : '<span class="acct-side">—</span>';
+    };
+    const stat = (label, value, cls = "") => `<div><span>${label}</span><b class="${cls}">${value}</b></div>`;
+    return `<section class="acct-day" aria-label="${esc(day.date)} 交易明細">
+      <div class="acct-day-head">
+        <div><h4>${esc(day.date)}（${weekday}）</h4><span class="acct-muted">開盤餘額 ${money(day.startBalance)} → 收盤 ${money(day.closingBalance)}</span></div>
+        <button type="button" class="acct-day-close" data-day-close aria-label="關閉當日明細">✕</button>
+      </div>
+      <div class="acct-day-stats">
+        ${stat("當日損益", signedMoney(day.profit), tone(day.profit))}
+        ${stat("當日 R", rText(day.totalR), tone(day.totalR))}
+        ${stat("交易", `${trades.length} 筆（${wins} 勝 ${losses} 負）`)}
+        ${stat("手數", day.lots.toFixed(2))}
+        ${stat("盤中最大虧損", day.dailyLossUsed ? `-${money(day.dailyLossUsed)}` : money(0), day.dailyLossUsed ? "neg" : "")}
+      </div>
+      <div class="acct-table-wrap"><table class="acct-table journal">
+        <thead><tr><th>時間</th><th>商品</th><th>方向</th><th class="num">手數</th><th class="num">進場</th><th class="num">出場</th><th class="num">損益</th><th class="num">R</th><th>筆記</th></tr></thead>
+        <tbody>${trades.map((trade) => `<tr data-trade-id="${esc(trade.id)}" tabindex="0">
+          <td>${esc(String(trade.time || "").slice(0, 5) || "—")}</td><td><b>${esc(trade.pair || "—")}</b></td><td>${sideOf(trade)}</td>
+          <td class="num">${num(trade.lots) === null ? "—" : Number(trade.lots).toFixed(2)}</td>
+          <td class="num">${num(trade.entry) ? Number(trade.entry).toLocaleString("en-US", { maximumFractionDigits: 5 }) : "—"}</td>
+          <td class="num">${num(trade.exitPrice) ? Number(trade.exitPrice).toLocaleString("en-US", { maximumFractionDigits: 5 }) : "—"}</td>
+          <td class="num ${tone(trade.profit)}">${signedMoney(num(trade.profit))}</td><td class="num ${tone(trade.r)}">${rText(trade.r)}</td>
+          <td class="acct-note">${esc(trade.lesson || trade.review || trade.setup || "")}</td></tr>`).join("")}</tbody></table></div>
+      <p class="acct-muted acct-day-hint">點任一筆交易可查看完整細節與編輯。</p>
+    </section>`;
+  }
+
+
   function calendar(model) {
     const byDate = new Map(model.days.map((day) => [day.date, day]));
     const lastDate = model.days.at(-1)?.date;
@@ -205,7 +286,8 @@
       if (!day) return '<td class="empty"></td>';
       const info = byDate.get(key(day));
       const strength = info ? Math.min(1, Math.abs(info.profit) / maxAbs) : 0;
-      return `<td class="${info ? (info.profit >= 0 ? "pos" : "neg") : ""}" style="--s:${(0.12 + strength * 0.4).toFixed(2)}">
+      const selected = info && info.date === calendarState.selected;
+      return `<td class="${info ? (info.profit >= 0 ? "pos" : "neg") : ""}${selected ? " selected" : ""}" style="--s:${(0.12 + strength * 0.4).toFixed(2)}"${info ? ` data-day="${esc(info.date)}" tabindex="0" role="button" aria-pressed="${selected}" aria-label="${esc(info.date)} ${signedMoney(info.profit)}，${info.count} 筆，查看明細"` : ""}>
         <span>${day}</span>${info ? `<b>${signedMoney(info.profit)}</b><small>${info.count} 筆</small>` : ""}</td>`;
     };
     return `<article class="acct-card">
@@ -219,6 +301,7 @@
           const traded = week.some((day) => day && byDate.has(key(day)));
           return `<tr>${week.map(cell).join("")}<td class="week ${traded ? tone(total) : ""}">${traded ? signedMoney(total) : ""}</td></tr>`;
         }).join("")}</tbody></table></div>
+      ${calendarState.selected ? dayDetail(model) : `<p class="acct-muted acct-day-hint">點有交易的日子可展開當日明細。</p>`}
     </article>`;
   }
 
@@ -247,12 +330,18 @@
       ctx.fillText("尚無足夠交易可繪製曲線", 16, height / 2);
       return null;
     }
+    const peak = Math.max(model.initial, ...model.balancePoints.map((point) => point.balance));
     const refs = isBalance
-      ? [
-        { value: model.initial, label: "初始資金", color: color("--acct-muted") },
-        { value: model.initial + model.targetAmount, label: "獲利目標", color: color("--acct-pos") },
-        { value: model.maxLossFloor, label: "最大虧損線", color: color("--acct-neg") },
-      ].filter((ref) => Number.isFinite(ref.value))
+      ? (isChallenge(model)
+        ? [
+          { value: model.initial, label: "初始資金", color: color("--acct-muted") },
+          { value: model.initial + model.targetAmount, label: "獲利目標", color: color("--acct-pos") },
+          { value: model.maxLossFloor, label: "最大虧損線", color: color("--acct-neg") },
+        ]
+        : [
+          { value: model.initial, label: "初始資金", color: color("--acct-muted") },
+          { value: peak, label: "歷史高點", color: color("--acct-pos") },
+        ]).filter((ref) => Number.isFinite(ref.value))
       : [{ value: 0, label: "0R", color: color("--acct-muted") }];
     const all = [...values, ...refs.map((ref) => ref.value)];
     let low = Math.min(...all);
@@ -363,7 +452,7 @@
             </div></div>
           <div class="acct-chart"><canvas aria-label="帳戶餘額曲線"></canvas><div class="acct-tooltip" hidden></div></div>
         </article>
-        ${objectives(model)}
+        ${isChallenge(model) ? objectives(model) : accountHealth(model)}
       </div>
       <div class="acct-grid">
         ${statistics(model, extra)}
@@ -377,6 +466,20 @@
     attachChartHover(canvas, container.querySelector(".acct-tooltip"), () => geometry);
   }
 
+  // Select a day (from the calendar or the daily summary): move the calendar to its month and open it.
+  function selectDay(container, date) {
+    if (!lastModel) return;
+    const lastDate = lastModel.days.at(-1)?.date;
+    if (lastDate) {
+      const anchor = new Date(`${lastDate}T00:00:00`);
+      const target = new Date(`${date}T00:00:00`);
+      calendarState.offset = (target.getFullYear() - anchor.getFullYear()) * 12 + (target.getMonth() - anchor.getMonth());
+    }
+    calendarState.selected = calendarState.selected === date ? null : date;
+    rerender(container);
+    if (calendarState.selected) container.querySelector(".acct-day")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
   function rerender(container) {
     if (lastModel) render(container, lastModel);
   }
@@ -385,6 +488,11 @@
     document.addEventListener("click", (event) => {
       const container = event.target.closest?.("#accountOverview");
       if (!container) return;
+      const accountMode = event.target.closest("[data-account-mode]");
+      if (accountMode) { root.TradingNoteSetAccountMode?.(accountMode.dataset.accountMode); return; }
+      if (event.target.closest("[data-day-close]")) { calendarState.selected = null; rerender(container); return; }
+      const dayCell = event.target.closest("[data-day]");
+      if (dayCell) { selectDay(container, dayCell.dataset.day); return; }
       const mode = event.target.closest("[data-mode]");
       if (mode) { chartState.mode = mode.dataset.mode; rerender(container); return; }
       const cal = event.target.closest("[data-cal]");
@@ -393,6 +501,9 @@
       if (row) root.TradingNoteOpenTrade?.(row.dataset.tradeId);
     });
     document.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const dayCell = event.target.closest?.("#accountOverview [data-day]");
+      if (dayCell) { event.preventDefault(); selectDay(dayCell.closest("#accountOverview"), dayCell.dataset.day); return; }
       if (event.key !== "Enter") return;
       const row = event.target.closest?.("#accountOverview [data-trade-id]");
       if (row) root.TradingNoteOpenTrade?.(row.dataset.tradeId);
