@@ -222,8 +222,11 @@
   const calendarState = { offset: 0, selected: null };
   // Expanded view of one calendar day: totals plus every trade, each opening the full trade drawer.
   function dayDetail(model) {
-    const day = model.days.find((item) => item.date === calendarState.selected);
+    const index = model.days.findIndex((item) => item.date === calendarState.selected);
+    const day = model.days[index];
     if (!day) return "";
+    const previous = model.days[index - 1];
+    const next = model.days[index + 1];
     const trades = day.trades;
     const profits = trades.map((trade) => num(trade.profit) || 0);
     const wins = profits.filter((value) => value > 0).length;
@@ -240,7 +243,11 @@
     return `<section class="acct-day" aria-label="${esc(day.date)} 交易明細">
       <div class="acct-day-head">
         <div><h4>${esc(day.date)}（${weekday}）</h4><span class="acct-muted">開盤餘額 ${money(day.startBalance)} → 收盤 ${money(day.closingBalance)}</span></div>
-        <button type="button" class="acct-day-close" data-day-close aria-label="關閉當日明細">✕</button>
+        <div class="acct-day-nav">
+          <button type="button" data-day-step-dir="prev" ${previous ? `data-day-step="${esc(previous.date)}"` : "disabled"} aria-label="前一個交易日">‹</button>
+          <button type="button" data-day-step-dir="next" ${next ? `data-day-step="${esc(next.date)}"` : "disabled"} aria-label="下一個交易日">›</button>
+          <button type="button" class="acct-day-close" data-day-close aria-label="關閉">✕</button>
+        </div>
       </div>
       <div class="acct-day-stats">
         ${stat("當日損益", signedMoney(day.profit), tone(day.profit))}
@@ -258,7 +265,7 @@
           <td class="num">${num(trade.exitPrice) ? Number(trade.exitPrice).toLocaleString("en-US", { maximumFractionDigits: 5 }) : "—"}</td>
           <td class="num ${tone(trade.profit)}">${signedMoney(num(trade.profit))}</td><td class="num ${tone(trade.r)}">${rText(trade.r)}</td>
           <td class="acct-note">${esc(trade.lesson || trade.review || trade.setup || "")}</td></tr>`).join("")}</tbody></table></div>
-      <p class="acct-muted acct-day-hint">點任一筆交易可查看完整細節與編輯。</p>
+      <p class="acct-muted acct-day-hint">點任一筆交易可查看完整細節與編輯 · ← → 切換交易日 · Esc 關閉</p>
     </section>`;
   }
 
@@ -301,7 +308,7 @@
           const traded = week.some((day) => day && byDate.has(key(day)));
           return `<tr>${week.map(cell).join("")}<td class="week ${traded ? tone(total) : ""}">${traded ? signedMoney(total) : ""}</td></tr>`;
         }).join("")}</tbody></table></div>
-      ${calendarState.selected ? dayDetail(model) : `<p class="acct-muted acct-day-hint">點有交易的日子可展開當日明細。</p>`}
+      <p class="acct-muted acct-day-hint">點有交易的日子可查看當日明細。</p>
     </article>`;
   }
 
@@ -466,18 +473,63 @@
     attachChartHover(canvas, container.querySelector(".acct-tooltip"), () => geometry);
   }
 
-  // Select a day (from the calendar or the daily summary): move the calendar to its month and open it.
-  function selectDay(container, date) {
+  // Day detail opens in a floating window (native <dialog>, so it sits above everything and traps focus).
+  let dayDialog = null;
+  function getDayDialog() {
+    if (dayDialog) return dayDialog;
+    dayDialog = document.createElement("dialog");
+    dayDialog.className = "acct acct-day-dialog";
+    document.body.appendChild(dayDialog);
+    dayDialog.addEventListener("close", () => {
+      calendarState.selected = null;
+      const container = document.querySelector("#accountOverview");
+      if (container) rerender(container);
+    });
+    dayDialog.addEventListener("click", (event) => {
+      if (event.target === dayDialog) { dayDialog.close(); return; } // backdrop
+      if (event.target.closest("[data-day-close]")) { dayDialog.close(); return; }
+      const step = event.target.closest("[data-day-step]");
+      if (step && !step.disabled) { showDay(step.dataset.dayStep); return; }
+      const row = event.target.closest("[data-trade-id]");
+      if (row) {
+        // The trade drawer lives in the page, below the dialog's top layer: close the dialog first.
+        const id = row.dataset.tradeId;
+        dayDialog.close();
+        root.TradingNoteOpenTrade?.(id);
+      }
+    });
+    dayDialog.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") dayDialog.querySelector('[data-day-step-dir="prev"]:not([disabled])')?.click();
+      if (event.key === "ArrowRight") dayDialog.querySelector('[data-day-step-dir="next"]:not([disabled])')?.click();
+      if (event.key === "Enter") {
+        const row = event.target.closest?.("[data-trade-id]");
+        if (row) row.click();
+      }
+    });
+    return dayDialog;
+  }
+
+  function showDay(date) {
     if (!lastModel) return;
-    const lastDate = lastModel.days.at(-1)?.date;
-    if (lastDate) {
-      const anchor = new Date(`${lastDate}T00:00:00`);
-      const target = new Date(`${date}T00:00:00`);
-      calendarState.offset = (target.getFullYear() - anchor.getFullYear()) * 12 + (target.getMonth() - anchor.getMonth());
+    calendarState.selected = date;
+    const dialog = getDayDialog();
+    dialog.innerHTML = dayDetail(lastModel);
+    if (!dialog.open) dialog.showModal();
+    dialog.querySelector(".acct-day-close")?.focus();
+    const container = document.querySelector("#accountOverview");
+    if (container) {
+      const lastDate = lastModel.days.at(-1)?.date;
+      if (lastDate) {
+        const anchor = new Date(`${lastDate}T00:00:00`);
+        const target = new Date(`${date}T00:00:00`);
+        calendarState.offset = (target.getFullYear() - anchor.getFullYear()) * 12 + (target.getMonth() - anchor.getMonth());
+      }
+      rerender(container);
     }
-    calendarState.selected = calendarState.selected === date ? null : date;
-    rerender(container);
-    if (calendarState.selected) container.querySelector(".acct-day")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  function selectDay(container, date) {
+    showDay(date);
   }
 
   function rerender(container) {

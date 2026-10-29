@@ -59,6 +59,13 @@ assert.match(overviewSource, /data-day="\$\{esc\(info\.date\)\}" tabindex="0" ro
 assert.match(overviewSource, /<tr data-day="\$\{esc\(day\.date\)\}" tabindex="0" class="acct-clickable">/);
 assert.match(overviewSource, /function dayDetail\(model\)/);
 assert.match(overviewSource, /function selectDay\(container, date\)/);
+// The day detail is a floating window (native dialog), with previous / next trading day navigation;
+// opening a trade closes it first because the trade drawer sits below the dialog's top layer.
+assert.match(overviewSource, /dayDialog = document\.createElement\("dialog"\);/);
+assert.match(overviewSource, /dialog\.showModal\(\);/);
+assert.match(overviewSource, /data-day-step-dir="prev"/);
+assert.match(overviewSource, /dayDialog\.close\(\);\s+root\.TradingNoteOpenTrade\?\.\(id\);/);
+assert.doesNotMatch(overviewSource, /calendarState\.selected \? dayDetail\(model\)/, "no inline panel any more");
 
 // Visual effects are opt-in in every system (no html.fx-on unless the user switched them on).
 for (const system of ["live-system", "research-system", "review-system", "analysis-system"]) {
