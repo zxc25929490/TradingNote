@@ -302,6 +302,12 @@ html[data-theme] .sidebar-footer .partial-exit-sidebar > small { display: none; 
 html[data-theme] .sidebar-footer .partial-exit-button span { width: 18px; color: var(--tn-muted); font-size: 10px; font-weight: 700; text-align: center; }
 html[data-theme] .sidebar-footer .partial-exit-button b { font-weight: 500; }
 html[data-theme] .sidebar .cycle { display: none; }
+/* Cloud sync status (shared/cloud-sync.js), first row of the footer. */
+html[data-theme] .sidebar-footer .sync-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 30px; padding: 0 10px; color: var(--tn-muted); font-size: 12px; }
+html[data-theme] .sidebar-footer .sync-status[hidden] { display: none; }
+html[data-theme] .sidebar-footer .sync-status[data-tone="ok"] .nav-icon { color: var(--tn-pos); }
+html[data-theme] .sidebar-footer .sync-status[data-tone="warn"] { color: var(--tn-warn); }
+html[data-theme] .sidebar-footer .sync-status button { flex-basis: 100%; margin-left: 28px; padding: 0; border: 0; background: none; color: var(--tn-accent); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
 
 /* ---- Surfaces: cards, panels, dialogs ---- */
 html[data-theme] :is(

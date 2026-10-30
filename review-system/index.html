@@ -6,6 +6,7 @@
   <script>try{if(sessionStorage.getItem('tradingnote.system-switching')==='1')document.documentElement.classList.add('system-transition-pending')}catch(_){}</script>
   <script>try{if(localStorage.getItem('tradingnote.effects')==='on')document.documentElement.classList.add('fx-on')}catch(_){}</script>
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('tradingnote.theme')==='light'?'light':'dark'}catch(_){document.documentElement.dataset.theme='dark'}</script>
+  <script src="../shared/cloud-sync.js?v=20261030-1"></script>
   <title>TradingNote · 實盤復盤系統</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,9 +19,9 @@
   <link rel="stylesheet" href="loop.css?v=20261029-7">
   <link rel="stylesheet" href="../shared/system-transition.css?v=20261029-7">
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261029-1">
-  <link rel="stylesheet" href="../shared/sidebar.css?v=20261029-9">
+  <link rel="stylesheet" href="../shared/sidebar.css?v=20261030-2">
   <link rel="stylesheet" href="../shared/responsive.css?v=20261029-7">
-  <link rel="stylesheet" href="../shared/theme.css?v=20261029-9">
+  <link rel="stylesheet" href="../shared/theme.css?v=20261030-2">
   <style>
     .table-sort{display:inline-flex;align-items:center;gap:6px;width:max-content;padding:2px 0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;white-space:nowrap;cursor:pointer}
     .table-sort::after{content:"↕";color:var(--muted);font-size:.78em;opacity:.45}.table-sort.active{color:var(--teal)}.table-sort.active[data-direction="asc"]::after{content:"↑";opacity:1}.table-sort.active[data-direction="desc"]::after{content:"↓";opacity:1}.table-sort:hover{color:var(--teal)}

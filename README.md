@@ -12,9 +12,13 @@ TradingNote/
 ├── review-system/      實盤復盤：復盤工作台、執行落差、復盤結論、改善追蹤
 ├── analysis-system/    差異分析：回測 × 實盤 × 復盤 三層診斷、執行落差、Monte Carlo
 ├── shared/             四個系統共用的模組（見下表）
+├── functions/api/      Cloudflare Pages Function：雲端同步 API（/api/sync）
+├── server/             同步 API 的邏輯：D1 存取、Cloudflare Access 驗證
+├── docs/               部署說明（cloudflare-deploy.md）
 ├── mt4/                MT4 Expert Advisor：把實盤交易與價格路徑匯出成可匯入的 CSV
 ├── tradingnote-site/   線上網站（Next.js）；public/ 底下是上面四個系統的副本，請勿直接修改
 ├── scripts/
+│   ├── build-pages.mjs 產生 Cloudflare Pages 的輸出（dist/）
 │   ├── sync-site.mjs   把四個系統與 shared/ 同步到 tradingnote-site/public/
 │   └── test.mjs        執行全部測試
 └── data/
@@ -32,6 +36,7 @@ TradingNote/
 | `backtest-r.js` | 回測 R 的唯一定義：研究紀錄存「最大到達 R」，一律經這裡換算成已實現 R |
 | `partial-exit.js` | 分批出場設定與 R 換算 |
 | `review-loop.js` | 復盤閉環分析：錯誤成本排名、月度趨勢、改善行動追蹤 |
+| `cloud-sync.js` | 跨裝置雲端同步（Cloudflare D1）；沒有同步 API 時自動停用 |
 | `sidebar.js/.css` | 共用側欄：分組摺疊、窄條模式、手機版頂端列與抽屜選單 |
 | `responsive.css` | 研究／復盤／差異分析系統的手機版版面 |
 | `cursor-fx.js/.css` | 滑鼠特效 |
@@ -60,3 +65,5 @@ python -m http.server 8765
 ## 資料儲存
 
 所有資料都在瀏覽器 localStorage（同一網域的四個系統共用）。換電腦或清除瀏覽資料前，請先在實盤中樞「資料管理 → 完整備份」匯出，存到 `data/backups/`。
+
+部署到 Cloudflare Pages 後，資料會透過 D1 在電腦、手機之間自動同步，並以 Cloudflare Access 限定只有你能登入。步驟見 [docs/cloudflare-deploy.md](docs/cloudflare-deploy.md)。

@@ -65,6 +65,8 @@ html[data-theme] body.sidebar-rail .sidebar .system-switcher a { justify-content
 html[data-theme] body.sidebar-rail :is(#nav, .sidebar nav) :is(a, button):not(.nav-group-toggle) { justify-content: center; gap: 0; padding: 0; }
 html[data-theme] body.sidebar-rail .sidebar-footer :is(.theme-switch, .fx-switch, .partial-exit-button) { justify-content: center; padding: 0; }
 body.sidebar-rail .sidebar-footer .fx-switch-track { display: none; }
+html[data-theme] body.sidebar-rail .sidebar-footer .sync-status { justify-content: center; padding: 0; }
+body.sidebar-rail .sidebar-footer .sync-status button { display: none; }
 body.sidebar-rail .system-switcher a { grid-template-columns: 1fr; justify-items: center; padding: 7px 0; text-align: center; }
 body.sidebar-rail .system-switcher a b { display: none; }
 
