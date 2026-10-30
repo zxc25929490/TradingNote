@@ -256,6 +256,7 @@ const pageTitles = {
   checklist: "交易前檢查表",
   "tp-analysis": "TP 統計分析",
   "breakpoint-compare": "斷點比較",
+  mindset: "心態與標籤",
   calculator: "風控手數計算",
 };
 
@@ -2617,6 +2618,7 @@ function openTradeDetail(trade) {
       <dt>Mamba R</dt><dd>${mambaRLabel(trade.mambaR)}</dd>
       <dt>策略版本</dt><dd>${escapeHtml(strategyVersionLabel(trade.strategyVersionId))}</dd>
       <dt>復盤分類</dt><dd>${reviewClassLabel(trade.reviewClass)}</dd>
+      ${tradeAnnotationRows(trade)}
       <dt>紀錄類型</dt><dd>${trade.recordType === "missed_opportunity" ? "符合策略但漏單" : "實際交易"}</dd>
       <dt>已歸因 R 落差</dt><dd>${tradeAttributionTotal(trade) ? `-${tradeAttributionTotal(trade).toFixed(2)}R` : "尚未歸因"}</dd>
       <dt>Setup</dt><dd>${trade.setup || trade.checklist || "-"}</dd>
@@ -2797,6 +2799,10 @@ function editTrade(trade) {
     const input = els.tradeForm.elements[field];
     if (input) input.value = editable[field] ?? "";
   }
+  const note = window.TradingNoteMindset?.annotationOf?.(trade);
+  els.tradeForm.elements.grade.value = note?.grade || "";
+  els.tradeForm.elements.emotion.value = note?.emotion || "";
+  els.tradeForm.elements.tags.value = note?.tags.join(", ") || "";
   els.tradeImageInput.value = "";
   updateTradeImagePreview(editable.image || "");
   delete els.tradeForm.elements.r.dataset.autoCalculated;
@@ -2807,6 +2813,16 @@ function editTrade(trade) {
   els.saveTrade.textContent = "更新交易";
   closeTradeDetail();
   els.tradeDialog.showModal();
+}
+
+function tradeAnnotationRows(trade) {
+  const mindset = window.TradingNoteMindset;
+  const note = mindset?.annotationOf?.(trade);
+  if (!note) return "";
+  const grade = mindset.GRADES.find((item) => item.id === note.grade)?.label || "未評級";
+  const emotion = mindset.EMOTIONS.find((item) => item.id === note.emotion)?.label || "未記錄";
+  const tags = note.tags.length ? note.tags.map(escapeHtml).join("、") : "—";
+  return `<dt>自評</dt><dd>${grade}</dd><dt>進場時情緒</dt><dd>${emotion}</dd><dt>標籤</dt><dd>${tags}</dd>`;
 }
 
 function deleteTrade(trade) {
@@ -2907,6 +2923,7 @@ function render() {
   renderHomeComparisons();
   window.renderTpAnalysis?.();
   if (document.querySelector("#breakpoint-compare.active")) window.renderBreakpointCompare?.();
+  if (document.querySelector("#mindset.active")) window.renderMindset?.(items);
   els.tradeEmpty.hidden = items.length !== 0;
   document.querySelector(".table-wrap").hidden = items.length === 0;
 }
@@ -2922,6 +2939,7 @@ function setPage(pageName) {
   if (nextPage === "account" || nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "strategy") render();
   if (nextPage === "tp-analysis") window.requestAnimationFrame(() => window.renderTpAnalysis?.());
   if (nextPage === "breakpoint-compare") window.renderBreakpointCompare?.();
+  if (nextPage === "mindset") window.renderMindset?.(filteredTrades());
   if (nextPage === "income-goals") window.renderIncomeGoals?.(tradesForActiveView(), activeLiveBatch, accountRules.initialBalance, liveBatchLabel(activeLiveBatch));
   if (nextPage === "calculator") renderReturnSimulation();
 }
@@ -4278,6 +4296,12 @@ els.tradeForm.addEventListener("submit", (event) => {
   const existingIndex = localTrades.findIndex((item) => item.localId === trade.localId);
   if (existingIndex >= 0) localTrades[existingIndex] = { ...localTrades[existingIndex], ...trade };
   else localTrades.push(trade);
+  // Grade, emotion and tags live in the annotation store (mindset.js), keyed by trade identity.
+  window.TradingNoteMindset?.setAnnotation?.(trade, {
+    grade: els.tradeForm.elements.grade.value,
+    emotion: els.tradeForm.elements.emotion.value,
+    tags: els.tradeForm.elements.tags.value,
+  }, editingTradeContext);
   saveLocalTrades();
   els.tradeDialog.close();
   resetTradeForm();

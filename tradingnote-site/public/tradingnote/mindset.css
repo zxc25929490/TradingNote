@@ -1,0 +1,72 @@
+/* Mindset & tags page (mindset.js) */
+#mindset.active { display: grid; gap: 16px; }
+
+.mind-intro { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.mind-intro > div { max-width: 680px; }
+.mind-intro h2 { margin: 2px 0 6px; font-size: 22px; }
+.mind-intro p:not(.eyebrow) { margin: 0; color: var(--tn-muted); font-size: 13px; line-height: 1.6; }
+.mind-coverage { color: var(--tn-muted); font-size: 12px; font-weight: 600; }
+
+.mind-top { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); gap: 16px; }
+.mind-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.mind-panel, .mind-tilt { min-width: 0; }
+
+.mind-tilt { --mind-level: var(--tn-muted); }
+.mind-tilt[data-level="steady"] { --mind-level: var(--tn-pos); }
+.mind-tilt[data-level="watch"] { --mind-level: var(--tn-warn); }
+.mind-tilt[data-level="tilt"] { --mind-level: var(--tn-neg); }
+.mind-tilt-score { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; }
+.mind-tilt-score strong { color: var(--tn-ink); font-size: 40px; font-weight: 700; line-height: 1; }
+.mind-tilt-score span { color: var(--mind-level); font-size: 14px; font-weight: 600; }
+.mind-tilt-track { height: 8px; margin: 14px 0; border-radius: 999px; background: var(--tn-surface-3); overflow: hidden; }
+.mind-tilt-track i { display: block; height: 100%; border-radius: inherit; background: var(--mind-level); transition: width 300ms ease; }
+.mind-tilt-compare { margin: 0; color: var(--tn-ink-2); font-size: 13px; line-height: 1.7; }
+
+.mind-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--tn-muted); font-size: 13px; white-space: nowrap; cursor: pointer; }
+
+.mind-table-wrap { overflow-x: auto; }
+html[data-theme] .mind-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+html[data-theme] .mind-table :is(th, td) { padding: 9px 10px; border-bottom: 1px solid var(--tn-border); text-align: right; white-space: nowrap; vertical-align: middle; }
+html[data-theme] .mind-table :is(thead th:first-child, tbody th) { text-align: left; }
+html[data-theme] .mind-table tbody th { background: transparent; color: var(--tn-ink-2); font-weight: 500; }
+.mind-table small { display: block; margin-top: 2px; color: var(--tn-muted); font-size: 11px; font-weight: 400; }
+.mind-table .pos { color: var(--tn-pos); }
+.mind-table .neg { color: var(--tn-neg); }
+.mind-table .mind-small :is(th, td) { color: var(--tn-muted); }
+.mind-dim { color: var(--tn-muted); text-align: left !important; white-space: normal !important; }
+
+/* Quick tagging rows */
+html[data-theme] .mind-quick :is(th, td) { text-align: left; }
+html[data-theme] .mind-quick td:nth-child(3) { text-align: right; }
+.mind-grades { display: inline-flex; gap: 4px; }
+html[data-theme] .mind-grades button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--tn-border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tn-muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+html[data-theme] .mind-grades button:hover { border-color: var(--tn-accent); color: var(--tn-ink); }
+html[data-theme] .mind-grades button.active[data-grade="A"] { border-color: var(--tn-pos); background: color-mix(in srgb, var(--tn-pos) 16%, transparent); color: var(--tn-pos); }
+html[data-theme] .mind-grades button.active[data-grade="B"] { border-color: var(--tn-warn); background: color-mix(in srgb, var(--tn-warn) 16%, transparent); color: var(--tn-warn); }
+html[data-theme] .mind-grades button.active[data-grade="C"] { border-color: var(--tn-neg); background: color-mix(in srgb, var(--tn-neg) 16%, transparent); color: var(--tn-neg); }
+html[data-theme] .mind-quick :is(select, input) { min-height: 32px; padding: 4px 8px; font-size: 13px; }
+html[data-theme] .mind-quick select { min-width: 120px; }
+html[data-theme] .mind-quick input { width: 100%; min-width: 180px; }
+
+/* Keep real tables on phones (styles.css turns tables into cards); they scroll sideways. */
+#mindset table { display: table; min-width: 0; }
+#mindset thead { display: table-header-group; }
+#mindset tbody { display: table-row-group; }
+#mindset tr { display: table-row; width: auto; padding: 0; border: 0; border-radius: 0; background: none; }
+#mindset :is(th, td) { display: table-cell; width: auto; }
+#mindset td::before { content: none; }
+
+@media (max-width: 980px) {
+  .mind-top, .mind-groups { grid-template-columns: 1fr; }
+}

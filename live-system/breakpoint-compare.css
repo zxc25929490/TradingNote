@@ -88,7 +88,7 @@ body:has(#breakpoint-compare.active) .filters { display: none; }
 .bc-table thead th:first-child { text-align: left; }
 html[data-theme] #bcTable tbody th { background: transparent; color: var(--tn-ink-2); font-weight: 500; }
 /* Keep a real table at every width (styles.css turns tables into cards on phones); it scrolls sideways. */
-#bcTable { display: table; width: 100%; }
+#bcTable { display: table; width: 100%; min-width: 0; }
 #bcTable thead { display: table-header-group; }
 #bcTable tbody { display: table-row-group; }
 #bcTable tr { display: table-row; width: auto; padding: 0; border: 0; border-radius: 0; background: none; }
