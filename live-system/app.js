@@ -2586,10 +2586,8 @@ function openTradeDetail(trade) {
   };
   const hasMt4Metrics = Boolean(trade.externalId || trade.source === "TradingNote MT4 EA");
   const mt4Metrics = hasMt4Metrics ? `
-    <div class="detail-section-heading">
-      <span>MT4 EA 執行分析</span>
-      <small>${trade.account || "-"} · Ticket ${trade.ticket || "-"}</small>
-    </div>
+    <details class="trade-detail-more">
+    <summary>MT4 EA 執行分析<small>${trade.account || "-"} · Ticket ${trade.ticket || "-"}</small></summary>
     <div class="detail-stats ea-detail-stats">
       <div><span>MFE</span><strong class="profit-pos">${metric(trade.mfeR, "R")}</strong></div>
       <div><span>MAE</span><strong class="profit-neg">${metric(trade.maeR, "R")}</strong></div>
@@ -2617,56 +2615,102 @@ function openTradeDetail(trade) {
       <dt>進場帳戶風險</dt><dd>淨值 ${trade.equityAtEntry == null ? "-" : money(trade.equityAtEntry)} · 風險 ${metric(trade.riskPctEquity, "%", 2)} · 同時持倉 ${metric(trade.openTradesAtEntry, " 筆", 0)} · 同商品 ${metric(trade.sameSymbolTradesAtEntry, " 筆", 0)}</dd>
       <dt>資料品質</dt><dd>${captureQualityLabel(trade.captureQuality)}</dd>
     </dl>
+    </details>
   ` : "";
   const imageBlock = trade.image
     ? `<figure class="detail-image"><button type="button" class="detail-image-button" data-preview-image="${trade.id}" aria-label="放大交易截圖"><img src="${trade.image}" alt="${trade.pair} 交易截圖"><span>點擊放大</span></button><figcaption>交易截圖</figcaption></figure>`
     : "";
+  const isMissed = trade.recordType === "missed_opportunity";
+  const direction = tradeDirection(trade);
+  const outcomeLabel = isMissed ? "漏單" : { win: "獲利", loss: "虧損", be: "持平" }[trade.outcome] || "—";
+  const outcomeTone = isMissed ? "warn" : trade.outcome === "win" ? "pos" : trade.outcome === "loss" ? "neg" : "";
+  const rValue = Number(trade.r);
+  const rClass = trade.riskUnavailable || !Number.isFinite(rValue) || rValue === 0 ? "" : rValue > 0 ? "profit-pos" : "profit-neg";
+  const source = trade.origin === "local" ? (trade.partialExitCount > 1 ? `MT4 分批出場 · ${trade.partialExitCount} 段` : "手動新增") : `${trade.source || "匯入"} · 第 ${trade.row} 列`;
+  const row = (label, value) => `<dt>${label}</dt><dd>${value}</dd>`;
   els.detail.innerHTML = `
-    <p class="eyebrow">${trade.origin === "local" ? "Local trade" : `${trade.source} · row ${trade.row}`}</p>
-    <h2>${trade.pair} · ${trade.recordType === "missed_opportunity" ? "漏單" : String(trade.outcome || "-").toUpperCase()}</h2>
-    <div class="detail-stats">
-      <div><span>P/L</span><strong class="${profitClass}">${trade.profit == null ? "—" : money(trade.profit)}</strong></div>
-      <div><span>R</span><strong>${tradeRLabel(trade)}</strong></div>
-      <div><span>Lots</span><strong>${trade.lots ?? "-"}</strong></div>
-      <div><span>SL pips</span><strong>${trade.slPips ?? "-"}</strong></div>
+    <header class="trade-detail-head">
+      <h2 id="tradeDetailTitle">${escapeHtml(trade.pair || "-")}${direction ? `<span class="trade-dir ${direction === "Long" ? "long" : "short"}">${direction === "Long" ? "多" : "空"}</span>` : ""}<span class="trade-detail-outcome ${outcomeTone}">${outcomeLabel}</span></h2>
+      <p>${trade.date || "-"} ${String(trade.time || "").slice(0, 5)} · ${escapeHtml(liveBatchLabel(trade.batchId))} · ${escapeHtml(source)}</p>
+    </header>
+    <div class="trade-detail-kpis">
+      <div><span>損益</span><strong class="${profitClass}">${trade.profit == null ? "—" : money(trade.profit)}</strong></div>
+      <div><span>R</span><strong class="${rClass}">${tradeRLabel(trade)}</strong></div>
+      <div><span>手數</span><strong>${trade.lots ?? "—"}</strong></div>
+      <div><span>止損點數</span><strong>${trade.slPips ?? "—"}</strong></div>
     </div>
-    <dl class="detail-list">
-      <dt>Date</dt><dd>${trade.date || "-"} ${trade.time || ""}</dd>
-      <dt>斷點</dt><dd>${liveBatchLabel(trade.batchId)}</dd>
-      <dt>Year</dt><dd>${trade.year || "-"}</dd>
-      <dt>Direction</dt><dd>${trade.direction || "-"}</dd>
-      <dt>Entry</dt><dd>${trade.entry ?? "-"}</dd>
-      <dt>SL</dt><dd>${trade.stopLoss ?? "-"}</dd>
-      <dt>TP</dt><dd>${trade.takeProfit ?? "-"}</dd>
-      <dt>Exit</dt><dd>${trade.exitPrice ?? "-"}</dd>
-      <dt>Mamba</dt><dd>${mambaDecisionLabel(trade.mambaDecision)} · ${mambaAgreementLabel(trade)}</dd>
-      <dt>Mamba R</dt><dd>${mambaRLabel(trade.mambaR)}</dd>
-      <dt>策略版本</dt><dd>${escapeHtml(strategyVersionLabel(trade.strategyVersionId))}</dd>
-      <dt>復盤分類</dt><dd>${reviewClassLabel(trade.reviewClass)}</dd>
-      ${tradeAnnotationRows(trade)}
-      <dt>紀錄類型</dt><dd>${trade.recordType === "missed_opportunity" ? "符合策略但漏單" : "實際交易"}</dd>
-      <dt>已歸因 R 落差</dt><dd>${tradeAttributionTotal(trade) ? `-${tradeAttributionTotal(trade).toFixed(2)}R` : "尚未歸因"}</dd>
-      <dt>Setup</dt><dd>${trade.setup || trade.checklist || "-"}</dd>
-      <dt>Review</dt><dd>${trade.review || trade.lesson || "尚未填寫賽後檢討。"}</dd>
-      <dt>下次改善</dt><dd>${trade.improvement || "尚未填寫改善行動。"}</dd>
-    </dl>
-    ${mt4Metrics}
+    <div class="trade-detail-grid">
+      <section>
+        <h3>價位</h3>
+        <dl class="trade-detail-list">
+          ${row("方向", direction ? (direction === "Long" ? "做多" : "做空") : "—")}
+          ${row("進場", trade.entry ?? "—")}
+          ${row("止損", trade.stopLoss ?? "—")}
+          ${row("停利", trade.takeProfit ?? "—")}
+          ${row("出場", trade.exitPrice ?? "—")}
+          ${row("Mamba", `${mambaDecisionLabel(trade.mambaDecision)} · ${mambaAgreementLabel(trade)}`)}
+          ${row("Mamba R", mambaRLabel(trade.mambaR))}
+        </dl>
+      </section>
+      <section>
+        <h3>分類與標記</h3>
+        <dl class="trade-detail-list">
+          ${row("Setup", escapeHtml(trade.setup || "—"))}
+          ${row("策略版本", escapeHtml(strategyVersionLabel(trade.strategyVersionId)))}
+          ${row("復盤分類", reviewClassLabel(trade.reviewClass))}
+          ${tradeAnnotationRows(trade)}
+          ${row("已歸因 R 落差", tradeAttributionTotal(trade) ? `-${tradeAttributionTotal(trade).toFixed(2)}R` : "尚未歸因")}
+          ${row("紀錄類型", isMissed ? "符合策略但漏單" : "實際交易")}
+        </dl>
+      </section>
+    </div>
+    <section class="trade-detail-review">
+      <h3>檢討</h3>
+      <p class="${trade.review || trade.lesson ? "" : "is-empty"}">${escapeHtml(trade.review || trade.lesson || "尚未填寫賽後檢討。")}</p>
+      <h3>下次改善</h3>
+      <p class="${trade.improvement ? "" : "is-empty"}">${escapeHtml(trade.improvement || "尚未填寫改善行動。")}</p>
+    </section>
     ${imageBlock}
-    ${isAllLiveView()
-      ? `<div class="drawer-actions"><p class="form-hint">完整紀錄為只讀彙總；請切換到「${liveBatchLabel(trade.batchId)}」後再編輯或刪除。</p></div>`
-      : `<div class="drawer-actions">
-          <button type="button" class="primary-button" data-trade-action="edit">編輯交易</button>
-          <button type="button" class="ghost-button danger-button" data-trade-action="delete">刪除交易</button>
-        </div>`}
+    ${mt4Metrics}
+    <footer class="trade-detail-foot">
+      ${isAllLiveView()
+        ? `<p class="form-hint">完整紀錄為只讀彙總；請切換到「${escapeHtml(liveBatchLabel(trade.batchId))}」後再編輯或刪除。</p>`
+        : `<button type="button" class="ghost-button danger-button" data-trade-action="delete">刪除</button>
+           <button type="button" class="primary-button" data-trade-action="edit">編輯交易</button>`}
+    </footer>
   `;
-  els.drawer.classList.add("open");
-  els.drawer.setAttribute("aria-hidden", "false");
+  updateTradeDetailSteps();
+  if (!els.drawer.open) {
+    els.drawer.showModal();
+    els.detail.focus({ preventScroll: true }); // not the ‹ button: no focus ring on open, arrows still work
+  }
+  els.detail.scrollTop = 0;
+}
+
+// Previous / next follow the trade table's current filter and sort order.
+function tradeDetailSequence() {
+  return sortTradeTable(filteredTrades());
+}
+
+function updateTradeDetailSteps() {
+  const list = tradeDetailSequence();
+  const index = list.findIndex((item) => item.id === currentDetailId);
+  for (const button of els.drawer.querySelectorAll("[data-detail-step]")) {
+    const target = list[index + Number(button.dataset.detailStep)];
+    button.disabled = index < 0 || !target;
+  }
+}
+
+function stepTradeDetail(direction) {
+  const list = tradeDetailSequence();
+  const index = list.findIndex((item) => item.id === currentDetailId);
+  const target = index >= 0 ? list[index + direction] : null;
+  if (target) openTradeDetail(target);
 }
 
 function closeTradeDetail() {
   currentDetailId = null;
-  els.drawer.classList.remove("open");
-  els.drawer.setAttribute("aria-hidden", "true");
+  if (els.drawer.open) els.drawer.close();
 }
 
 function createTradeFromForm(form) {
@@ -4429,6 +4473,17 @@ els.rows.addEventListener("keydown", (event) => {
 });
 
 els.closeDrawer.addEventListener("click", closeTradeDetail);
+els.drawer.addEventListener("close", () => { currentDetailId = null; });
+els.drawer.addEventListener("click", (event) => {
+  if (event.target === els.drawer) closeTradeDetail(); // a click on the backdrop
+  const step = event.target.closest("[data-detail-step]");
+  if (step) stepTradeDetail(Number(step.dataset.detailStep));
+});
+els.drawer.addEventListener("keydown", (event) => {
+  if (event.target.closest("input, textarea, select")) return;
+  if (event.key === "ArrowLeft") stepTradeDetail(-1);
+  if (event.key === "ArrowRight") stepTradeDetail(1);
+});
 els.detail.addEventListener("click", (event) => {
   const previewButton = event.target.closest("[data-preview-image]");
   if (previewButton) {

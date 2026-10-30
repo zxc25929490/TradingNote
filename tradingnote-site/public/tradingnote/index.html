@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="breakpoint-compare.css?v=20261030-3" />
     <link rel="stylesheet" href="mindset.css?v=20261030-2" />
     <link rel="stylesheet" href="trade-log.css?v=20261030-4" />
+    <link rel="stylesheet" href="trade-detail.css?v=20261030-1" />
     <link rel="stylesheet" href="effects.css?v=20261029-7" />
     <link rel="stylesheet" href="../shared/system-transition.css?v=20261029-7" />
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261029-1">
@@ -1018,10 +1019,14 @@
       </form>
     </dialog>
 
-    <aside id="detailDrawer" class="drawer" aria-hidden="true">
-      <button id="closeDrawer" class="icon-button drawer-close" title="關閉">×</button>
-      <div id="detailContent"></div>
-    </aside>
+    <dialog id="detailDrawer" class="trade-detail-dialog" aria-labelledby="tradeDetailTitle">
+      <div class="trade-detail-tools">
+        <button type="button" class="trade-detail-step" data-detail-step="-1" title="上一筆（←）" aria-label="上一筆">‹</button>
+        <button type="button" class="trade-detail-step" data-detail-step="1" title="下一筆（→）" aria-label="下一筆">›</button>
+        <button id="closeDrawer" type="button" class="trade-detail-step" title="關閉（Esc）" aria-label="關閉">×</button>
+      </div>
+      <div id="detailContent" tabindex="-1"></div>
+    </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
@@ -1037,7 +1042,7 @@
     <script src="income-goals.js?v=20260919-1"></script>
     <script src="breakpoint-compare.js?v=20261030-2"></script>
     <script src="mindset.js?v=20261030-2"></script>
-    <script src="app.js?v=20261030-4"></script>
+    <script src="app.js?v=20261030-6"></script>
     <script src="effects.js?v=20261029-1"></script>
     <script src="../shared/sidebar.js?v=20261030-1"></script>
     <script src="responsive.js?v=20261017-1"></script>
