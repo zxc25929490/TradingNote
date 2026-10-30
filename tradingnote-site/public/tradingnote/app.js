@@ -255,6 +255,7 @@ const pageTitles = {
   strategy: "策略版本庫",
   checklist: "交易前檢查表",
   "tp-analysis": "TP 統計分析",
+  "breakpoint-compare": "斷點比較",
   calculator: "風控手數計算",
 };
 
@@ -2905,6 +2906,7 @@ function render() {
   renderStrategyVersions();
   renderHomeComparisons();
   window.renderTpAnalysis?.();
+  if (document.querySelector("#breakpoint-compare.active")) window.renderBreakpointCompare?.();
   els.tradeEmpty.hidden = items.length !== 0;
   document.querySelector(".table-wrap").hidden = items.length === 0;
 }
@@ -2919,6 +2921,7 @@ function setPage(pageName) {
   }
   if (nextPage === "account" || nextPage === "dashboard" || nextPage === "objectives" || nextPage === "analytics" || nextPage === "review" || nextPage === "strategy") render();
   if (nextPage === "tp-analysis") window.requestAnimationFrame(() => window.renderTpAnalysis?.());
+  if (nextPage === "breakpoint-compare") window.renderBreakpointCompare?.();
   if (nextPage === "income-goals") window.renderIncomeGoals?.(tradesForActiveView(), activeLiveBatch, accountRules.initialBalance, liveBatchLabel(activeLiveBatch));
   if (nextPage === "calculator") renderReturnSimulation();
 }

@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="start-here.css?v=20261016-2" />
     <link rel="stylesheet" href="account-overview.css?v=20261029-6" />
     <link rel="stylesheet" href="tp-analysis.css?v=20261029-7" />
+    <link rel="stylesheet" href="breakpoint-compare.css?v=20261030-2" />
     <link rel="stylesheet" href="effects.css?v=20261029-7" />
     <link rel="stylesheet" href="../shared/system-transition.css?v=20261029-7" />
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261029-1">
@@ -46,6 +47,7 @@
         <span class="nav-section-title">每月驗證</span>
         <a href="#advanced-stats" data-page-link="advanced-stats"><span aria-hidden="true">∑</span>進階統計</a>
         <a href="#tp-analysis" data-page-link="tp-analysis"><span aria-hidden="true">⌖</span>TP 統計</a>
+        <a href="#breakpoint-compare" data-page-link="breakpoint-compare"><span aria-hidden="true">⇄</span>斷點比較</a>
         <span class="nav-section-title">目標規劃</span>
         <a href="#income-goals" data-page-link="income-goals"><span aria-hidden="true">◎</span>收入目標</a>
         <a href="#objectives" data-page-link="objectives"><span aria-hidden="true">◉</span>挑戰目標</a>
@@ -663,6 +665,33 @@
         </aside>
       </section>
 
+      <section id="breakpoint-compare" class="page" data-page="breakpoint-compare">
+        <section class="bc-intro">
+          <div>
+            <p class="eyebrow">BREAKPOINT COMPARE</p>
+            <h2>斷點比較</h2>
+            <p>把不同時期或不同版本的斷點放在一起，以 R 比較表現，並判斷差異是真的還是運氣。回測 R 依目前的分批出場設定換算；上方的篩選列不影響這一頁。</p>
+          </div>
+          <div class="bc-settings">
+            <label>比較基準<select id="bcBaseline"></select></label>
+            <label>商品<select id="bcMarket"><option value="all">全部商品</option></select></label>
+          </div>
+        </section>
+        <div id="bcPicker" class="bc-picker" aria-label="選擇要比較的斷點"></div>
+        <div id="bcEmpty" class="empty-state bc-empty" hidden></div>
+        <div id="bcResult" hidden>
+          <ul id="bcVerdicts" class="bc-verdicts"></ul>
+          <article class="panel bc-panel">
+            <div class="panel-heading"><div><h3>累積 R 曲線</h3><p>橫軸是第幾筆交易，讓樣本數不同的斷點也能並排看走勢。</p></div><div id="bcLegend" class="bc-legend"></div></div>
+            <div id="bcChart" class="bc-chart"></div>
+          </article>
+          <article class="panel bc-panel">
+            <div class="panel-heading"><div><h3>指標對照</h3><p>p 值越小，差異越不像運氣；小於 0.05 才算顯著。每邊至少 10 筆有 R 的交易才判斷。</p></div></div>
+            <div class="bc-table-wrap"><table id="bcTable" class="bc-table"></table></div>
+          </article>
+        </div>
+      </section>
+
       <section id="calculator" class="page" data-page="calculator">
         <section class="panel single-panel">
           <div class="panel-heading">
@@ -954,9 +983,10 @@
     <script src="account-overview.js?v=20261029-5"></script>
     <script src="tp-analysis.js?v=20260828-9"></script>
     <script src="income-goals.js?v=20260919-1"></script>
-    <script src="app.js?v=20261029-7"></script>
+    <script src="breakpoint-compare.js?v=20261030-2"></script>
+    <script src="app.js?v=20261030-1"></script>
     <script src="effects.js?v=20261029-1"></script>
-    <script src="../shared/sidebar.js?v=20261029-9"></script>
+    <script src="../shared/sidebar.js?v=20261030-1"></script>
     <script src="responsive.js?v=20261017-1"></script>
     <script src="../shared/cursor-fx.js?v=20261029-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>
