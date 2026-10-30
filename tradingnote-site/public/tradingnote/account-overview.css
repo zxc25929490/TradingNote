@@ -209,7 +209,10 @@ body.dark .acct {
   .acct-day-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* Day detail floating window */
+/* Day detail floating window. It also carries .acct (for the colour tokens), whose display: grid
+   would otherwise keep the closed dialog visible at the bottom of the page. */
+.acct-day-dialog:not([open]) { display: none; }
+.acct-day-dialog[open] { display: block; }
 .acct-day-dialog {
   width: min(920px, calc(100vw - 24px));
   max-height: min(86dvh, 820px);

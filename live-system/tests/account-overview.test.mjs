@@ -74,4 +74,13 @@ for (const system of ["live-system", "research-system", "review-system", "analys
 }
 assert.match(fs.readFileSync(new URL("../effects.css", import.meta.url), "utf8"), /html\.fx-on \{/);
 
+// The day dialog also carries .acct (display: grid); a closed dialog must still be hidden, or it sits
+// at the bottom of the page after the first close.
+{
+  const overviewCss = fs.readFileSync(new URL("../account-overview.css", import.meta.url), "utf8");
+  const themeCss = fs.readFileSync(new URL("../../shared/theme.css", import.meta.url), "utf8");
+  assert.match(overviewCss, /\.acct-day-dialog:not\(\[open\]\) \{ display: none; \}/);
+  assert.match(themeCss, /html\[data-theme\] dialog:not\(\[open\]\) \{ display: none !important; \}/);
+}
+
 console.log("Account overview tests passed");

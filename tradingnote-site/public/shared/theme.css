@@ -328,6 +328,8 @@ html[data-theme] dialog {
   color: var(--tn-ink);
   box-shadow: var(--tn-shadow-lg);
 }
+/* A closed dialog stays hidden even when a class on it sets display (e.g. .acct { display: grid }). */
+html[data-theme] dialog:not([open]) { display: none !important; }
 html[data-theme] dialog::backdrop { background: rgba(8, 12, 18, .55); backdrop-filter: blur(2px); }
 
 /* ---- Controls ---- */
