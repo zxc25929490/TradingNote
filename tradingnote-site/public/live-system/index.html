@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="trade-log.css?v=20261030-4" />
     <link rel="stylesheet" href="trade-detail.css?v=20261030-1" />
     <link rel="stylesheet" href="sample-health.css?v=20261030-1" />
+    <link rel="stylesheet" href="breakpoint-manager.css?v=20261030-4" />
     <link rel="stylesheet" href="effects.css?v=20261029-7" />
     <link rel="stylesheet" href="../shared/system-transition.css?v=20261029-7" />
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261029-1">
@@ -54,6 +55,7 @@
         <a href="#advanced-stats" data-page-link="advanced-stats"><span aria-hidden="true">∑</span>進階統計</a>
         <a href="#tp-analysis" data-page-link="tp-analysis"><span aria-hidden="true">⌖</span>TP 統計</a>
         <a href="#breakpoint-compare" data-page-link="breakpoint-compare"><span aria-hidden="true">⇄</span>斷點比較</a>
+        <a href="#breakpoints" data-page-link="breakpoints"><span aria-hidden="true">⊞</span>斷點管理</a>
         <span class="nav-section-title">目標規劃</span>
         <a href="#income-goals" data-page-link="income-goals"><span aria-hidden="true">◎</span>收入目標</a>
         <a href="#objectives" data-page-link="objectives"><span aria-hidden="true">◉</span>挑戰目標</a>
@@ -84,7 +86,8 @@
                   <span><strong>新增斷點</strong><small>建立空白斷點或複製歷史區間</small></span>
                 </button>
                 <button id="inheritLiveBatchButton" class="menu-action" type="button" role="menuitem"><span class="menu-icon" aria-hidden="true">⎘</span><span><strong>繼承目前斷點</strong><small>複製全部交易，建立後各自獨立</small></span></button>
-                <button id="deleteLiveBatchButton" class="menu-action danger-menu-action" type="button" role="menuitem">
+                <a class="menu-action" href="#breakpoints" role="menuitem"><span class="menu-icon" aria-hidden="true">⊞</span><span><strong>斷點管理頁</strong><small>刪除或搬移特定時段、合併與改名</small></span></a>
+              <button id="deleteLiveBatchButton" class="menu-action danger-menu-action" type="button" role="menuitem">
                   <span class="menu-icon" aria-hidden="true">×</span>
                   <span><strong>刪除目前斷點</strong><small id="deleteLiveBatchHint">會一併移除其中的交易</small></span>
                 </button>
@@ -717,6 +720,56 @@
         </article>
       </section>
 
+      <section id="breakpoints" class="page" data-page="breakpoints">
+        <section class="bpm-intro">
+          <div>
+            <p>一覽所有斷點的期間與績效，並對其中一段交易做細部調整：刪除、移動到其他斷點，或複製一份。每一步都可以在這頁復原。</p>
+          </div>
+          <button id="bpmCreate" type="button" class="primary-button">＋ 新增空白斷點</button>
+        </section>
+        <div id="bpmStatus" class="bpm-status" role="status" hidden></div>
+
+        <article class="panel bpm-panel">
+          <div class="panel-heading"><div><h3>所有斷點</h3><p>時間軸：<span id="bpmTimelineRange"></span></p></div></div>
+          <div class="bpm-table-wrap">
+            <table class="bpm-table">
+              <thead><tr><th>斷點</th><th class="num">筆數</th><th>期間</th><th>時間軸</th><th class="num">總 R</th><th class="num">損益</th><th></th></tr></thead>
+              <tbody id="bpmRows"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel bpm-panel">
+          <div class="panel-heading"><div><h3>區段調整</h3><p>先選條件，確認下方清單（可取消勾選個別交易），再選要做的動作。</p></div></div>
+          <div id="bpmRange" class="bpm-range">
+            <label>來源斷點<select id="bpmSource"></select></label>
+            <label>開始日期<input id="bpmFrom" type="date" /></label>
+            <label>結束日期<input id="bpmTo" type="date" /></label>
+            <label>時段從<input id="bpmTimeFrom" type="time" /></label>
+            <label>時段到<input id="bpmTimeTo" type="time" /></label>
+            <label>商品<select id="bpmPair"><option value="all">全部商品</option></select></label>
+            <label>結果<select id="bpmOutcome"><option value="all">全部</option><option value="win">獲利</option><option value="loss">虧損</option><option value="be">持平</option><option value="missed">漏單</option></select></label>
+            <div id="bpmWeekdays" class="bpm-weekdays" role="group" aria-label="星期"><span class="bpm-weekdays-label">星期</span>
+              <label><input type="checkbox" value="1" checked />一</label><label><input type="checkbox" value="2" checked />二</label><label><input type="checkbox" value="3" checked />三</label><label><input type="checkbox" value="4" checked />四</label><label><input type="checkbox" value="5" checked />五</label><label><input type="checkbox" value="6" checked />六</label><label><input type="checkbox" value="0" checked />日</label>
+            </div>
+            <button id="bpmReset" type="button" class="ghost-button">清除條件</button>
+          </div>
+          <p id="bpmSummary" class="bpm-summary"></p>
+          <div class="bpm-preview">
+            <table class="bpm-table">
+              <thead><tr><th><input id="bpmCheckAll" type="checkbox" aria-label="全選" checked /></th><th>時間</th><th>商品</th><th class="num">R</th><th class="num">損益</th></tr></thead>
+              <tbody id="bpmPreviewRows"></tbody>
+            </table>
+          </div>
+          <div class="bpm-ops">
+            <button type="button" class="ghost-button bpm-danger" data-bpm-op="delete">刪除選取</button>
+            <span class="bpm-ops-target"><label>目的斷點<select id="bpmTarget"></select></label>
+              <button type="button" class="ghost-button" data-bpm-op="copy">複製過去</button>
+              <button type="button" class="primary-button" data-bpm-op="move">移動過去</button></span>
+          </div>
+        </article>
+      </section>
+
       <section id="breakpoint-compare" class="page" data-page="breakpoint-compare">
         <section class="bc-intro">
           <div>
@@ -1045,9 +1098,10 @@
     <script src="breakpoint-compare.js?v=20261030-2"></script>
     <script src="mindset.js?v=20261030-2"></script>
     <script src="sample-health.js?v=20261030-1"></script>
-    <script src="app.js?v=20261030-7"></script>
+    <script src="breakpoint-manager.js?v=20261030-1"></script>
+    <script src="app.js?v=20261030-8"></script>
     <script src="effects.js?v=20261029-1"></script>
-    <script src="../shared/sidebar.js?v=20261030-1"></script>
+    <script src="../shared/sidebar.js?v=20261030-2"></script>
     <script src="responsive.js?v=20261017-1"></script>
     <script src="../shared/cursor-fx.js?v=20261029-1"></script>
   <script src="../shared/system-transition.js?v=20260821-2"></script>

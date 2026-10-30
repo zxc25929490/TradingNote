@@ -82,6 +82,7 @@
     inbox: '<path d="M3 13h5l2 3h4l2-3h5M5.5 5h13L21 13v6H3v-6z"/>',
     edge: '<path d="M12 3 21 12 12 21 3 12z"/>',
     tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
+    sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
     compare: '<rect x="3" y="8" width="6" height="12" rx="1.5"/><rect x="15" y="4" width="6" height="16" rx="1.5"/><path d="M12 3v18"/>',
     dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01M12 12h.01"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -90,7 +91,7 @@
   };
   const NAV_ICONS = {
     帳戶總覽: "grid", 今日待辦: "today", 交易檢查: "check", 風控計算: "calc", 交易紀錄: "list",
-    週月績效: "bars", 深度分析: "chart", 心態與標籤: "tag", 進階統計: "sigma", "TP 統計": "target", 斷點比較: "compare", 收入目標: "flag", 挑戰目標: "trophy",
+    週月績效: "bars", 深度分析: "chart", 心態與標籤: "tag", 進階統計: "sigma", "TP 統計": "target", 斷點比較: "compare", 斷點管理: "sliders", 收入目標: "flag", 挑戰目標: "trophy",
     研究總覽: "grid", 回測紀錄: "list", 決策差異: "diff", "Rule Book": "book", 錯誤資料庫: "alert",
     策略版本: "layers", "TP 模擬器": "target", "回測 vs 實盤": "diff",
     復盤工作台: "inbox", 執行落差: "gap", 復盤結論: "book", 改善追蹤: "loop",

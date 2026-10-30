@@ -257,6 +257,7 @@ const pageTitles = {
   "tp-analysis": "TP 統計分析",
   "breakpoint-compare": "斷點比較",
   mindset: "心態與標籤",
+  breakpoints: "斷點管理",
   calculator: "風控手數計算",
 };
 
@@ -3007,6 +3008,7 @@ function render() {
   window.renderTpAnalysis?.();
   if (document.querySelector("#breakpoint-compare.active")) window.renderBreakpointCompare?.();
   if (document.querySelector("#mindset.active")) window.renderMindset?.(items);
+  if (document.querySelector("#breakpoints.active")) window.renderBreakpointManager?.();
   els.tradeEmpty.hidden = items.length !== 0;
   document.querySelector(".table-wrap").hidden = items.length === 0;
 }
@@ -3023,6 +3025,7 @@ function setPage(pageName) {
   if (nextPage === "tp-analysis") window.requestAnimationFrame(() => window.renderTpAnalysis?.());
   if (nextPage === "breakpoint-compare") window.renderBreakpointCompare?.();
   if (nextPage === "mindset") window.renderMindset?.(filteredTrades());
+  if (nextPage === "breakpoints") { closeActionMenus(); window.renderBreakpointManager?.(); }
   if (nextPage === "income-goals") window.renderIncomeGoals?.(tradesForActiveView(), activeLiveBatch, accountRules.initialBalance, liveBatchLabel(activeLiveBatch));
   if (nextPage === "calculator") renderReturnSimulation();
 }
