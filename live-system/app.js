@@ -2272,47 +2272,72 @@ function tradeReviewText(trade) {
   return trade.improvement ? `${review} · 下次行動：${trade.improvement}` : review;
 }
 
+let tradeRowLimit = 100;
+
+function tradeDirection(trade) {
+  if (trade.direction) return trade.direction;
+  if (Number.isFinite(Number(trade.entry)) && Number.isFinite(Number(trade.stopLoss)) && trade.entry !== trade.stopLoss) {
+    return Number(trade.entry) > Number(trade.stopLoss) ? "Long" : "Short";
+  }
+  return "";
+}
+
+function tradeExitLabel(trade) {
+  if (trade.exitPrice != null && trade.exitPrice !== "") return trade.exitPrice;
+  const recorded = String(trade.takeProfit ?? "").split(/[、,;/]/)[0]?.trim();
+  return recorded && recorded !== "-" ? recorded : "—";
+}
+
 function renderRows(items) {
-  const labels = ["日期", "編號", "商品", "結果", "損益", "R 倍數", "手數", "止損點數", "Entry", "SL", "TP", "Mamba", "Mamba R", "策略", "來源"];
-  const outcomeLabels = { win: "獲利", loss: "虧損", be: "損益兩平" };
+  const labels = ["時間", "商品", "手數", "進場", "止損", "出場", "R", "損益", "策略／標籤"];
   if (els.toggleReviews) {
-    els.toggleReviews.textContent = reviewsExpanded ? "收合 Review" : "展開 Review";
+    els.toggleReviews.textContent = reviewsExpanded ? "隱藏 Review" : "顯示 Review";
     els.toggleReviews.setAttribute("aria-pressed", String(reviewsExpanded));
   }
   updateTradeSortHeaders();
-  els.rows.innerHTML = sortTradeTable(items)
-    .slice(0, 100)
+  const sorted = sortTradeTable(items);
+  const shown = sorted.slice(0, tradeRowLimit);
+  const mindset = window.TradingNoteMindset;
+  els.rows.innerHTML = shown
     .map((trade) => {
       const isMissed = trade.recordType === "missed_opportunity" || trade.reviewClass === "missed_trade";
-      const profitClass = trade.profit == null ? "" : trade.profit >= 0 ? "profit-pos" : "profit-neg";
+      const profitClass = trade.profit == null ? "" : trade.profit > 0 ? "profit-pos" : trade.profit < 0 ? "profit-neg" : "";
+      const rValue = Number(trade.r);
+      const rClass = trade.riskUnavailable || !Number.isFinite(rValue) || rValue === 0 ? "" : rValue > 0 ? "profit-pos" : "profit-neg";
+      const direction = tradeDirection(trade);
+      const note = mindset?.annotationOf?.(trade);
+      const strategy = trade.setup || "";
+      const version = trade.strategyVersionId ? strategyVersionLabel(trade.strategyVersionId) : "";
+      const tags = [
+        note?.grade ? `<span class="trade-grade grade-${note.grade}">${note.grade}</span>` : "",
+        ...(note?.tags || []).slice(0, 2).map((tag) => `<span class="trade-tag">${escapeHtml(tag)}</span>`),
+      ].join("");
       const mainRow = `
-        <tr data-id="${trade.id}" tabindex="0">
-          <td data-label="${labels[0]}"><strong>${trade.date || "-"}</strong><small>${trade.time || ""}</small></td>
-          <td data-label="${labels[1]}">${trade.id}</td>
-          <td data-label="${labels[2]}"><strong>${trade.pair}</strong></td>
-          <td data-label="${labels[3]}"><span class="pill ${isMissed ? "be" : trade.outcome}">${isMissed ? "漏單" : outcomeLabels[trade.outcome] || String(trade.outcome || "-").toUpperCase()}</span></td>
-          <td data-label="${labels[4]}" class="${profitClass}">${trade.profit == null ? "—" : money(trade.profit)}</td>
-          <td data-label="${labels[5]}">${tradeRLabel(trade)}</td>
-          <td data-label="${labels[6]}">${trade.lots ?? "-"}</td>
-          <td data-label="${labels[7]}">${trade.slPips ?? "-"}</td>
-          <td data-label="${labels[8]}">${trade.entry ?? "-"}</td>
-          <td data-label="${labels[9]}">${trade.stopLoss ?? "-"}</td>
-          <td data-label="${labels[10]}">${trade.takeProfit ?? "-"}</td>
-          <td data-label="${labels[11]}"><span class="mamba-chip">${mambaDecisionLabel(trade.mambaDecision)}</span><small>${mambaAgreementLabel(trade)}</small></td>
-          <td data-label="${labels[12]}" class="${mambaRClass(trade.mambaR)}">${mambaRLabel(trade.mambaR)}</td>
-          <td data-label="${labels[13]}">${trade.setup || trade.checklist || "-"}<small>${escapeHtml(strategyVersionLabel(trade.strategyVersionId))}</small></td>
-          <td data-label="${labels[14]}">${trade.origin === "local" ? (trade.partialExitCount > 1 ? `MT4 分批出場 · ${trade.partialExitCount} 段` : "手動新增") : `第 ${trade.row} 列`}</td>
+        <tr data-id="${trade.id}" tabindex="0" class="${isMissed ? "is-missed" : ""}">
+          <td data-label="${labels[0]}">${trade.date || "-"} <span class="trade-time">${String(trade.time || "").slice(0, 5)}</span></td>
+          <td data-label="${labels[1]}"><span class="trade-symbol">${escapeHtml(trade.pair || "-")}</span>${direction ? `<span class="trade-dir ${direction === "Long" ? "long" : "short"}">${direction === "Long" ? "多" : "空"}</span>` : ""}</td>
+          <td data-label="${labels[2]}" class="num">${trade.lots ?? "—"}</td>
+          <td data-label="${labels[3]}" class="num">${trade.entry ?? "—"}</td>
+          <td data-label="${labels[4]}" class="num"${trade.slPips != null ? ` title="止損 ${trade.slPips} 點"` : ""}>${trade.stopLoss ?? "—"}</td>
+          <td data-label="${labels[5]}" class="num">${tradeExitLabel(trade)}</td>
+          <td data-label="${labels[6]}" class="num ${rClass}">${isMissed ? "—" : tradeRLabel(trade)}</td>
+          <td data-label="${labels[7]}" class="num trade-pl ${profitClass}">${isMissed ? '<span class="trade-missed">漏單</span>' : trade.profit == null ? "—" : money(trade.profit)}</td>
+          <td data-label="${labels[8]}"><span class="trade-strategy">${escapeHtml(strategy || version || "—")}</span>${tags ? `<span class="trade-tags">${tags}</span>` : ""}</td>
         </tr>`;
       if (!reviewsExpanded) return mainRow;
       return `${mainRow}
         <tr class="review-row">
-          <td colspan="15">
+          <td colspan="${labels.length}">
             <span>Review</span>
             <p><b>${reviewClassLabel(trade.reviewClass)}</b> · ${tradeReviewText(trade)}${tradeAttributionTotal(trade) ? ` · 已歸因 -${tradeAttributionTotal(trade).toFixed(2)}R` : ""}</p>
           </td>
         </tr>`;
     })
     .join("");
+  const count = document.querySelector("#tradeLogCount");
+  const more = document.querySelector("#tradeLogMore");
+  if (count) count.textContent = sorted.length ? `顯示 ${shown.length} / ${sorted.length} 筆` : "";
+  if (more) more.hidden = shown.length >= sorted.length;
 }
 
 function renderChecklist() {
@@ -4371,6 +4396,17 @@ els.weeklyBreakdown.addEventListener("keydown", (event) => {
 els.toggleReviews?.addEventListener("click", () => {
   reviewsExpanded = !reviewsExpanded;
   renderRows(filteredTrades());
+});
+
+document.querySelector("#tradeLogMore")?.addEventListener("click", () => {
+  tradeRowLimit += 100;
+  renderRows(filteredTrades());
+});
+
+// The data menu closes after picking an action or clicking elsewhere.
+document.addEventListener("click", (event) => {
+  const menu = document.querySelector(".trade-menu[open]");
+  if (menu && (!menu.contains(event.target) || event.target.closest(".trade-menu-item"))) menu.open = false;
 });
 
 window.TradingNoteOpenTrade = (id) => {

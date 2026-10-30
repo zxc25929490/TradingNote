@@ -19,11 +19,12 @@
     <link rel="stylesheet" href="tp-analysis.css?v=20261029-7" />
     <link rel="stylesheet" href="breakpoint-compare.css?v=20261030-3" />
     <link rel="stylesheet" href="mindset.css?v=20261030-2" />
+    <link rel="stylesheet" href="trade-log.css?v=20261030-4" />
     <link rel="stylesheet" href="effects.css?v=20261029-7" />
     <link rel="stylesheet" href="../shared/system-transition.css?v=20261029-7" />
   <link rel="stylesheet" href="../shared/cursor-fx.css?v=20261029-1">
   <link rel="stylesheet" href="../shared/sidebar.css?v=20261029-9">
-  <link rel="stylesheet" href="responsive.css?v=20261029-7">
+  <link rel="stylesheet" href="responsive.css?v=20261030-2">
   <link rel="stylesheet" href="../shared/theme.css?v=20261029-9">
   </head>
   <body>
@@ -527,19 +528,21 @@
       </section>
 
       <section id="trades" class="page" data-page="trades">
-        <section class="panel">
-          <div class="panel-heading">
-            <div>
-              <h2>交易紀錄</h2>
-              <p>點擊任一筆交易可以看完整細節與賽後筆記。</p>
-            </div>
+        <section class="panel trade-log">
+          <div class="trade-log-head">
+            <p id="tradeLogSummary">點任一筆交易看完整細節與賽後筆記。</p>
             <div class="trade-tools">
               <input id="searchInput" type="search" placeholder="搜尋商品、策略或筆記" aria-label="搜尋交易" />
-              <label class="file-button" for="importFileInput">合併匯入</label>
+              <button id="toggleReviewsButton" class="ghost-button" type="button" aria-pressed="false">顯示 Review</button>
+              <details class="trade-menu">
+                <summary class="ghost-button">管理資料</summary>
+                <div class="trade-menu-list">
+                  <label class="trade-menu-item" for="importFileInput"><b>合併匯入</b><small>Excel、CSV、JSON，自動略過重複交易</small></label>
+                  <button id="moveTradesButton" class="trade-menu-item" type="button"><b>移動交易</b><small>把交易搬到另一個斷點</small></button>
+                  <label class="trade-menu-item danger" for="replaceFileInput" title="備份後，以新 Excel／CSV 完整取代目前資料"><b>取代來源</b><small>先下載備份，再以新檔案取代目前斷點</small></label>
+                </div>
+              </details>
               <input id="importFileInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv,.json" />
-              <button id="moveTradesButton" class="ghost-button" type="button">移動交易</button>
-              <button id="toggleReviewsButton" class="ghost-button" type="button" aria-pressed="false">展開 Review</button>
-              <label class="file-button danger-button" for="replaceFileInput" title="備份後，以新 Excel／CSV 完整取代目前資料">取代來源</label>
               <input id="replaceFileInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv" />
             </div>
           </div>
@@ -548,29 +551,24 @@
             <span>請重設篩選，或匯入 Excel、CSV、JSON 資料。</span>
           </div>
           <div class="table-wrap">
-            <table>
+            <table class="trade-log-table">
               <thead>
                 <tr>
-                  <th><button class="table-sort active" type="button" data-trade-sort="date" data-direction="desc">日期</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="id">#</button></th>
+                  <th><button class="table-sort active" type="button" data-trade-sort="date" data-direction="desc">時間</button></th>
                   <th><button class="table-sort" type="button" data-trade-sort="pair">商品</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="outcome">結果</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="profit">損益</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="r">R 倍數</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="lots">手數</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="slPips">止損點數</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="entry">Entry</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="stopLoss">SL</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="takeProfit">TP</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="mambaDecision">Mamba</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="mambaR">Mamba R</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="setup">策略</button></th>
-                  <th><button class="table-sort" type="button" data-trade-sort="source">來源</button></th>
+                  <th class="num"><button class="table-sort" type="button" data-trade-sort="lots">手數</button></th>
+                  <th class="num"><button class="table-sort" type="button" data-trade-sort="entry">進場</button></th>
+                  <th class="num"><button class="table-sort" type="button" data-trade-sort="stopLoss">止損</button></th>
+                  <th class="num"><button class="table-sort" type="button" data-trade-sort="exitPrice">出場</button></th>
+                  <th class="num"><button class="table-sort" type="button" data-trade-sort="r">R</button></th>
+                  <th class="num"><button class="table-sort" type="button" data-trade-sort="profit">損益</button></th>
+                  <th><button class="table-sort" type="button" data-trade-sort="setup">策略／標籤</button></th>
                 </tr>
               </thead>
               <tbody id="tradeRows"></tbody>
             </table>
           </div>
+          <div class="trade-log-foot"><span id="tradeLogCount"></span><button id="tradeLogMore" class="ghost-button" type="button" hidden>再顯示 100 筆</button></div>
         </section>
       </section>
 
@@ -1038,7 +1036,7 @@
     <script src="income-goals.js?v=20260919-1"></script>
     <script src="breakpoint-compare.js?v=20261030-2"></script>
     <script src="mindset.js?v=20261030-2"></script>
-    <script src="app.js?v=20261030-2"></script>
+    <script src="app.js?v=20261030-4"></script>
     <script src="effects.js?v=20261029-1"></script>
     <script src="../shared/sidebar.js?v=20261030-1"></script>
     <script src="responsive.js?v=20261017-1"></script>
