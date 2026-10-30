@@ -1488,6 +1488,20 @@ function renderAccountOverview(items) {
   const container = document.querySelector("#accountOverview");
   if (!container || !window.TradingNoteAccountOverview) return;
   window.TradingNoteAccountOverview.render(container, buildAccountOverview(items));
+  renderSampleHealth();
+}
+
+// Sample sufficiency uses the whole breakpoint, not the filter bar: it asks whether the evidence is enough.
+function renderSampleHealth() {
+  const container = document.querySelector("#sampleHealth");
+  if (!container || !window.TradingNoteSampleHealth) return;
+  const research = readResearchBreakpoints();
+  const batch = research.batches.find((item) => String(item.id) === String(research.activeBatch)) || research.batches[0];
+  window.TradingNoteSampleHealth.render(container, {
+    live: sortByDate(tradesForActiveView().filter((trade) => trade.recordType !== "missed_opportunity")),
+    backtest: batch?.trades || [],
+    backtestName: batch?.name || "",
+  });
 }
 
 function renderObjectives(items) {

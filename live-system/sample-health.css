@@ -1,0 +1,26 @@
+/* Sample health card under the account overview (sample-health.js). Uses the overview's .acct tokens. */
+#sampleHealth:empty { display: none; }
+#sampleHealth { margin-top: 16px; }
+.sample-health .sh-rows { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.sh-row { --sh-tone: var(--acct-muted); display: grid; align-content: start; gap: 10px; padding: 4px 20px 4px 0; }
+.sh-row + .sh-row { padding-left: 20px; border-left: 1px solid var(--acct-grid); }
+.sh-row[data-tone="good"] { --sh-tone: var(--acct-pos); }
+.sh-row[data-tone="bad"] { --sh-tone: var(--acct-neg); }
+.sh-row[data-tone="warn"] { --sh-tone: #d4a017; }
+.sh-head b { display: block; font-size: .92rem; }
+.sh-head span { display: block; margin-top: 2px; color: var(--acct-muted); font-size: .76rem; line-height: 1.5; }
+.sh-bar { height: 6px; border-radius: 999px; background: var(--acct-grid); overflow: hidden; }
+.sh-bar i { display: block; height: 100%; border-radius: inherit; background: var(--sh-tone); }
+.sh-row[data-tone="muted"] .sh-bar i { background: var(--acct-accent); }
+.sh-foot { display: grid; gap: 4px; font-size: .82rem; }
+.sh-foot strong { font-variant-numeric: tabular-nums; }
+.sh-foot span { color: var(--acct-muted); line-height: 1.6; }
+.sh-row[data-tone="good"] .sh-foot span,
+.sh-row[data-tone="bad"] .sh-foot span { color: var(--sh-tone); }
+.sh-foot .acct-link { justify-self: start; margin-top: 2px; }
+
+@media (max-width: 980px) {
+  .sample-health .sh-rows { grid-template-columns: 1fr; }
+  .sh-row { padding: 14px 0; }
+  .sh-row + .sh-row { padding-left: 0; border-left: 0; border-top: 1px solid var(--acct-grid); }
+}
