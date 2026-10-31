@@ -98,7 +98,9 @@
   // ---------------------------------------------------------------- page
   if (typeof document === "undefined") return;
   const $ = (selector) => document.querySelector(selector);
-  const SERIES = ["--tn-accent", "--tn-warn", "--tn-violet", "--tn-info", "--tn-muted"];
+  // Eight distinct line colours (theme tokens first); profit green / loss red stay reserved for P/L.
+  const SERIES = ["var(--tn-accent)", "var(--tn-warn)", "var(--tn-violet)", "var(--tn-info)", "#ec4899", "#14b8a6", "#a3a35c", "var(--tn-muted)"];
+  const seriesColor = (index) => SERIES[index % SERIES.length];
   const fmtR = (value, digits = 2) => (finite(value) ? `${value > 0 ? "+" : ""}${Number(value).toFixed(digits)}R` : "—");
   const fmtMoney = (value) => (finite(value) ? `${value < 0 ? "-" : value > 0 ? "+" : ""}$${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : "—");
   const fmtPct = (value) => (finite(value) ? `${Number(value).toFixed(1)}%` : "—");
@@ -136,7 +138,8 @@
     const live = groups.filter((group) => group.kind === "live" && group.trades.length);
     const backtest = groups.filter((group) => group.kind === "backtest" && group.trades.length);
     const active = typeof readResearchBreakpoints === "function" ? `bt:${readResearchBreakpoints().activeBatch}` : "";
-    const picked = [...live.slice(0, 3), ...(backtest.find((group) => group.id === active) ? [backtest.find((group) => group.id === active)] : backtest.slice(0, 1))];
+    // Every live breakpoint with trades, plus the active backtest breakpoint.
+    const picked = [...live, ...(backtest.find((group) => group.id === active) ? [backtest.find((group) => group.id === active)] : backtest.slice(0, 1))];
     return picked.map((group) => group.id);
   }
 
@@ -179,7 +182,7 @@
 
   function renderTable(result) {
     const cols = result.rows;
-    const head = `<tr><th>指標</th>${cols.map((row, index) => `<th><span class="bc-swatch" style="background:var(${SERIES[index % SERIES.length]})"></span>${esc(row.label)}<small>${row.kind === "live" ? "實盤" : "回測"}${row === result.baseline ? " · 基準" : ""}</small></th>`).join("")}</tr>`;
+    const head = `<tr><th>指標</th>${cols.map((row, index) => `<th><span class="bc-swatch" style="background:${seriesColor(index)}"></span>${esc(row.label)}<small>${row.kind === "live" ? "實盤" : "回測"}${row === result.baseline ? " · 基準" : ""}</small></th>`).join("")}</tr>`;
     const line = (label, cell, hint = "") => `<tr><th scope="row">${label}${hint ? `<small>${hint}</small>` : ""}</th>${cols.map((row) => `<td>${cell(row)}</td>`).join("")}</tr>`;
     const delta = (row) => {
       if (!row.vsBaseline) return '<span class="bc-dim">基準</span>';
@@ -223,7 +226,7 @@
     const lines = result.rows.map((row, index) => {
       if (!row.n) return "";
       const points = row.curve.map((value, step) => `${x(step).toFixed(1)},${y(value).toFixed(1)}`).join(" ");
-      return `<polyline points="${points}" fill="none" stroke="var(${SERIES[index % SERIES.length]})" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>${esc(row.label)}：${fmtR(row.total)}</title></polyline>`;
+      return `<polyline points="${points}" fill="none" stroke="${seriesColor(index)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>${esc(row.label)}：${fmtR(row.total)}</title></polyline>`;
     }).join("");
     const xAxis = `<text x="${pad.left}" y="${height - 6}" class="bc-axis">第 1 筆</text><text x="${width - pad.right}" y="${height - 6}" class="bc-axis" text-anchor="end">第 ${maxN} 筆</text>`;
     target.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="各斷點累積 R">${grid}${zero}${lines}${xAxis}</svg>`;
@@ -234,8 +237,16 @@
     const groups = availableGroups();
     const stored = readState();
     const ids = new Set(groups.map((group) => group.id));
+    // Breakpoints created after the selection was saved join it automatically (unticking still sticks).
+    const known = new Set(Array.isArray(stored.known) ? stored.known : []);
+    const added = groups.filter((group) => group.trades.length && !known.has(group.id)).map((group) => group.id);
+    // A selection saved before this list existed (only 3 live breakpoints) gets every breakpoint once.
+    const savedSelection = !Array.isArray(stored.selected) ? chooseDefaults(groups)
+      : Array.isArray(stored.known) ? [...stored.selected, ...added]
+        : [...stored.selected, ...chooseDefaults(groups)];
+    if (!Array.isArray(stored.known) || added.length) saveState({ ...stored, selected: savedSelection, known: [...ids] });
     const state = {
-      selected: (Array.isArray(stored.selected) ? stored.selected : chooseDefaults(groups)).filter((id) => ids.has(id)),
+      selected: [...new Set(savedSelection)].filter((id) => ids.has(id)),
       baseline: stored.baseline,
       market: stored.market || "all",
     };
@@ -258,7 +269,7 @@
     renderVerdicts(result);
     renderTable(result);
     renderCurves(result);
-    $("#bcLegend").innerHTML = result.rows.map((row, index) => `<span><i style="background:var(${SERIES[index % SERIES.length]})"></i>${esc(row.label)}</span>`).join("");
+    $("#bcLegend").innerHTML = result.rows.map((row, index) => `<span><i style="background:${seriesColor(index)}"></i>${esc(row.label)}</span>`).join("");
   }
 
   function bind() {

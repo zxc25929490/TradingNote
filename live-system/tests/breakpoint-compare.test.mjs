@@ -67,4 +67,9 @@ assert.ok(html.indexOf("breakpoint-compare.js") < html.indexOf('src="app.js'), "
 assert.match(app, /"breakpoint-compare": "斷點比較"/);
 assert.match(app, /nextPage === "breakpoint-compare"\) window\.renderBreakpointCompare/);
 
+// Every breakpoint is compared by default, and breakpoints created later join the saved selection.
+assert.doesNotMatch(source, /live\.slice\(0, 3\)/, "no longer limited to the first three live breakpoints");
+assert.match(source, /stored\.known/, "remembers which breakpoints existed when the selection was saved");
+assert.match(source, /const SERIES = \[[^\]]*(?:,[^\]]*){7}\]/, "eight line colours");
+
 console.log("Breakpoint compare tests passed");
